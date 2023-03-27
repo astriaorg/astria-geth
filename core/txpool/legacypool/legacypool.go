@@ -100,6 +100,11 @@ var (
 	slotsGauge   = metrics.NewRegisteredGauge("txpool/slots", nil)
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
+
+	// Metrics related to the astria ordered txs
+	astriaValidMeter             = metrics.GetOrRegisterMeter("astria/txpool/valid", nil)
+	astriaExcludedFromBlockMeter = metrics.GetOrRegisterMeter("astria/txpool/excludedFromBlock", nil)
+	astriaRequestedMeter         = metrics.GetOrRegisterMeter("astria/txpool/requested", nil)
 )
 
 // BlockChain defines the minimal set of methods needed to back a tx pool with
@@ -207,6 +212,8 @@ type LegacyPool struct {
 	signer      types.Signer
 	mu          sync.RWMutex
 
+	astria *astriaOrdered
+
 	currentHead   atomic.Pointer[types.Header] // Current head of the blockchain
 	currentState  *state.StateDB               // Current state in the blockchain head
 	pendingNonces *noncer                      // Pending state tracking virtual nonces
@@ -270,6 +277,86 @@ func New(config Config, chain BlockChain) *LegacyPool {
 		pool.journal = newTxJournal(config.Journal)
 	}
 	return pool
+}
+
+type astriaOrdered struct {
+	valid             types.Transactions
+	excludedFromBlock types.Transactions
+	pool              *LegacyPool
+}
+
+func newAstriaOrdered(valid types.Transactions, pool *LegacyPool) *astriaOrdered {
+	astriaValidMeter.Mark(int64(len(valid)))
+
+	return &astriaOrdered{
+		valid:             valid,
+		excludedFromBlock: types.Transactions{},
+		pool:              pool,
+	}
+}
+
+func (ao *astriaOrdered) clear() {
+	ao.valid = types.Transactions{}
+	ao.excludedFromBlock = types.Transactions{}
+}
+
+func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
+	astriaRequestedMeter.Mark(int64(len(txs)))
+
+	valid := []*types.Transaction{}
+	for idx, tx := range txs {
+		err := pool.validateTxBasics(tx, false)
+		if err != nil {
+			log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
+			continue
+		}
+
+		valid = append(valid, tx)
+	}
+
+	pool.astria = newAstriaOrdered(valid, pool)
+}
+
+func (pool *LegacyPool) AddToAstriaExcludedFromBlock(tx *types.Transaction) {
+	if pool.astria.excludedFromBlock == nil {
+		pool.astria.excludedFromBlock = types.Transactions{tx}
+		return
+	}
+
+	pool.astria.excludedFromBlock = append(pool.astria.excludedFromBlock, tx)
+}
+
+func (pool *LegacyPool) AstriaExcludedFromBlock() *types.Transactions {
+	if pool.astria == nil {
+		return &types.Transactions{}
+	}
+	return &pool.astria.excludedFromBlock
+}
+
+func (pool *LegacyPool) ClearAstriaOrdered() {
+	if pool.astria == nil {
+		return
+	}
+
+	astriaExcludedFromBlockMeter.Mark(int64(len(pool.astria.excludedFromBlock)))
+	for _, tx := range pool.astria.excludedFromBlock {
+		n := pool.removeTx(tx.Hash(), false, true)
+		if n == 0 {
+			log.Trace("astria tx excluded from block not found in mempool", "hash", tx.Hash())
+		} else {
+			log.Trace("astria tx excluded from block removed from mempool", "hash", tx.Hash())
+		}
+	}
+
+	pool.astria.clear()
+}
+
+func (pool *LegacyPool) AstriaOrdered() *types.Transactions {
+	// sus but whatever
+	if pool.astria == nil {
+		return &types.Transactions{}
+	}
+	return &pool.astria.valid
 }
 
 // Filter returns whether the given transaction can be consumed by the legacy
@@ -592,7 +679,8 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) erro
 		Accept: 0 |
 			1<<types.LegacyTxType |
 			1<<types.AccessListTxType |
-			1<<types.DynamicFeeTxType,
+			1<<types.DynamicFeeTxType |
+			1<<types.DepositTxType,
 		MaxSize: txMaxSize,
 		MinTip:  pool.gasTip.Load(),
 	}

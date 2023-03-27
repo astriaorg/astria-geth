@@ -233,6 +233,24 @@ func WriteFinalizedBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
 	}
 }
 
+// ReadFinalizedCelestiaBlockHeight retrieves the height of the finalized block.
+func ReadBaseCelestiaHeight(db ethdb.KeyValueReader) uint64 {
+	data, _ := db.Get(headBaseCelestiaHeightKey)
+	if len(data) != 8 {
+		return 0
+	}
+	number := binary.BigEndian.Uint64(data)
+	return number
+}
+
+// WriteFinalizedCelestiaBlockHeight stores the height of the finalized block.
+func WriteBaseCelestiaHeight(db ethdb.KeyValueWriter, height uint64) {
+	byteHeight := encodeBlockNumber(height)
+	if err := db.Put(headBaseCelestiaHeightKey, byteHeight); err != nil {
+		log.Crit("Failed to store base celestia height", "err", err)
+	}
+}
+
 // ReadLastPivotNumber retrieves the number of the last pivot block. If the node
 // full synced, the last pivot will always be nil.
 func ReadLastPivotNumber(db ethdb.KeyValueReader) *uint64 {
