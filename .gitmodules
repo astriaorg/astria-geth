@@ -6,3 +6,6 @@
 	path = tests/evm-benchmarks
 	url = https://github.com/ipsilon/evm-benchmarks
 	shallow = true
+[submodule "contracts/astria-bridge-contracts"]
+	path = contracts/astria-bridge-contracts
+	url = https://github.com/astriaorg/astria-bridge-contracts.git
