@@ -55,6 +55,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb/remotedb"
 	"github.com/ethereum/go-ethereum/ethstats"
 	"github.com/ethereum/go-ethereum/graphql"
+	executionv1a1 "github.com/ethereum/go-ethereum/grpc/gen/astria/execution/v1alpha1"
+	executionv1a2 "github.com/ethereum/go-ethereum/grpc/gen/astria/execution/v1alpha2"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/ethereum/go-ethereum/les"
@@ -733,6 +735,24 @@ var (
 		Usage:    "Enables the (deprecated) personal namespace",
 		Category: flags.APICategory,
 	}
+	// grpc
+	GRPCEnabledFlag = &cli.BoolFlag{
+		Name:     "grpc",
+		Usage:    "Enable the gRPC server",
+		Category: flags.APICategory,
+	}
+	GRPCHostFlag = &cli.StringFlag{
+		Name:     "grpc.addr",
+		Usage:    "gRPC server listening interface",
+		Value:    node.DefaultGRPCHost,
+		Category: flags.APICategory,
+	}
+	GRPCPortFlag = &cli.IntFlag{
+		Name:     "grpc.port",
+		Usage:    "gRPC server listening port",
+		Value:    node.DefaultGRPCPort,
+		Category: flags.APICategory,
+	}
 
 	// Network Settings
 	MaxPeersFlag = &cli.IntFlag{
@@ -1175,6 +1195,19 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 	}
 }
 
+// setGRPC creates the gRPC RPC listener interface string from the set command
+// line flags, returning empty if the gRPC endpoint is disabled.
+func setGRPC(ctx *cli.Context, cfg *node.Config) {
+	if ctx.Bool(GRPCEnabledFlag.Name) {
+		if ctx.IsSet(GRPCHostFlag.Name) {
+			cfg.GRPCHost = ctx.String(GRPCHostFlag.Name)
+		}
+		if ctx.IsSet(GRPCPortFlag.Name) {
+			cfg.GRPCPort = ctx.Int(GRPCPortFlag.Name)
+		}
+	}
+}
+
 // setGraphQL creates the GraphQL listener interface string from the set
 // command line flags, returning empty if the GraphQL endpoint is disabled.
 func setGraphQL(ctx *cli.Context, cfg *node.Config) {
@@ -1415,6 +1448,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	SetP2PConfig(ctx, &cfg.P2P)
 	setIPC(ctx, cfg)
 	setHTTP(ctx, cfg)
+	setGRPC(ctx, cfg)
 	setGraphQL(ctx, cfg)
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
@@ -1945,6 +1979,14 @@ func RegisterGraphQLService(stack *node.Node, backend ethapi.Backend, filterSyst
 	err := graphql.New(stack, backend, filterSystem, cfg.GraphQLCors, cfg.GraphQLVirtualHosts)
 	if err != nil {
 		Fatalf("Failed to register the GraphQL service: %v", err)
+	}
+}
+
+// RegisterGRPCExecutionService adds the gRPC API to the node.
+// It was done this way so that our grpc execution server can access the ethapi.Backend
+func RegisterGRPCExecutionService(stack *node.Node, execServerV1a1 executionv1a1.ExecutionServiceServer, execServerV1a2 executionv1a2.ExecutionServiceServer, cfg *node.Config) {
+	if err := node.NewGRPCServerHandler(stack, execServerV1a1, execServerV1a2, cfg); err != nil {
+		Fatalf("Failed to register the gRPC service: %v", err)
 	}
 }
 

@@ -176,6 +176,9 @@ var (
 		utils.AllowUnprotectedTxs,
 		utils.BatchRequestLimit,
 		utils.BatchResponseMaxSize,
+		utils.GRPCEnabledFlag,
+		utils.GRPCHostFlag,
+		utils.GRPCPortFlag,
 	}
 
 	metricsFlags = []cli.Flag{
