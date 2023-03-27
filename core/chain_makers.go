@@ -231,7 +231,7 @@ func (b *BlockGen) AddUncle(h *types.Header) {
 	if b.cm.config.IsLondon(h.Number) {
 		h.BaseFee = eip1559.CalcBaseFee(b.cm.config, parent)
 		if !b.cm.config.IsLondon(parent.Number) {
-			parentGasLimit := parent.GasLimit * b.cm.config.ElasticityMultiplier()
+			parentGasLimit := parent.GasLimit * b.cm.config.ElasticityMultiplier(parent.Number.Uint64())
 			h.GasLimit = CalcGasLimit(parentGasLimit, parentGasLimit)
 		}
 	}
@@ -314,7 +314,6 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	genblock := func(i int, parent *types.Block, triedb *trie.Database, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		b := &BlockGen{i: i, cm: cm, parent: parent, statedb: statedb, engine: engine}
 		b.header = cm.makeHeader(parent, statedb, b.engine)
-
 		// Set the difficulty for clique block. The chain maker doesn't have access
 		// to a chain, so the difficulty will be left unset (nil). Set it here to the
 		// correct value.
@@ -339,6 +338,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
 			misc.ApplyDAOHardFork(statedb)
 		}
+
 		// Execute any user modifications to the block
 		if gen != nil {
 			gen(i, b)
@@ -431,7 +431,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 	if cm.config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(cm.config, parent.Header())
 		if !cm.config.IsLondon(parent.Number()) {
-			parentGasLimit := parent.GasLimit() * cm.config.ElasticityMultiplier()
+			parentGasLimit := parent.GasLimit() * cm.config.ElasticityMultiplier(parent.Number().Uint64())
 			header.GasLimit = CalcGasLimit(parentGasLimit, parentGasLimit)
 		}
 	}
@@ -449,6 +449,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 		header.BlobGasUsed = new(uint64)
 		header.ParentBeaconRoot = new(common.Hash)
 	}
+
 	return header
 }
 

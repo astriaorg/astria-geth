@@ -1,0 +1,96 @@
+title: "astria-geth - go-ethereum fork diff overview"
+footer: |
+  Fork-diff overview of [`astria-geth`](https://github.com/astriaorg/astria-geth), a fork of [`go-ethereum`](https://github.com/ethereum/go-ethereum).
+base:
+  name: go-ethereum
+  url: https://github.com/ethereum/go-ethereum
+  hash: 916d6a441a866cb618ae826c220866de118899f7
+fork:
+  name: astria-geth
+  url: https://github.com/astriaorg/astria-geth
+  ref: refs/heads/main
+def:
+  title: "astria-geth"
+  description: |
+    This is an overview of the changes in [`astria-geth`](https://github.com/astriaorg/astria-geth),
+    a fork of [`go-ethereum`](https://github.com/ethereum/go-ethereum), part of the Astria-stack.
+
+    The Astria-stack architecture is modular, following the Consensus/Execution split of post-Merge Ethereum L1:
+      - [`astria-geth`](https://github.com/astriaorg/astria-geth) implements the Execution-Layer, with **minimal changes** for a secure Ethereum-equivalent application environment.
+
+    Related [astria-stack specifications](https://github.com/astriaorg/astria/tree/main/specs):
+  sub:
+    - title: "Core modifications"
+      sub:
+        - title: "Execution API"
+          description: |
+            The execution implements the [execution apiֿ](https://github.com/astriaorg/astria/blob/main/specs/execution-api.md) of the shared sequencer.
+            Its procedures will be called from the [conductor](https://github.com/astriaorg/astria/blob/main/specs/conductor.md). It is responsible
+            for immediately executing lists of ordered transactions that come from the shared sequencer.
+          globs:
+            - "grpc/execution/*"
+            - "grpc/*"
+        - title: "Tx-pool"
+          description: |
+            Transactions ordering as set by the shared sequencer
+          globs:
+            - "core/txpool/blobpool/*"
+            - "core/txpool/*"
+            - "core/txpool/legacypool/*"
+        - title: "State-transition modifications"
+          description: ""
+          sub:
+            - title: "Deposit Transaction type"
+              description: |
+                `Deposit` transaction type enable changes to the rollup based on sequencer layer events
+              globs:
+                - "core/types/deposit_tx.go"
+                - "core/types/transaction.go"
+                - "core/state_transition.go"
+                - "core/types/receipt.go"
+            
+        - title: "Block-building modifications"
+          description: |
+            The block-building code implements changes to support shared sequencer transactions ordering.
+            Transactions are now being fethced from the `TxPool` based on the shared sequencer.
+          globs:
+            - "miner/*"
+    - title: "Node modifications"
+      description: Changes to the node configuration and services.
+      sub:
+        - title: Node config
+          globs:
+            - "node/config.go"
+            - "node/defaults.go"
+            - "node/grpcstack.go"
+            - "node/node.go"
+        - title: "CLI"
+          description: |
+            CLI changes to support grpc server.
+          globs:
+            - "cmd/utils/flags.go"
+            - "cmd/geth/main.go"
+            - "internal/flags/categories.go"
+            - "cmd/geth/config.go"
+    - title: "Chain Configuration"
+      sub:
+        - title: "Chain config"
+          description: |
+            Configuration changes for integrating the shared seuqnecer
+          globs:
+            - "params/config.go"
+            - "params/protocol_params.go"
+            - "core/genesis.go"
+            - "genesis.json"
+            - "core/blockchain.go"
+            - "eth/backend.go"
+
+# ignored globally, does not count towards line count
+ignore:
+  - ".circleci/*"
+  - "*.sum"
+  - "go.mod"
+  - "fork.yaml"
+  - ".github/*"
+  - ".github/workflows/*"
+

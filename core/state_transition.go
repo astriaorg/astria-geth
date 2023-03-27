@@ -26,6 +26,7 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -66,7 +67,12 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool, isDepositTx bool) (uint64, error) {
+	if isDepositTx {
+		// deposit txs are gasless
+		return 0, nil
+	}
+
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if isContractCreation && isHomestead {
@@ -139,6 +145,7 @@ type Message struct {
 	AccessList    types.AccessList
 	BlobGasFeeCap *big.Int
 	BlobHashes    []common.Hash
+	IsDepositTx   bool
 
 	// When SkipAccountChecks is true, the message nonce is not checked against the
 	// account nonce in state. It also disables checking that the sender is an EOA.
@@ -148,6 +155,8 @@ type Message struct {
 
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
+	isDepositTx := tx.Type() == types.DepositTxType
+
 	msg := &Message{
 		Nonce:             tx.Nonce(),
 		GasLimit:          tx.Gas(),
@@ -161,11 +170,17 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipAccountChecks: false,
 		BlobHashes:        tx.BlobHashes(),
 		BlobGasFeeCap:     tx.BlobGasFeeCap(),
+		IsDepositTx:       isDepositTx,
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
 		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
 	}
+	if isDepositTx {
+		msg.From = tx.From()
+		return msg, nil
+	}
+
 	var err error
 	msg.From, err = types.Sender(s, tx)
 	return msg, err
@@ -266,6 +281,12 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
+	if st.msg.IsDepositTx {
+		// deposit txs do not require checks as they are part of rollup consensus,
+		// not txs that originate externally.
+		return nil
+	}
+
 	// Only check transactions that are not fake
 	msg := st.msg
 	if !msg.SkipAccountChecks {
@@ -354,6 +375,23 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
+	// if this is a native asset deposit tx, we only need to mint funds.
+	if st.msg.IsDepositTx && len(st.msg.Data) == 0 {
+		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
+		st.state.AddBalance(*st.msg.To, st.msg.Value)
+		return &ExecutionResult{
+			UsedGas:    0,
+			Err:        nil,
+			ReturnData: nil,
+		}, nil
+	}
+
+	if st.msg.IsDepositTx {
+		st.initialGas = st.msg.GasLimit
+		st.gasRemaining = st.msg.GasLimit
+		log.Debug("deposit tx minting erc20", "to", *st.msg.To, "value", st.msg.Value)
+	}
+
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
@@ -384,7 +422,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
+	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai, msg.IsDepositTx)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +458,19 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, msg.Value)
 	}
 
+	// if this is a deposit tx, don't refund gas and also don't pay to the coinbase,
+	// as no gas was used.
+	if st.msg.IsDepositTx {
+		log.Debug("deposit tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
+		return &ExecutionResult{
+			UsedGas:    st.gasUsed(),
+			Err:        vmerr,
+			ReturnData: ret,
+		}, nil
+	}
+
 	var gasRefund uint64
+
 	if !rules.IsLondon {
 		// Before EIP-3529: refunds were capped to gasUsed / 2
 		gasRefund = st.refundGas(params.RefundQuotient)
@@ -441,6 +491,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee := new(big.Int).SetUint64(st.gasUsed())
 		fee.Mul(fee, effectiveTip)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
+
+		// collect base fee instead of burn
+		if rules.IsLondon && st.evm.Context.Coinbase.Cmp(common.Address{}) != 0 {
+			baseFee := new(big.Int).SetUint64(st.gasUsed())
+			baseFee.Mul(baseFee, st.evm.Context.BaseFee)
+			st.state.AddBalance(st.evm.Context.Coinbase, baseFee)
+		}
 	}
 
 	return &ExecutionResult{
