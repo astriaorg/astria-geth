@@ -17,11 +17,16 @@
 package params
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params/forks"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -362,8 +367,104 @@ type ChainConfig struct {
 	TerminalTotalDifficultyPassed bool `json:"terminalTotalDifficultyPassed,omitempty"`
 
 	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
+	Ethash    *EthashConfig `json:"ethash,omitempty"`
+	Clique    *CliqueConfig `json:"clique,omitempty"`
+	IsDevMode bool          `json:"isDev,omitempty"`
+
+	// Astria Specific Configuration
+	AstriaOverrideGenesisExtraData bool                        `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
+	AstriaRollupName               string                      `json:"astriaRollupName"`
+	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
+	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
+	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
+	AstriaBridgeSenderAddress      common.Address              `json:"astriaBridgeSenderAddress,omitempty"`
+	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
+	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
+}
+
+func (c *ChainConfig) AstriaExtraData() []byte {
+	if c.AstriaExtraDataOverride != nil {
+		return c.AstriaExtraDataOverride
+	}
+
+	// create default extradata
+	extra, _ := rlp.EncodeToBytes([]interface{}{
+		c.AstriaRollupName,
+		c.AstriaSequencerInitialHeight,
+		c.AstriaCelestiaInitialHeight,
+		c.AstriaCelestiaHeightVariance,
+	})
+	if uint64(len(extra)) > MaximumExtraDataSize {
+		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
+		extra = nil
+	}
+	return extra
+}
+
+type AstriaEIP1559Param struct {
+	MinBaseFee               uint64 `json:"minBaseFee"`
+	ElasticityMultiplier     uint64 `json:"elasticityMultiplier"`
+	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
+}
+
+type AstriaEIP1559Params struct {
+	heights        map[uint64]AstriaEIP1559Param
+	orderedHeights []uint64
+}
+
+func NewAstriaEIP1559Params(heights map[uint64]AstriaEIP1559Param) *AstriaEIP1559Params {
+	orderedHeights := []uint64{}
+	for k := range heights {
+		orderedHeights = append(orderedHeights, k)
+	}
+	sort.Slice(orderedHeights, func(i, j int) bool { return orderedHeights[i] > orderedHeights[j] })
+
+	return &AstriaEIP1559Params{
+		heights:        heights,
+		orderedHeights: orderedHeights,
+	}
+}
+
+func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return big.NewInt(0).SetUint64(c.heights[h].MinBaseFee)
+		}
+	}
+	return common.Big0
+}
+
+func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return c.heights[h].ElasticityMultiplier
+		}
+	}
+	return DefaultElasticityMultiplier
+}
+
+func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return c.heights[h].BaseFeeChangeDenominator
+		}
+	}
+	return DefaultBaseFeeChangeDenominator
+}
+
+func (c AstriaEIP1559Params) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.heights)
+}
+
+func (c *AstriaEIP1559Params) UnmarshalJSON(data []byte) error {
+	var heights map[uint64]AstriaEIP1559Param
+	if err := json.Unmarshal(data, &heights); err != nil {
+		return err
+	}
+	*c = *NewAstriaEIP1559Params(heights)
+	return nil
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -742,12 +843,18 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 }
 
 // BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
-func (c *ChainConfig) BaseFeeChangeDenominator() uint64 {
+func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
+	if c.AstriaEIP1559Params != nil {
+		return c.AstriaEIP1559Params.BaseFeeChangeDenominatorAt(height)
+	}
 	return DefaultBaseFeeChangeDenominator
 }
 
 // ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
-func (c *ChainConfig) ElasticityMultiplier() uint64 {
+func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
+	if c.AstriaEIP1559Params != nil {
+		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
+	}
 	return DefaultElasticityMultiplier
 }
 
@@ -927,4 +1034,49 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         c.IsPrague(num, timestamp),
 		IsVerkle:         c.IsVerkle(num, timestamp),
 	}
+}
+
+type AstriaBridgeAddressConfig struct {
+	BridgeAddress  hexutil.Bytes           `json:"bridgeAddress"`
+	StartHeight    uint32                  `json:"startHeight"`
+	AssetDenom     string                  `json:"assetDenom"`
+	AssetPrecision uint16                  `json:"assetPrecision"`
+	Erc20Asset     *AstriaErc20AssetConfig `json:"erc20Asset,omitempty"`
+}
+
+type AstriaErc20AssetConfig struct {
+	ContractAddress   common.Address `json:"contractAddress"`
+	ContractPrecision uint16         `json:"contractPrecision"`
+}
+
+func (abc *AstriaBridgeAddressConfig) Validate() error {
+	if len(abc.BridgeAddress) != 20 {
+		return fmt.Errorf("bridge address must be 20 bytes")
+	}
+	if abc.StartHeight == 0 {
+		return fmt.Errorf("start height must be greater than 0")
+	}
+	if abc.AssetDenom == "" {
+		return fmt.Errorf("asset denom must be set")
+	}
+	if abc.Erc20Asset == nil && abc.AssetPrecision > 18 {
+		return fmt.Errorf("asset precision of native asset must be less than or equal to 18")
+	}
+	if abc.Erc20Asset != nil && abc.AssetPrecision > abc.Erc20Asset.ContractPrecision {
+		return fmt.Errorf("asset precision must be less than or equal to contract precision")
+	}
+
+	return nil
+}
+
+func (abc *AstriaBridgeAddressConfig) ScaledDepositAmount(deposit *big.Int) *big.Int {
+	var exponent uint16
+	if abc.Erc20Asset != nil {
+		exponent = abc.Erc20Asset.ContractPrecision - abc.AssetPrecision
+	} else {
+		exponent = 18 - abc.AssetPrecision
+	}
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
+
+	return new(big.Int).Mul(deposit, multiplier)
 }

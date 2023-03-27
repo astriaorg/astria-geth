@@ -3665,10 +3665,12 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 
 	// 3: Ensure that miner received only the tx's tip.
 	actual := state.GetBalance(block.Coinbase()).ToBig()
+	totalBaseFee := new(big.Int).SetUint64(block.BaseFee().Uint64() * block.GasUsed())
 	expected := new(big.Int).Add(
 		new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
 		ethash.ConstantinopleBlockReward.ToBig(),
 	)
+	expected = expected.Add(expected, totalBaseFee)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -3703,12 +3705,15 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 	state, _ = chain.State()
 	effectiveTip := block.Transactions()[0].GasTipCap().Uint64() - block.BaseFee().Uint64()
 
-	// 6+5: Ensure that miner received only the tx's effective tip.
+	// 6+5: Ensure that miner received only the tx's effective tip and the base fee.
+	// astria-evm doesn't burn the base fee, but it is given to the miner.
 	actual = state.GetBalance(block.Coinbase()).ToBig()
+	totalBaseFee = new(big.Int).SetUint64(block.BaseFee().Uint64() * block.GasUsed())
 	expected = new(big.Int).Add(
 		new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
 		ethash.ConstantinopleBlockReward.ToBig(),
 	)
+	expected = expected.Add(expected, totalBaseFee)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
@@ -4312,9 +4317,13 @@ func TestEIP3651(t *testing.T) {
 
 	state, _ := chain.State()
 
-	// 3: Ensure that miner received only the tx's tip.
+	// 3: Ensure that miner receives tx's tip and the base fee.
+	// in the astria-evm, the base fee is not burned but transferred to the miner.
 	actual := state.GetBalance(block.Coinbase()).ToBig()
+
+	totalBaseFee := new(big.Int).SetUint64(block.GasUsed() * block.BaseFee().Uint64())
 	expected := new(big.Int).SetUint64(block.GasUsed() * block.Transactions()[0].GasTipCap().Uint64())
+	expected = expected.Add(expected, totalBaseFee)
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}

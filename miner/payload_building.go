@@ -178,10 +178,7 @@ func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 
 // buildPayload builds the payload according to the provided parameters.
 func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
-	// Build the initial version with no transaction included. It should be fast
-	// enough to run. The empty payload can at least make sure there is something
-	// to deliver for not missing slot.
-	emptyParams := &generateParams{
+	fullParams := &generateParams{
 		timestamp:   args.Timestamp,
 		forceTime:   true,
 		parentHash:  args.Parent,
@@ -189,57 +186,19 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		random:      args.Random,
 		withdrawals: args.Withdrawals,
 		beaconRoot:  args.BeaconRoot,
-		noTxs:       true,
+		noTxs:       false,
 	}
-	empty := w.getSealingBlock(emptyParams)
-	if empty.err != nil {
-		return nil, empty.err
+	start := time.Now()
+	full := w.getSealingBlock(fullParams)
+	if full.err != nil {
+		return nil, full.err
 	}
 
 	// Construct a payload object for return.
-	payload := newPayload(empty.block, args.Id())
+	payload := newPayload(full.block, args.Id())
 
-	// Spin up a routine for updating the payload in background. This strategy
-	// can maximum the revenue for including transactions with highest fee.
-	go func() {
-		// Setup the timer for re-building the payload. The initial clock is kept
-		// for triggering process immediately.
-		timer := time.NewTimer(0)
-		defer timer.Stop()
-
-		// Setup the timer for terminating the process if SECONDS_PER_SLOT (12s in
-		// the Mainnet configuration) have passed since the point in time identified
-		// by the timestamp parameter.
-		endTimer := time.NewTimer(time.Second * 12)
-
-		fullParams := &generateParams{
-			timestamp:   args.Timestamp,
-			forceTime:   true,
-			parentHash:  args.Parent,
-			coinbase:    args.FeeRecipient,
-			random:      args.Random,
-			withdrawals: args.Withdrawals,
-			beaconRoot:  args.BeaconRoot,
-			noTxs:       false,
-		}
-
-		for {
-			select {
-			case <-timer.C:
-				start := time.Now()
-				r := w.getSealingBlock(fullParams)
-				if r.err == nil {
-					payload.update(r, time.Since(start))
-				}
-				timer.Reset(w.recommit)
-			case <-payload.stop:
-				log.Info("Stopping work on payload", "id", payload.id, "reason", "delivery")
-				return
-			case <-endTimer.C:
-				log.Info("Stopping work on payload", "id", payload.id, "reason", "timeout")
-				return
-			}
-		}
-	}()
+	// Add the updated block to the payload
+	payload.update(full, time.Since(start))
+	log.Info("Stopping work on payload", "id", payload.id, "reason", "delivery")
 	return payload, nil
 }

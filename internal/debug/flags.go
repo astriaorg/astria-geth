@@ -71,6 +71,11 @@ var (
 		Usage:    "Log format to use (json|logfmt|terminal)",
 		Category: flags.LoggingCategory,
 	}
+	logfmtFlag = &cli.BoolFlag{
+		Name:     "log.logfmt",
+		Usage:    "Format logs with logfmt",
+		Category: flags.LoggingCategory,
+	}
 	logFileFlag = &cli.StringFlag{
 		Name:     "log.file",
 		Usage:    "Write logs to a file",
