@@ -1,0 +1,54 @@
+{
+    "config": {
+        "chainId": 1337,
+        "homesteadBlock": 0,
+        "eip150Block": 0,
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "byzantiumBlock": 0,
+        "constantinopleBlock": 0,
+        "petersburgBlock": 0,
+        "istanbulBlock": 0,
+        "berlinBlock": 0,
+        "londonBlock": 0,
+        "shanghaiTime": 0,
+        "terminalTotalDifficulty": 0,
+        "terminalTotalDifficultyPassed": true,
+        "ethash": {},
+        "astriaRollupName": "astria",
+        "astriaOverrideGenesisExtraData": true,
+        "astriaSequencerInitialHeight": 2,
+        "astriaCelestiaInitialHeight": 2,
+        "astriaCelestiaHeightVariance": 10,
+        "astriaBridgeAddresses": [
+            {
+                "bridgeAddress": "684ae50c49a434199199c9c698115391152d7b3f",
+                "startHeight": 1,
+                "assetDenom": "nria",
+                "assetPrecision": 9
+            },
+            {
+                "bridgeAddress": "34fec43c7fcab9aef3b3cf8aba855e41ee69ca3a",
+                "startHeight": 1,
+                "assetDenom": "transfer/channel-1/usdc",
+                "assetPrecision": 6,
+                "erc20asset": {
+                    "contractAddress":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                    "contractPrecision": 6
+                }
+            }
+        ],
+        "astriaBridgeSenderAddress": "0x0000000000000000000000000000000000000000",
+        "astriaFeeCollectors": {
+            "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
+        },
+        "astriaEIP1559Params": {
+            "1": { "minBaseFee": 0, "elasticityMultiplier": 2, "BaseFeeChangeDenominator": 8 }
+        }
+    },
+    "difficulty": "10000000",
+    "gasLimit": "8000000",
+    "alloc": {
+        "0x46B77EFDFB20979E1C29ec98DcE73e3eCbF64102": { "balance": "300000000000000000000" }
+    }
+}

@@ -137,4 +137,10 @@ type SubPool interface {
 	// Status returns the known status (unknown/pending/queued) of a transaction
 	// identified by their hashes.
 	Status(hash common.Hash) TxStatus
+
+	SetAstriaOrdered(types.Transactions)
+	ClearAstriaOrdered()
+	AddToAstriaExcludedFromBlock(tx *types.Transaction)
+	AstriaExcludedFromBlock() *types.Transactions
+	AstriaOrdered() *types.Transactions
 }

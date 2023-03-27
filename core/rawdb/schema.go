@@ -43,6 +43,9 @@ var (
 	// headFinalizedBlockKey tracks the latest known finalized block hash.
 	headFinalizedBlockKey = []byte("LastFinalized")
 
+	// headBaseCelestiaHeightKey tracks the lowest celestia height from which to attempt derivation.
+	headBaseCelestiaHeightKey = []byte("LastBaseCelestiaHeight")
+
 	// persistentStateIDKey tracks the id of latest stored state(for path-based only).
 	persistentStateIDKey = []byte("LastStateID")
 
