@@ -67,4 +67,3 @@ func (handler *GRPCServerHandler) Stop() error {
 	log.Info("gRPC server stopped", "endpoint", handler.endpoint)
 	return nil
 }
-

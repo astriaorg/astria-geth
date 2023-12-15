@@ -207,7 +207,7 @@ type LegacyPool struct {
 	signer      types.Signer
 	mu          sync.RWMutex
 
-	astria  *astriaOrdered
+	astria *astriaOrdered
 
 	currentHead   atomic.Pointer[types.Header] // Current head of the blockchain
 	currentState  *state.StateDB               // Current state in the blockchain head
@@ -275,16 +275,16 @@ func New(config Config, chain BlockChain) *LegacyPool {
 }
 
 type astriaOrdered struct {
-	valid types.Transactions
+	valid  types.Transactions
 	parsed types.Transactions
-	pool *LegacyPool
+	pool   *LegacyPool
 }
 
 func newAstriaOrdered(valid types.Transactions, parsed types.Transactions, pool *LegacyPool) *astriaOrdered {
 	return &astriaOrdered{
-		valid: valid,
+		valid:  valid,
 		parsed: parsed,
-		pool: pool,
+		pool:   pool,
 	}
 }
 

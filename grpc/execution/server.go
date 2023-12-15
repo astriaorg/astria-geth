@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	codes "google.golang.org/grpc/codes"
@@ -35,7 +34,7 @@ type ExecutionServiceServerV1Alpha2 struct {
 	bc  *core.BlockChain
 
 	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
-	blockExecutionLock sync.Mutex // Lock for the NewPayload method
+	blockExecutionLock    sync.Mutex // Lock for the NewPayload method
 }
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
@@ -94,7 +93,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
 	log.Info("ExecuteBlock called", "request", req)
-	
+
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
 
@@ -178,10 +177,10 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 // CommitmentState.
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("UpdateCommitmentState called", "request", req)
-	
+
 	s.commitementUpdateLock.Lock()
 	defer s.commitementUpdateLock.Unlock()
-	
+
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
 	firmEthHash := common.BytesToHash(req.CommitmentState.Firm.Hash)
 
@@ -219,7 +218,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 		return nil, status.Error(codes.InvalidArgument, "soft block in request is not a descendant of the current firmly committed block")
 	}
 
-	s.eth.SetSynced();
+	s.eth.SetSynced()
 
 	// Updating the safe and final after everything validated
 	currentSafe := s.bc.CurrentSafeBlock().Hash()
