@@ -336,7 +336,7 @@ func New(config Config, chain BlockChain) *BlobPool {
 
 func (p *BlobPool) SetAstriaOrdered(rawTxs [][]byte) {}
 func (p *BlobPool) ClearAstriaOrdered() {}
-func (p *BlobPool) AstriaOrdered() *types.Transactions { return nil }
+func (p *BlobPool) AstriaOrdered() *types.Transactions { return &types.Transactions{} }
 
 // Filter returns whether the given transaction can be consumed by the blob pool.
 func (p *BlobPool) Filter(tx *types.Transaction) bool {

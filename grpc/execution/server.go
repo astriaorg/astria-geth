@@ -19,137 +19,25 @@ import (
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	grpcv1a1 "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha1/executionv1alpha1grpc"
-	executionv1a1 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha1"
-	grpcv1a2 "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
-	executionv1a2 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
+	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
+	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
 )
-
-// executionServiceServer is the implementation of the ExecutionServiceServerV1Alpha1 interface.
-type ExecutionServiceServerV1Alpha1 struct {
-	// NOTE - from the generated code:
-	// All implementations must embed UnimplementedExecutionServiceServer
-	// for forward compatibility
-	grpcv1a1.UnimplementedExecutionServiceServer
-
-	consensus *catalyst.ConsensusAPI
-	eth       *eth.Ethereum
-
-	bc *core.BlockChain
-}
-
-func NewExecutionServiceServerV1Alpha1(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha1 {
-	consensus := catalyst.NewConsensusAPI(eth)
-
-	bc := eth.BlockChain()
-
-	return &ExecutionServiceServerV1Alpha1{
-		eth:       eth,
-		consensus: consensus,
-		bc:        bc,
-	}
-}
-
-func (s *ExecutionServiceServerV1Alpha1) DoBlock(ctx context.Context, req *executionv1a1.DoBlockRequest) (*executionv1a1.DoBlockResponse, error) {
-	log.Info("DoBlock called request", "request", req)
-	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
-
-	// The Engine API has been modified to use transactions from this mempool and abide by it's ordering.
-	s.eth.TxPool().SetAstriaOrdered(req.Transactions)
-
-	// Do the whole Engine API in a single loop
-	startForkChoice := &engine.ForkchoiceStateV1{
-		HeadBlockHash:      prevHeadHash,
-		SafeBlockHash:      prevHeadHash,
-		FinalizedBlockHash: prevHeadHash,
-	}
-	payloadAttributes := &engine.PayloadAttributes{
-		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
-		Random:                common.Hash{},
-		SuggestedFeeRecipient: common.Address{},
-	}
-
-	fcStartResp, err := s.consensus.ForkchoiceUpdatedV1(*startForkChoice, payloadAttributes)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: we should probably just execute + store the block directly instead of using the engine api.
-	payloadResp, err := s.consensus.GetPayloadV1(*fcStartResp.PayloadID)
-	if err != nil {
-		log.Error("failed to call GetPayloadV1", "err", err)
-		return nil, err
-	}
-
-	// call blockchain.InsertChain to actually execute and write the blocks to state
-	block, err := engine.ExecutableDataToBlock(*payloadResp, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	blocks := types.Blocks{
-		block,
-	}
-	n, err := s.bc.InsertChain(blocks)
-	if err != nil {
-		return nil, err
-	}
-	if n != 1 {
-		return nil, fmt.Errorf("failed to insert block into blockchain (n=%d)", n)
-	}
-
-	// remove txs from original mempool
-	s.eth.TxPool().ClearAstriaOrdered()
-
-	finalizedBlock := s.bc.CurrentFinalBlock()
-	newForkChoice := &engine.ForkchoiceStateV1{
-		HeadBlockHash:      block.Hash(),
-		SafeBlockHash:      block.Hash(),
-		FinalizedBlockHash: finalizedBlock.Hash(),
-	}
-	fcEndResp, err := s.consensus.ForkchoiceUpdatedV1(*newForkChoice, nil)
-	if err != nil {
-		log.Error("failed to call ForkchoiceUpdatedV1", "err", err)
-		return nil, err
-	}
-
-	res := &executionv1a1.DoBlockResponse{
-		BlockHash: fcEndResp.PayloadStatus.LatestValidHash.Bytes(),
-	}
-	return res, nil
-}
-
-func (s *ExecutionServiceServerV1Alpha1) FinalizeBlock(ctx context.Context, req *executionv1a1.FinalizeBlockRequest) (*executionv1a1.FinalizeBlockResponse, error) {
-	header := s.bc.GetHeaderByHash(common.BytesToHash(req.BlockHash))
-	if header == nil {
-		return nil, fmt.Errorf("failed to get header for block hash 0x%x", req.BlockHash)
-	}
-
-	s.bc.SetFinalized(header)
-	return &executionv1a1.FinalizeBlockResponse{}, nil
-}
-
-func (s *ExecutionServiceServerV1Alpha1) InitState(ctx context.Context, req *executionv1a1.InitStateRequest) (*executionv1a1.InitStateResponse, error) {
-	currHead := s.bc.CurrentHeader()
-	res := &executionv1a1.InitStateResponse{
-		BlockHash: currHead.Hash().Bytes(),
-	}
-
-	return res, nil
-}
 
 // ExecutionServiceServerV1Alpha2 is the implementation of the
 // ExecutionServiceServer interface.
 type ExecutionServiceServerV1Alpha2 struct {
 	// NOTE - from the generated code: All implementations must embed
 	// UnimplementedExecutionServiceServer for forward compatibility
-	grpcv1a2.UnimplementedExecutionServiceServer
+	astriaGrpc.UnimplementedExecutionServiceServer
 
 	eth *eth.Ethereum
+	consensus *catalyst.ConsensusAPI
 	bc  *core.BlockChain
 }
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
 	bc := eth.BlockChain()
+	consensus := catalyst.NewConsensusAPI(eth)
 
 	if merger := eth.Merger(); !merger.PoSFinalized() {
 		merger.FinalizePoS()
@@ -157,12 +45,13 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 
 	return &ExecutionServiceServerV1Alpha2{
 		eth: eth,
+		consensus: consensus,
 		bc:  bc,
 	}
 }
 
 // GetBlock will return a block given an identifier.
-func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *executionv1a2.GetBlockRequest) (*executionv1a2.Block, error) {
+func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
 	log.Info("GetBlock called", "request", req)
 
 	res, err := s.getBlockFromIdentifier(req.GetIdentifier())
@@ -177,9 +66,9 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *exec
 
 // BatchGetBlocks will return an array of Blocks given an array of block
 // identifiers.
-func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *executionv1a2.BatchGetBlocksRequest) (*executionv1a2.BatchGetBlocksResponse, error) {
+func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
 	log.Info("BatchGetBlocks called", "request", req)
-	var blocks []*executionv1a2.Block
+	var blocks []*astriaPb.Block
 
 	ids := req.GetIdentifiers()
 	for _, id := range ids {
@@ -192,7 +81,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 		blocks = append(blocks, block)
 	}
 
-	res := &executionv1a2.BatchGetBlocksResponse{
+	res := &astriaPb.BatchGetBlocksResponse{
 		Blocks: blocks,
 	}
 
@@ -202,7 +91,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
-func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *executionv1a2.ExecuteBlockRequest) (*executionv1a2.Block, error) {
+func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
 	log.Info("ExecuteBlock called", "request", req)
 
 	// Validate block being created has valid previous hash
@@ -248,7 +137,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &executionv1a2.Block{
+	res := &astriaPb.Block{
 		Number: uint32(block.NumberU64()),
 		Hash:   block.Hash().Bytes(),
 		Timestamp: &timestamppb.Timestamp{
@@ -261,7 +150,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 }
 
 // GetCommitmentState fetches the current CommitmentState of the chain.
-func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context, req *executionv1a2.GetCommitmentStateRequest) (*executionv1a2.CommitmentState, error) {
+func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("GetCommitmentState called", "request", req)
 
 	softBlock, err := ethHeaderToExecutionBlock(s.bc.CurrentSafeBlock())
@@ -275,7 +164,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 		return nil, status.Error(codes.Internal, "could not locate firm block")
 	}
 
-	res := &executionv1a2.CommitmentState{
+	res := &astriaPb.CommitmentState{
 		Soft: softBlock,
 		Firm: firmBlock,
 	}
@@ -286,7 +175,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 
 // UpdateCommitmentState replaces the whole CommitmentState with a new
 // CommitmentState.
-func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *executionv1a2.UpdateCommitmentStateRequest) (*executionv1a2.CommitmentState, error) {
+func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("UpdateCommitmentState called", "request", req)
 	
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
@@ -315,11 +204,10 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	}
 
 	// Once head is updated validate that firm belongs to chain
+	rollbackBlock := s.bc.GetBlockByHash(currentHead)
 	if s.bc.GetCanonicalHash(firmBlock.NumberU64()) != firmEthHash {
 		log.Error("firm block not found in canonical chain defined by soft block, rolling back")
 
-		// We don't want partial commitments, rolling back.
-		rollbackBlock := s.bc.GetBlockByHash(currentHead)
 		if _, err := s.bc.SetCanonical(rollbackBlock); err != nil {
 			panic("rollback to previous head after failed validation failed")
 		}
@@ -327,28 +215,35 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 		return nil, status.Error(codes.InvalidArgument, "soft block in request is not a descendant of the current firmly committed block")
 	}
 
-	// Updating the safe and final after everything validated
-	currentSafe := s.bc.CurrentSafeBlock().Hash()
-	if currentSafe != softEthHash {
-		s.bc.SetSafe(softBlock.Header())
+	// Using ForkchoiceUpdatedV1 to update the rest of the state.
+	newForkChoice := &engine.ForkchoiceStateV1{
+		HeadBlockHash:      softEthHash,
+		SafeBlockHash:      softEthHash,
+		FinalizedBlockHash: firmEthHash,
 	}
-	currentFirm := s.bc.CurrentFinalBlock().Hash()
-	if currentFirm != firmEthHash {
-		s.bc.SetFinalized(firmBlock.Header())
+	_, err := s.consensus.ForkchoiceUpdatedV1(*newForkChoice, nil)
+	if err != nil {
+		log.Error("Error calling ForkchoiceUpdated, initiating rollback", "err", err)
+
+		if _, err := s.bc.SetCanonical(rollbackBlock); err != nil {
+			panic("rollback to previous head after failed validation failed")
+		}
+
+		return nil, status.Error(codes.Internal, "Failed to update forkchoice commitment state")
 	}
 
 	log.Info("UpdateCommitmentState completed", "request", req)
 	return req.CommitmentState, nil
 }
 
-func (s *ExecutionServiceServerV1Alpha2) getBlockFromIdentifier(identifier *executionv1a2.BlockIdentifier) (*executionv1a2.Block, error) {
+func (s *ExecutionServiceServerV1Alpha2) getBlockFromIdentifier(identifier *astriaPb.BlockIdentifier) (*astriaPb.Block, error) {
 	var header *types.Header
 
 	// Grab the header based on the identifier provided
 	switch idType := identifier.Identifier.(type) {
-	case *executionv1a2.BlockIdentifier_BlockNumber:
+	case *astriaPb.BlockIdentifier_BlockNumber:
 		header = s.bc.GetHeaderByNumber(uint64(identifier.GetBlockNumber()))
-	case *executionv1a2.BlockIdentifier_BlockHash:
+	case *astriaPb.BlockIdentifier_BlockHash:
 		header = s.bc.GetHeaderByHash(common.BytesToHash(identifier.GetBlockHash()))
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "identifier has unexpected type %T", idType)
@@ -367,12 +262,12 @@ func (s *ExecutionServiceServerV1Alpha2) getBlockFromIdentifier(identifier *exec
 	return res, nil
 }
 
-func ethHeaderToExecutionBlock(header *types.Header) (*executionv1a2.Block, error) {
+func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 	if header == nil {
 		return nil, fmt.Errorf("cannot convert nil header to execution block")
 	}
 
-	return &executionv1a2.Block{
+	return &astriaPb.Block{
 		Number:          uint32(header.Number.Int64()),
 		Hash:            header.Hash().Bytes(),
 		ParentBlockHash: header.ParentHash.Bytes(),
