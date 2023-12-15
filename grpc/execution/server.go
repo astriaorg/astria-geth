@@ -14,13 +14,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
-	executionv1a1 "github.com/ethereum/go-ethereum/grpc/gen/astria/execution/v1alpha1"
-	executionv1a2 "github.com/ethereum/go-ethereum/grpc/gen/astria/execution/v1alpha2"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	grpcv1a1 "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha1/executionv1alpha1grpc"
+	executionv1a1 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha1"
+	grpcv1a2 "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
+	executionv1a2 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
 )
 
 // executionServiceServer is the implementation of the ExecutionServiceServerV1Alpha1 interface.
@@ -28,7 +30,7 @@ type ExecutionServiceServerV1Alpha1 struct {
 	// NOTE - from the generated code:
 	// All implementations must embed UnimplementedExecutionServiceServer
 	// for forward compatibility
-	executionv1a1.UnimplementedExecutionServiceServer
+	grpcv1a1.UnimplementedExecutionServiceServer
 
 	consensus *catalyst.ConsensusAPI
 	eth       *eth.Ethereum
@@ -80,7 +82,7 @@ func (s *ExecutionServiceServerV1Alpha1) DoBlock(ctx context.Context, req *execu
 	}
 
 	// call blockchain.InsertChain to actually execute and write the blocks to state
-	block, err := engine.ExecutableDataToBlock(*payloadResp)
+	block, err := engine.ExecutableDataToBlock(*payloadResp, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +98,7 @@ func (s *ExecutionServiceServerV1Alpha1) DoBlock(ctx context.Context, req *execu
 	}
 
 	// remove txs from original mempool
-	for _, tx := range block.Transactions() {
-		s.eth.TxPool().RemoveTx(tx.Hash())
-	}
+	s.eth.TxPool().ClearAstriaOrdered()
 
 	finalizedBlock := s.bc.CurrentFinalBlock()
 	newForkChoice := &engine.ForkchoiceStateV1{
@@ -142,7 +142,7 @@ func (s *ExecutionServiceServerV1Alpha1) InitState(ctx context.Context, req *exe
 type ExecutionServiceServerV1Alpha2 struct {
 	// NOTE - from the generated code: All implementations must embed
 	// UnimplementedExecutionServiceServer for forward compatibility
-	executionv1a2.UnimplementedExecutionServiceServer
+	grpcv1a2.UnimplementedExecutionServiceServer
 
 	eth *eth.Ethereum
 	bc  *core.BlockChain
@@ -231,7 +231,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
@@ -246,9 +246,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	}
 
 	// remove txs from original mempool
-	for _, tx := range block.Transactions() {
-		s.eth.TxPool().RemoveTx(tx.Hash())
-	}
+	s.eth.TxPool().ClearAstriaOrdered()
 
 	res := &executionv1a2.Block{
 		Number: uint32(block.NumberU64()),

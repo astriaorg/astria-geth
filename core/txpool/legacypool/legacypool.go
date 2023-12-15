@@ -207,6 +207,8 @@ type LegacyPool struct {
 	signer      types.Signer
 	mu          sync.RWMutex
 
+	astria  *astriaOrdered
+
 	currentHead   atomic.Pointer[types.Header] // Current head of the blockchain
 	currentState  *state.StateDB               // Current state in the blockchain head
 	pendingNonces *noncer                      // Pending state tracking virtual nonces
@@ -270,6 +272,69 @@ func New(config Config, chain BlockChain) *LegacyPool {
 		pool.journal = newTxJournal(config.Journal)
 	}
 	return pool
+}
+
+type astriaOrdered struct {
+	valid types.Transactions
+	parsed types.Transactions
+	pool *LegacyPool
+}
+
+func newAstriaOrdered(valid types.Transactions, parsed types.Transactions, pool *LegacyPool) *astriaOrdered {
+	return &astriaOrdered{
+		valid: valid,
+		parsed: parsed,
+		pool: pool,
+	}
+}
+
+func (ao *astriaOrdered) clear() {
+	ao.valid = *&types.Transactions{}
+	ao.parsed = *&types.Transactions{}
+}
+
+func (pool *LegacyPool) SetAstriaOrdered(rawTxs [][]byte) {
+	valid := []*types.Transaction{}
+	parsed := []*types.Transaction{}
+	for idx, rawTx := range rawTxs {
+		tx := new(types.Transaction)
+		err := tx.UnmarshalBinary(rawTx)
+		if err != nil {
+			log.Warn("failed to unmarshal raw astria tx bytes", rawTx, "at index", idx, "error:", err)
+			continue
+		}
+		parsed = append(parsed, tx)
+
+		err = pool.validateTxBasics(tx, false)
+		if err != nil {
+			log.Warn("astria tx failed validation at index: ", idx, "hash: ", tx.Hash(), "error:", err)
+			continue
+		}
+
+		valid = append(valid, tx)
+	}
+
+	pool.astria = newAstriaOrdered(types.Transactions(valid), types.Transactions(parsed), pool)
+}
+
+func (pool *LegacyPool) ClearAstriaOrdered() {
+	if pool.astria == nil {
+		return
+	}
+
+	for _, tx := range pool.astria.parsed {
+		pool.removeTx(tx.Hash(), false, true)
+	}
+
+	pool.astria.clear()
+}
+
+func (pool *LegacyPool) AstriaOrdered() *types.Transactions {
+	// sus but whatever
+	if pool.astria == nil {
+		return &types.Transactions{}
+	}
+	return &pool.astria.valid
 }
 
 // Filter returns whether the given transaction can be consumed by the legacy

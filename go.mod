@@ -1,8 +1,10 @@
 module github.com/ethereum/go-ethereum
 
-go 1.20
+go 1.21
 
 require (
+	buf.build/gen/go/astria/astria/grpc/go v1.3.0-20231213194648-0685137780d3.2
+	buf.build/gen/go/astria/astria/protocolbuffers/go v1.31.0-20231213194648-0685137780d3.2
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -71,7 +73,7 @@ require (
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.13.0
 	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )

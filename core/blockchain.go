@@ -319,8 +319,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		return nil, ErrNoGenesis
 	}
 
+	bc.currentSnapBlock.Store(nil)
 	bc.currentBlock.Store(bc.genesisBlock.Header())
-	bc.currentSnapBlock.Store(bc.genesisBlock.Header())
 	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
 	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
 

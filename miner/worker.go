@@ -793,7 +793,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction) (*typ
 }
 
 // This is a copy of commitTransactions, but updated to take a list of txs instead of using heap
-func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transactions, interrupt *atomic.int32) error {
+func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transactions, interrupt *atomic.Int32) error {
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
@@ -803,7 +803,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 	for _, tx := range *txs {
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
-			if signal := atomic.LoadInt32(interrupt); signal != commitInterruptNone {
+			if signal := interrupt.Load(); signal != commitInterruptNone {
 				return signalToErr(signal)
 			}
 		}
@@ -874,7 +874,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 	return nil
 }
 
-func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByPriceAndNonce, interrupt *atomic.int32) error {
+func (w *worker) commitTransactions(env *environment, txs *transactionsByPriceAndNonce, interrupt *atomic.Int32) error {
 	gasLimit := env.header.GasLimit
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
@@ -1063,7 +1063,7 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 	return env, nil
 }
 
-func (w *worker) fillAstriaTransactions(interrupt *atomic.int32, env *environment) error {
+func (w *worker) fillAstriaTransactions(interrupt *atomic.Int32, env *environment) error {
 	// Use pre ordered array of txs
 	astriaTxs := w.eth.TxPool().AstriaOrdered()
 	if len(*astriaTxs) > 0 {
@@ -1071,7 +1071,7 @@ func (w *worker) fillAstriaTransactions(interrupt *atomic.int32, env *environmen
 			return err
 		}
 	}
-	w.eth.TxPool().ClearAstriaOrdered()
+
 	return nil
 }
 
