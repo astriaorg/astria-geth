@@ -303,6 +303,9 @@ func containsLifecycle(lfs []Lifecycle, l Lifecycle) bool {
 func (n *Node) stopServices(running []Lifecycle) error {
 	n.stopRPC()
 
+	// Stop GRPC server
+	n.stopGRPC()
+
 	// Stop running lifecycles in reverse order.
 	failure := &StopError{Services: make(map[reflect.Type]error)}
 	for i := len(running) - 1; i >= 0; i-- {
@@ -313,9 +316,6 @@ func (n *Node) stopServices(running []Lifecycle) error {
 
 	// Stop p2p networking.
 	n.server.Stop()
-
-	// Stop GRPC server
-	n.stopGRPC()
 
 	if len(failure.Services) > 0 {
 		return failure

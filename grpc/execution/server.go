@@ -7,7 +7,10 @@ package execution
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
+	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -19,8 +22,6 @@ import (
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
-	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
 )
 
 // ExecutionServiceServerV1Alpha2 is the implementation of the
@@ -31,13 +32,14 @@ type ExecutionServiceServerV1Alpha2 struct {
 	astriaGrpc.UnimplementedExecutionServiceServer
 
 	eth *eth.Ethereum
-	consensus *catalyst.ConsensusAPI
 	bc  *core.BlockChain
+
+	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
+	blockExecutionLock sync.Mutex // Lock for the NewPayload method
 }
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
 	bc := eth.BlockChain()
-	consensus := catalyst.NewConsensusAPI(eth)
 
 	if merger := eth.Merger(); !merger.PoSFinalized() {
 		merger.FinalizePoS()
@@ -45,7 +47,6 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 
 	return &ExecutionServiceServerV1Alpha2{
 		eth: eth,
-		consensus: consensus,
 		bc:  bc,
 	}
 }
@@ -93,6 +94,9 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
 	log.Info("ExecuteBlock called", "request", req)
+	
+	s.blockExecutionLock.Lock()
+	defer s.blockExecutionLock.Unlock()
 
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
@@ -125,12 +129,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
-	blocks := types.Blocks{
-		block,
-	}
-	n, err := s.bc.InsertChain(blocks)
+	err = s.bc.InsertBlockWithoutSetHead(block)
 	if err != nil {
-		log.Error("failed to insert block to chain", err, "index", n)
+		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
 	}
 
@@ -178,6 +179,9 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("UpdateCommitmentState called", "request", req)
 	
+	s.commitementUpdateLock.Lock()
+	defer s.commitementUpdateLock.Unlock()
+	
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
 	firmEthHash := common.BytesToHash(req.CommitmentState.Firm.Hash)
 
@@ -215,21 +219,16 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 		return nil, status.Error(codes.InvalidArgument, "soft block in request is not a descendant of the current firmly committed block")
 	}
 
-	// Using ForkchoiceUpdatedV1 to update the rest of the state.
-	newForkChoice := &engine.ForkchoiceStateV1{
-		HeadBlockHash:      softEthHash,
-		SafeBlockHash:      softEthHash,
-		FinalizedBlockHash: firmEthHash,
+	s.eth.SetSynced();
+
+	// Updating the safe and final after everything validated
+	currentSafe := s.bc.CurrentSafeBlock().Hash()
+	if currentSafe != softEthHash {
+		s.bc.SetSafe(softBlock.Header())
 	}
-	_, err := s.consensus.ForkchoiceUpdatedV1(*newForkChoice, nil)
-	if err != nil {
-		log.Error("Error calling ForkchoiceUpdated, initiating rollback", "err", err)
-
-		if _, err := s.bc.SetCanonical(rollbackBlock); err != nil {
-			panic("rollback to previous head after failed validation failed")
-		}
-
-		return nil, status.Error(codes.Internal, "Failed to update forkchoice commitment state")
+	currentFirm := s.bc.CurrentFinalBlock().Hash()
+	if currentFirm != firmEthHash {
+		s.bc.SetFinalized(firmBlock.Header())
 	}
 
 	log.Info("UpdateCommitmentState completed", "request", req)
