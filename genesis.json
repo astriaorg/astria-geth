@@ -11,12 +11,18 @@
         "istanbulBlock": 0,
         "berlinBlock": 0,
         "londonBlock": 0,
+        "shanghaiTime": 0,
         "terminalTotalDifficulty": 0,
+        "terminalTotalDifficultyPassed": true,
         "ethash": {}
     },
     "difficulty": "10000000",
     "gasLimit": "8000000",
     "alloc": {
         "0x46B77EFDFB20979E1C29ec98DcE73e3eCbF64102": { "balance": "300000000000000000000" }
-    }
+    },
+    "astriaOverrideGenesisExtraData": true,
+    "astriaSequencerInitialHeight": 1,
+    "astriaDataAvailabilityInitialHeight": 1,
+    "astriaDataAvailabilityHeightVariance": 50
 }
