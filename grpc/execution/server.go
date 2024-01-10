@@ -269,5 +269,8 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 		Number:          uint32(header.Number.Int64()),
 		Hash:            header.Hash().Bytes(),
 		ParentBlockHash: header.ParentHash.Bytes(),
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(header.Time),
+		},
 	}, nil
 }
