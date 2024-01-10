@@ -140,6 +140,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	res := &astriaPb.Block{
 		Number: uint32(block.NumberU64()),
 		Hash:   block.Hash().Bytes(),
+		ParentBlockHash: block.ParentHash().Bytes(),
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(block.Time()),
 		},
