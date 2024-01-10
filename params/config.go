@@ -21,6 +21,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -332,6 +335,31 @@ type ChainConfig struct {
 	Ethash    *EthashConfig `json:"ethash,omitempty"`
 	Clique    *CliqueConfig `json:"clique,omitempty"`
 	IsDevMode bool          `json:"isDev,omitempty"`
+
+	// Astria Specific Configuration
+	AstriaOverrideGenesisExtraData       bool          `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaExtraDataOverride              hexutil.Bytes `json:"astriaExtraDataOverride,omitempty"`
+	AstriaSequencerInitialHeight         *big.Int      `json:"astriaDequencerInitialHeight,omitempty"`
+	AstriaDataAvailabilityInitialHeight  *big.Int      `json:"astriaDataAvailabilityInitialHeight,omitempty"`
+	AstriaDataAvailabilityHeightVariance *big.Int      `json:"astriaDataAvailabilityHeightVariance,omitempty"`
+}
+
+func (c *ChainConfig) AstriaExtraData() []byte {
+	if c.AstriaExtraDataOverride != nil {
+		return c.AstriaExtraDataOverride
+	}
+
+	// create default extradata
+	extra, _ := rlp.EncodeToBytes([]interface{}{
+		c.AstriaSequencerInitialHeight,
+		c.AstriaDataAvailabilityInitialHeight,
+		c.AstriaDataAvailabilityHeightVariance,
+	})
+	if uint64(len(extra)) > MaximumExtraDataSize {
+		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
+		extra = nil
+	}
+	return extra
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

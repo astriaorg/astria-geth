@@ -319,10 +319,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		return nil, ErrNoGenesis
 	}
 
-	bc.currentBlock.Store(nil)
 	bc.currentSnapBlock.Store(nil)
-	bc.currentFinalBlock.Store(nil)
-	bc.currentSafeBlock.Store(nil)
+	bc.currentBlock.Store(bc.genesisBlock.Header())
+	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
+	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
 
 	// Update chain info data metrics
 	chainInfoGauge.Update(metrics.GaugeInfoValue{"chain_id": bc.chainConfig.ChainID.String()})

@@ -260,6 +260,30 @@ func (p *TxPool) Get(hash common.Hash) *types.Transaction {
 	return nil
 }
 
+// Get returns a transaction if it is contained in the pool, or nil otherwise.
+func (p *TxPool) SetAstriaOrdered(rawTxs [][]byte) {
+	for _, subpool := range p.subpools {
+		subpool.SetAstriaOrdered(rawTxs)
+	}
+}
+
+func (p *TxPool) ClearAstriaOrdered() {
+	for _, subpool := range p.subpools {
+		subpool.ClearAstriaOrdered()
+	}
+}
+
+func (p *TxPool) AstriaOrdered() *types.Transactions {
+	txs := types.Transactions{}
+
+	for _, subpool := range p.subpools {
+		subpoolTxs := subpool.AstriaOrdered()
+		txs = append(txs, *subpoolTxs...)
+	}
+
+	return &txs
+}
+
 // Add enqueues a batch of transactions into the pool if they are valid. Due
 // to the large transaction churn, add may postpone fully integrating the tx
 // to a later point to batch multiple ones together.
