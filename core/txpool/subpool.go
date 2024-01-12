@@ -141,6 +141,4 @@ type SubPool interface {
 	SetAstriaOrdered(rawTxs [][]byte)
 	ClearAstriaOrdered()
 	AstriaOrdered() *types.Transactions
-	AstriaOrderedTotalLen() int
-	AstriaOrderedValidLen() int
 }
