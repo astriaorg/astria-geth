@@ -317,6 +317,22 @@ func (pool *LegacyPool) SetAstriaOrdered(rawTxs [][]byte) {
 	pool.astria = newAstriaOrdered(types.Transactions(valid), types.Transactions(parsed), pool)
 }
 
+func (pool *LegacyPool) AstriaOrderedTotalSize() int {
+	if pool.astria == nil {
+		return 0
+	}
+
+	return pool.astria.parsed.Len()
+}
+
+func (pool *LegacyPool) AstriaOrderedValidLen() int {
+	if pool.astria == nil {
+		return 0
+	}
+
+	return pool.astria.valid.Len()
+}
+
 func (pool *LegacyPool) ClearAstriaOrdered() {
 	if pool.astria == nil {
 		return

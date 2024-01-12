@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
 	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -35,6 +37,16 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock    sync.Mutex // Lock for the NewPayload method
+
+	metrics ExecutionMetrics
+}
+
+type ExecutionMetrics struct {
+	executeBlockTime          metrics.Timer
+	comittmentStateUpdateTime metrics.Timer
+	validTxCount              metrics.Meter
+	parsedTxCount             metrics.Meter
+	reqTxCount                metrics.Meter
 }
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
@@ -44,9 +56,18 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 		merger.FinalizePoS()
 	}
 
+	metrics := ExecutionMetrics{
+		executeBlockTime:          metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil),
+		comittmentStateUpdateTime: metrics.GetOrRegisterTimer("astria/execution/committment_state_update_time", nil),
+		validTxCount:              metrics.GetOrRegisterMeter("astria/execution/valid_tx_count", nil),
+		parsedTxCount:             metrics.GetOrRegisterMeter("astria/execution/parsed_tx_count", nil),
+		reqTxCount:                metrics.GetOrRegisterMeter("astria/execution/req_tx_count", nil),
+	}
+
 	return &ExecutionServiceServerV1Alpha2{
-		eth: eth,
-		bc:  bc,
+		eth:     eth,
+		bc:      bc,
+		metrics: metrics,
 	}
 }
 
@@ -96,6 +117,8 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
+	executionStart := time.Now()
+	defer s.metrics.executeBlockTime.UpdateSince(executionStart)
 
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
@@ -107,6 +130,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// This set of ordered TXs on the TxPool is has been configured to be used by
 	// the Miner when building a payload.
 	s.eth.TxPool().SetAstriaOrdered(req.Transactions)
+	s.metrics.validTxCount.Mark(int64(s.eth.TxPool().AstriaOrderedValidLen()))
+	s.metrics.parsedTxCount.Mark(int64(s.eth.TxPool().AstriaOrderedTotalLen()))
+	s.metrics.reqTxCount.Mark(int64(len(req.Transactions)))
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -138,8 +164,8 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	s.eth.TxPool().ClearAstriaOrdered()
 
 	res := &astriaPb.Block{
-		Number: uint32(block.NumberU64()),
-		Hash:   block.Hash().Bytes(),
+		Number:          uint32(block.NumberU64()),
+		Hash:            block.Hash().Bytes(),
 		ParentBlockHash: block.ParentHash().Bytes(),
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(block.Time()),
@@ -181,6 +207,8 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 
 	s.commitementUpdateLock.Lock()
 	defer s.commitementUpdateLock.Unlock()
+	commitmentUpdateStart := time.Now()
+	defer s.metrics.comittmentStateUpdateTime.UpdateSince(commitmentUpdateStart)
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
 	firmEthHash := common.BytesToHash(req.CommitmentState.Firm.Hash)
