@@ -100,6 +100,11 @@ var (
 	slotsGauge   = metrics.NewRegisteredGauge("txpool/slots", nil)
 
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
+
+	// Metrics related to the astria ordered txs
+	astriaValidMeter     = metrics.GetOrRegisterMeter("astria/txpool/valid", nil)
+	astriaParsedMeter    = metrics.GetOrRegisterMeter("astria/txpool/parsed", nil)
+	astriaRequestedMeter = metrics.GetOrRegisterMeter("astria/txpool/requested", nil)
 )
 
 // BlockChain defines the minimal set of methods needed to back a tx pool with
@@ -281,6 +286,9 @@ type astriaOrdered struct {
 }
 
 func newAstriaOrdered(valid types.Transactions, parsed types.Transactions, pool *LegacyPool) *astriaOrdered {
+	astriaParsedMeter.Mark(int64(len(parsed)))
+	astriaValidMeter.Mark(int64(len(valid)))
+
 	return &astriaOrdered{
 		valid:  valid,
 		parsed: parsed,
@@ -289,11 +297,13 @@ func newAstriaOrdered(valid types.Transactions, parsed types.Transactions, pool 
 }
 
 func (ao *astriaOrdered) clear() {
-	ao.valid = *&types.Transactions{}
-	ao.parsed = *&types.Transactions{}
+	ao.valid = types.Transactions{}
+	ao.parsed = types.Transactions{}
 }
 
 func (pool *LegacyPool) SetAstriaOrdered(rawTxs [][]byte) {
+	astriaRequestedMeter.Mark(int64(len(rawTxs)))
+
 	valid := []*types.Transaction{}
 	parsed := []*types.Transaction{}
 	for idx, rawTx := range rawTxs {

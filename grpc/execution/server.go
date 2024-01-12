@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
 	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
@@ -17,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -36,6 +38,11 @@ type ExecutionServiceServerV1Alpha2 struct {
 	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock    sync.Mutex // Lock for the NewPayload method
 }
+
+var (
+	executeBlockTimer          = metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil)
+	comittmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/committment_state_update_time", nil)
+)
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
 	bc := eth.BlockChain()
@@ -96,6 +103,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
+	// Deliberately called after lock, to more directly measure the time spent executing
+	executionStart := time.Now()
+	defer executeBlockTimer.UpdateSince(executionStart)
 
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
@@ -138,8 +148,8 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	s.eth.TxPool().ClearAstriaOrdered()
 
 	res := &astriaPb.Block{
-		Number: uint32(block.NumberU64()),
-		Hash:   block.Hash().Bytes(),
+		Number:          uint32(block.NumberU64()),
+		Hash:            block.Hash().Bytes(),
 		ParentBlockHash: block.ParentHash().Bytes(),
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(block.Time()),
@@ -178,6 +188,8 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 // CommitmentState.
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("UpdateCommitmentState called", "request", req)
+	commitmentUpdateStart := time.Now()
+	defer comittmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
 
 	s.commitementUpdateLock.Lock()
 	defer s.commitementUpdateLock.Unlock()
