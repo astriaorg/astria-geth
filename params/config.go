@@ -339,9 +339,10 @@ type ChainConfig struct {
 	// Astria Specific Configuration
 	AstriaOverrideGenesisExtraData       bool          `json:"astriaOverrideGenesisExtraData,omitempty"`
 	AstriaExtraDataOverride              hexutil.Bytes `json:"astriaExtraDataOverride,omitempty"`
-	AstriaSequencerInitialHeight         *big.Int      `json:"astriaDequencerInitialHeight,omitempty"`
-	AstriaDataAvailabilityInitialHeight  *big.Int      `json:"astriaDataAvailabilityInitialHeight,omitempty"`
-	AstriaDataAvailabilityHeightVariance *big.Int      `json:"astriaDataAvailabilityHeightVariance,omitempty"`
+	AstriaRollupName                     string        `json:"astriaRollupName,omitempty"`
+	AstriaSequencerInitialHeight         uint32        `json:"astriaDequencerInitialHeight,omitempty"`
+	AstriaDataAvailabilityInitialHeight  uint32        `json:"astriaDataAvailabilityInitialHeight,omitempty"`
+	AstriaDataAvailabilityHeightVariance uint32        `json:"astriaDataAvailabilityHeightVariance,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
@@ -351,6 +352,7 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 
 	// create default extradata
 	extra, _ := rlp.EncodeToBytes([]interface{}{
+		c.AstriaRollupName,
 		c.AstriaSequencerInitialHeight,
 		c.AstriaDataAvailabilityInitialHeight,
 		c.AstriaDataAvailabilityHeightVariance,

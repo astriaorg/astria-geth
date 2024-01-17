@@ -6,6 +6,7 @@ package execution
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sync"
 	"time"
@@ -55,6 +56,22 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 		eth: eth,
 		bc:  bc,
 	}
+}
+
+func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GetGenesisInfoResponse, error) {
+	log.Info("GetGenesisInfo called", "request", req)
+
+	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+
+	res := &astriaPb.GenesisInfo{
+		RollupId:                    rollupId[:],
+		SequencerGenesisBlockNumber: s.bc.Config().AstriaSequencerInitialHeight,
+		CelestiaBaseBlockNumber:     s.bc.Config().AstriaDataAvailabilityInitialHeight,
+		CelestiaBlockVariance:       s.bc.Config().AstriaDataAvailabilityHeightVariance,
+	}
+
+	log.Info("GetGenesisInfo completed", "response", res)
+	return res, nil
 }
 
 // GetBlock will return a block given an identifier.
