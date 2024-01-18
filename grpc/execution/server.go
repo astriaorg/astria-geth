@@ -58,7 +58,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 	}
 }
 
-func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GetGenesisInfoResponse, error) {
+func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
 	log.Info("GetGenesisInfo called", "request", req)
 
 	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
