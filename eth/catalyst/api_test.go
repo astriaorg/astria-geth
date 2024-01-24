@@ -209,6 +209,7 @@ func TestEth2PrepareAndGetPayload(t *testing.T) {
 		FeeRecipient: blockParams.SuggestedFeeRecipient,
 		Random:       blockParams.Random,
 		BeaconRoot:   blockParams.BeaconRoot,
+		Version:      engine.PayloadV1,
 	}).Id()
 	execData, err := api.GetPayloadV1(payloadID)
 	if err != nil {
@@ -1075,6 +1076,7 @@ func TestWithdrawals(t *testing.T) {
 		Random:       blockParams.Random,
 		Withdrawals:  blockParams.Withdrawals,
 		BeaconRoot:   blockParams.BeaconRoot,
+		Version:      engine.PayloadV2,
 	}).Id()
 	execData, err := api.GetPayloadV2(payloadID)
 	if err != nil {
@@ -1123,6 +1125,7 @@ func TestWithdrawals(t *testing.T) {
 		Random:       blockParams.Random,
 		Withdrawals:  blockParams.Withdrawals,
 		BeaconRoot:   blockParams.BeaconRoot,
+		Version:      engine.PayloadV2,
 	}).Id()
 	execData, err = api.GetPayloadV2(payloadID)
 	if err != nil {
@@ -1237,12 +1240,15 @@ func TestNilWithdrawals(t *testing.T) {
 
 	for _, test := range tests {
 		var (
-			err      error
-			shanghai = genesis.Config.IsShanghai(genesis.Config.LondonBlock, test.blockParams.Timestamp)
+			err            error
+			payloadVersion engine.PayloadVersion
+			shanghai       = genesis.Config.IsShanghai(genesis.Config.LondonBlock, test.blockParams.Timestamp)
 		)
 		if !shanghai {
+			payloadVersion = engine.PayloadV1
 			_, err = api.ForkchoiceUpdatedV1(fcState, &test.blockParams)
 		} else {
+			payloadVersion = engine.PayloadV2
 			_, err = api.ForkchoiceUpdatedV2(fcState, &test.blockParams)
 		}
 		if test.wantErr {
@@ -1261,6 +1267,7 @@ func TestNilWithdrawals(t *testing.T) {
 			Timestamp:    test.blockParams.Timestamp,
 			FeeRecipient: test.blockParams.SuggestedFeeRecipient,
 			Random:       test.blockParams.Random,
+			Version:      payloadVersion,
 		}).Id()
 		execData, err := api.GetPayloadV2(payloadID)
 		if err != nil {
@@ -1615,6 +1622,7 @@ func TestParentBeaconBlockRoot(t *testing.T) {
 		Random:       blockParams.Random,
 		Withdrawals:  blockParams.Withdrawals,
 		BeaconRoot:   blockParams.BeaconRoot,
+		Version:      engine.PayloadV3,
 	}).Id()
 	execData, err := api.GetPayloadV3(payloadID)
 	if err != nil {
