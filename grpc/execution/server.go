@@ -57,7 +57,7 @@ var (
 	softCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/soft_commitment_height", nil)
 	firmCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/firm_commitment_height", nil)
 	totalExecutedTxCount = metrics.GetOrRegisterCounter("astria/execution/total_executed_tx", nil)
-	
+
 	executeBlockTimer          = metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil)
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
@@ -83,8 +83,8 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 
 	res := &astriaPb.GenesisInfo{
 		RollupId:                    rollupId[:],
-		SequencerGenesisBlockNumber: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBaseBlockNumber:     s.bc.Config().AstriaCelestiaInitialHeight,
+		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
+		CelestiaBaseBlockHeight:     s.bc.Config().AstriaCelestiaInitialHeight,
 		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
 	}
 
