@@ -1,8 +1,8 @@
-buf.build/gen/go/astria/astria/grpc/go v1.3.0-20240116222638-a448c1fa8d5a.2 h1:S7DdHhTg/v+BHEU4WaTnBCReGB2YFr7H8A7fgjkMZC8=
-buf.build/gen/go/astria/astria/grpc/go v1.3.0-20240116222638-a448c1fa8d5a.2/go.mod h1:E6uL+i0HBdhnF5z72VdlRAMvuPgugl+PFF1f60Lkoso=
-buf.build/gen/go/astria/astria/protocolbuffers/go v1.28.1-20240116222638-a448c1fa8d5a.4/go.mod h1:a2nDGgMECtFWAbBm06prW70xA/jP8X44wz9jpii2cxo=
-buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240116222638-a448c1fa8d5a.1 h1:U2M7lyl3CllQnr1NwF4Mrb8MlCRYWP8nr0Fid7y1kz8=
-buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240116222638-a448c1fa8d5a.1/go.mod h1:HTIae3hIWhV69v7f8BJQzr2tP6yd0/gxwLrMiG306RY=
+buf.build/gen/go/astria/astria/grpc/go v1.3.0-20240207182740-8aa6135e4248.2 h1:lGD10eGmrU5JPIqou/nHEpbT+2WtoZJksrS/vNFt92E=
+buf.build/gen/go/astria/astria/grpc/go v1.3.0-20240207182740-8aa6135e4248.2/go.mod h1:q1xigG3nat7PsF3w7GsQHp5cLhELedUr/NH7t2MXVMM=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.28.1-20240207182740-8aa6135e4248.4/go.mod h1:a2nDGgMECtFWAbBm06prW70xA/jP8X44wz9jpii2cxo=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240207182740-8aa6135e4248.1 h1:VVCye68MnBKAppDEVTKK/rCyq6hQqplwXkugdEMa3kc=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240207182740-8aa6135e4248.1/go.mod h1:HTIae3hIWhV69v7f8BJQzr2tP6yd0/gxwLrMiG306RY=
 buf.build/gen/go/cosmos/cosmos-proto/grpc/go v1.3.0-20211202220400-1935555c206d.2/go.mod h1:AS+jUupCTrSz+T88+ZsW4cOQwkYftIjjMzqXoK0hp3k=
 buf.build/gen/go/cosmos/cosmos-proto/protocolbuffers/go v1.28.1-20211202220400-1935555c206d.4/go.mod h1:eLpHyQeVRAtShjbHVpIla0w/42RZAdaaTpBErMv/6sc=
 buf.build/gen/go/cosmos/cosmos-proto/protocolbuffers/go v1.32.0-20211202220400-1935555c206d.1/go.mod h1:GpU2rx3tDDSvCER8/rvvgu6s6LeMU73TKjfBZ89OZKg=
