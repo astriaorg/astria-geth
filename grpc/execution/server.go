@@ -6,12 +6,13 @@ package execution
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sync"
 	"time"
 
-	astriaGrpc "buf.build/gen/go/astria/astria/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
-	astriaPb "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/execution/v1alpha2"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -40,8 +41,25 @@ type ExecutionServiceServerV1Alpha2 struct {
 }
 
 var (
+	getGenesisInfoRequestCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_requests", nil)
+	getGenesisInfoSuccessCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_success", nil)
+	getBlockRequestCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_requests", nil)
+	getBlockSuccessCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_success", nil)
+	batchGetBlockRequestCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_requests", nil)
+	batchGetBlockSuccessCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_success", nil)
+	executeBlockRequestCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_requests", nil)
+	executeBlockSuccessCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_success", nil)
+	getCommitmentStateRequestCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_requests", nil)
+	getCommitmentStateSuccessCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_success", nil)
+	updateCommitmentStateRequestCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_requests", nil)
+	updateCommitmentStateSuccessCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_success", nil)
+
+	softCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/soft_commitment_height", nil)
+	firmCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/firm_commitment_height", nil)
+	totalExecutedTxCount = metrics.GetOrRegisterCounter("astria/execution/total_executed_tx", nil)
+
 	executeBlockTimer          = metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil)
-	comittmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/committment_state_update_time", nil)
+	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
@@ -57,9 +75,28 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 	}
 }
 
+func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
+	log.Info("GetGenesisInfo called", "request", req)
+	getGenesisInfoRequestCount.Inc(1)
+
+	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+
+	res := &astriaPb.GenesisInfo{
+		RollupId:                    rollupId[:],
+		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
+		CelestiaBaseBlockHeight:     s.bc.Config().AstriaCelestiaInitialHeight,
+		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
+	}
+
+	log.Info("GetGenesisInfo completed", "response", res)
+	getGenesisInfoSuccessCount.Inc(1)
+	return res, nil
+}
+
 // GetBlock will return a block given an identifier.
 func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
 	log.Info("GetBlock called", "request", req)
+	getBlockRequestCount.Inc(1)
 
 	res, err := s.getBlockFromIdentifier(req.GetIdentifier())
 	if err != nil {
@@ -68,6 +105,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 	}
 
 	log.Info("GetBlock completed", "request", req, "response", res)
+	getBlockSuccessCount.Inc(1)
 	return res, nil
 }
 
@@ -75,6 +113,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 // identifiers.
 func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
 	log.Info("BatchGetBlocks called", "request", req)
+	batchGetBlockRequestCount.Inc(1)
 	var blocks []*astriaPb.Block
 
 	ids := req.GetIdentifiers()
@@ -93,6 +132,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 	}
 
 	log.Info("BatchGetBlocks completed", "request", req, "response", res)
+	batchGetBlockSuccessCount.Inc(1)
 	return res, nil
 }
 
@@ -100,6 +140,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
 	log.Info("ExecuteBlock called", "request", req)
+	executeBlockRequestCount.Inc(1)
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
@@ -157,12 +198,15 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	}
 
 	log.Info("ExecuteBlock completed", "request", req, "response", res)
+	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
+	executeBlockSuccessCount.Inc(1)
 	return res, nil
 }
 
 // GetCommitmentState fetches the current CommitmentState of the chain.
 func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("GetCommitmentState called", "request", req)
+	getCommitmentStateRequestCount.Inc(1)
 
 	softBlock, err := ethHeaderToExecutionBlock(s.bc.CurrentSafeBlock())
 	if err != nil {
@@ -181,6 +225,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 	}
 
 	log.Info("GetCommitmentState completed", "request", req, "response", res)
+	getCommitmentStateSuccessCount.Inc(1)
 	return res, nil
 }
 
@@ -188,8 +233,9 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 // CommitmentState.
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("UpdateCommitmentState called", "request", req)
+	updateCommitmentStateRequestCount.Inc(1)
 	commitmentUpdateStart := time.Now()
-	defer comittmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
+	defer commitmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
 
 	s.commitementUpdateLock.Lock()
 	defer s.commitementUpdateLock.Unlock()
@@ -244,6 +290,9 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	}
 
 	log.Info("UpdateCommitmentState completed", "request", req)
+	softCommitmentHeight.Update(int64(softBlock.NumberU64()))
+	firmCommitmentHeight.Update(int64(firmBlock.NumberU64()))
+	updateCommitmentStateSuccessCount.Inc(1)
 	return req.CommitmentState, nil
 }
 
