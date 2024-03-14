@@ -38,6 +38,9 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock    sync.Mutex // Lock for the NewPayload method
+
+	genesisInfoCalled        bool
+	getCommitmentStateCalled bool
 }
 
 var (
@@ -90,6 +93,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 
 	log.Info("GetGenesisInfo completed", "response", res)
 	getGenesisInfoSuccessCount.Inc(1)
+	s.genesisInfoCalled = true
 	return res, nil
 }
 
@@ -148,6 +152,10 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	executionStart := time.Now()
 	defer executeBlockTimer.UpdateSince(executionStart)
 
+	if !s.syncMethodsCalled() {
+		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
 	softHash := s.bc.CurrentSafeBlock().Hash()
@@ -155,9 +163,19 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
+	// Filter out any Deposit txs since we don't currently support them
+	txsToProcess := [][]byte{}
+	for idx, tx := range req.Transactions {
+		if tx.GetDeposit() != nil {
+			log.Info("Deposit transactions detected, not implemented for chain, skipping", "index", idx)
+		} else {
+			txsToProcess = append(txsToProcess, tx.GetSequencedData())
+		}
+	}
+
 	// This set of ordered TXs on the TxPool is has been configured to be used by
 	// the Miner when building a payload.
-	s.eth.TxPool().SetAstriaOrdered(req.Transactions)
+	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -226,6 +244,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 
 	log.Info("GetCommitmentState completed", "request", req, "response", res)
 	getCommitmentStateSuccessCount.Inc(1)
+	s.getCommitmentStateCalled = true
 	return res, nil
 }
 
@@ -239,6 +258,10 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 
 	s.commitementUpdateLock.Lock()
 	defer s.commitementUpdateLock.Unlock()
+
+	if !s.syncMethodsCalled() {
+		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
+	}
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
 	firmEthHash := common.BytesToHash(req.CommitmentState.Firm.Hash)
@@ -335,4 +358,8 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 			Seconds: int64(header.Time),
 		},
 	}, nil
+}
+
+func (s *ExecutionServiceServerV1Alpha2) syncMethodsCalled() bool {
+	return s.genesisInfoCalled && s.getCommitmentStateCalled
 }
