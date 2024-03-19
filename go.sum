@@ -1,8 +1,12 @@
-buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240209225522-97e3bc68f856.2 h1:mK0jVG2+QlJrPKsgL46KKh2ZqHc8lyexQP3TUcOvvNU=
-buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240209225522-97e3bc68f856.2/go.mod h1:soA8k5qokjmp9DmV6jdcWndlVdSYjfa8KJZgsJrvixc=
-buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.28.1-20240209225522-97e3bc68f856.4/go.mod h1:5wxRDkWimPnuhDUA4pFBaHMtrViNJAHguLU1Wq8T6x8=
-buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240209225522-97e3bc68f856.1 h1:6iyjwuNE2uuRikxiDVr56RvDJ+OE3g32v1V1zk5yIjI=
-buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240209225522-97e3bc68f856.1/go.mod h1:m409hJcO0kExqrFoQS8fQ7yXHuuM8JRTEYB+09WWVy0=
+buf.build/gen/go/astria/astria/grpc/go v1.3.0-20240314225002-310b29d1ef86.2/go.mod h1:FFX7uXjELBVDDB3WOW6lO6Sn36kC9QqkHu5xU9xY4ac=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.28.1-20240314225002-310b29d1ef86.4/go.mod h1:2267P73yUQPZlQyW96+03iM2xSEMVcK0DbRqSYbyLJQ=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240314225002-310b29d1ef86.1 h1:tqubh9diC2bk6BzxO9Obs9KgxvsfTEa0hWKqG9kA45E=
+buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240314225002-310b29d1ef86.1/go.mod h1:Ma4TsfKTQby0r4gCkdb6D2ThBxTNu0mSVNZF1udF2ko=
+buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240314225003-19f6b40c3e7b.2 h1:9vSSs8hVVcYrQMt7CTO5r1I4eUhPiXUEBrVBZ9SaCnc=
+buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240314225003-19f6b40c3e7b.2/go.mod h1:wSSvcWt7/78D8RQKhBjTaTvl0j7paszROJHHnJCfZ40=
+buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.28.1-20240314225003-19f6b40c3e7b.4/go.mod h1:Ow5heKoG4UcB64gsltdmZNOZQsL8khlJzysd5lLwOfI=
+buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240314225003-19f6b40c3e7b.1 h1:7dX4IwODvMlzcC0j0wkuLPf4JBzT9EW2O2Vb6tCEHHs=
+buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240314225003-19f6b40c3e7b.1/go.mod h1:1PoFKhLruAgpqRKBz6cY/Z5bfXXYj3pHTvtf2uBoRJs=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=

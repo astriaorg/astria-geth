@@ -3,8 +3,8 @@ module github.com/ethereum/go-ethereum
 go 1.21
 
 require (
-	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240209225522-97e3bc68f856.2
-	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240209225522-97e3bc68f856.1
+	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240314225003-19f6b40c3e7b.2
+	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.32.0-20240314225003-19f6b40c3e7b.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -79,6 +79,7 @@ require (
 )
 
 require (
+	buf.build/gen/go/astria/astria/protocolbuffers/go v1.32.0-20240314225002-310b29d1ef86.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
