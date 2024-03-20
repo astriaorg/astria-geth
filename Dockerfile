@@ -33,7 +33,7 @@ COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 EXPOSE 8545 8546 30303 30303/udp 50051
 ENTRYPOINT ["geth"]
 
-# Add some metadata labels to help programatic image consumption
+# Add some metadata labels to help programmatic image consumption
 ARG COMMIT=""
 ARG VERSION=""
 ARG BUILDNUM=""
