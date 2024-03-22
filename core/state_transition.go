@@ -138,6 +138,7 @@ type Message struct {
 	AccessList    types.AccessList
 	BlobGasFeeCap *big.Int
 	BlobHashes    []common.Hash
+	IsDepositTx   bool
 
 	// When SkipAccountChecks is true, the message nonce is not checked against the
 	// account nonce in state. It also disables checking that the sender is an EOA.
@@ -147,6 +148,12 @@ type Message struct {
 
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
+	isDepositTx := false
+	switch tx := tx.Type(); tx {
+	case types.DepositTxType:
+		isDepositTx = true
+	}
+
 	msg := &Message{
 		Nonce:             tx.Nonce(),
 		GasLimit:          tx.Gas(),
@@ -160,6 +167,7 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipAccountChecks: false,
 		BlobHashes:        tx.BlobHashes(),
 		BlobGasFeeCap:     tx.BlobGasFeeCap(),
+		IsDepositTx:       isDepositTx,
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
@@ -353,6 +361,16 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
+	// if this is a deposit tx, we only need to mint funds and no gas is used.
+	if st.msg.IsDepositTx {
+		st.state.AddBalance(st.msg.From, st.msg.Value)
+		return &ExecutionResult{
+			UsedGas:    0,
+			Err:        nil,
+			ReturnData: nil,
+		}, nil
+	}
+
 	// First check this message satisfies all consensus rules before
 	// applying the message. The rules include these clauses
 	//
