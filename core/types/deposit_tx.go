@@ -11,8 +11,6 @@ import (
 var _ TxData = &DepositTx{}
 
 type DepositTx struct {
-	// // SourceHash uniquely identifies the source of the deposit
-	// SourceHash common.Hash
 	// the address of the account that initiated the deposit
 	From common.Address
 	// value to be minted to `From`
@@ -21,7 +19,6 @@ type DepositTx struct {
 	Gas uint64
 }
 
-// copy creates a deep copy of the transaction data and initializes all fields.
 func (tx *DepositTx) copy() TxData {
 	cpy := &DepositTx{
 		From:  tx.From,
@@ -34,7 +31,6 @@ func (tx *DepositTx) copy() TxData {
 	return cpy
 }
 
-// accessors for innerTx.
 func (tx *DepositTx) txType() byte           { return DepositTxType }
 func (tx *DepositTx) chainID() *big.Int      { return common.Big0 }
 func (tx *DepositTx) accessList() AccessList { return nil }
@@ -56,7 +52,7 @@ func (tx *DepositTx) rawSignatureValues() (v, r, s *big.Int) {
 }
 
 func (tx *DepositTx) setSignatureValues(chainID, v, r, s *big.Int) {
-	// this is a noop for deposit transactions
+	// noop
 }
 
 func (tx *DepositTx) encode(b *bytes.Buffer) error {
