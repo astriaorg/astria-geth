@@ -205,7 +205,10 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 
 	// Configure gRPC if requested.
 	if ctx.IsSet(utils.GRPCEnabledFlag.Name) {
-		serviceV1a2 := execution.NewExecutionServiceServerV1Alpha2(eth)
+		serviceV1a2, err := execution.NewExecutionServiceServerV1Alpha2(eth)
+		if err != nil {
+			utils.Fatalf("failed to create execution service: %v", err)
+		}
 		utils.RegisterGRPCExecutionService(stack, serviceV1a2, &cfg.Node)
 	}
 
