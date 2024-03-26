@@ -745,6 +745,9 @@ func (w *worker) commitTransaction(env *environment, tx *types.Transaction) ([]*
 	if tx.Type() == types.BlobTxType {
 		return w.commitBlobTransaction(env, tx)
 	}
+	if tx.Type() == types.DepositTxType {
+		log.Warn("committing deposit tx")
+	}
 	receipt, err := w.applyTransaction(env, tx)
 	if err != nil {
 		return nil, err
@@ -828,6 +831,9 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		env.state.SetTxContext(tx.Hash(), env.tcount)
 
 		logs, err := w.commitTransaction(env, tx)
+		if err != nil {
+			log.Error("Failed to commit transaction", "hash", tx.Hash(), "err", err)
+		}
 		switch {
 		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -1066,6 +1072,7 @@ func (w *worker) prepareWork(genParams *generateParams) (*environment, error) {
 func (w *worker) fillAstriaTransactions(interrupt *atomic.Int32, env *environment) error {
 	// Use pre ordered array of txs
 	astriaTxs := w.eth.TxPool().AstriaOrdered()
+	log.Warn("Astria txs", "txs", astriaTxs)
 	if len(*astriaTxs) > 0 {
 		if err := w.commitAstriaTransactions(env, astriaTxs, interrupt); err != nil {
 			return err

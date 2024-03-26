@@ -99,6 +99,17 @@ type TxData interface {
 	decode([]byte) error
 }
 
+// From returns the sender of the transaction
+// only for deposit transactions.
+func (tx *Transaction) From() common.Address {
+	if tx.Type() != DepositTxType {
+		return common.Address{}
+	}
+
+	deposit := tx.inner.(*DepositTx)
+	return deposit.From
+}
+
 // EncodeRLP implements rlp.Encoder
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
 	if tx.Type() == LegacyTxType {

@@ -5,7 +5,6 @@
 package execution
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -174,9 +173,11 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	}
 
 	// Filter out any Deposit txs since we don't currently support them
-	txsToProcess := [][]byte{}
+	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
+		log.Info("Processing tx", "tx", tx)
 		if deposit := tx.GetDeposit(); deposit != nil {
+			log.Info("Deposit tx found", "tx", tx)
 			address := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
 				From:  address,
@@ -185,14 +186,15 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			}
 
 			tx := types.NewTx(&txdata)
-			bytes := new(bytes.Buffer)
-			if err := tx.EncodeRLP(bytes); err != nil {
-				log.Error("failed to encode deposit tx", "err", err)
-				return nil, status.Error(codes.InvalidArgument, "Could not encode deposit tx")
-			}
-			txsToProcess = append(txsToProcess, bytes.Bytes())
+			txsToProcess = append(txsToProcess, tx)
 		} else {
-			txsToProcess = append(txsToProcess, tx.GetSequencedData())
+			ethTx := new(types.Transaction)
+			err := ethTx.UnmarshalBinary(tx.GetSequencedData())
+			if err != nil {
+				log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
+				continue
+			}
+			txsToProcess = append(txsToProcess, ethTx)
 		}
 	}
 

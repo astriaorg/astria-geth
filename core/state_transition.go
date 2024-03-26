@@ -26,6 +26,7 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -148,11 +149,7 @@ type Message struct {
 
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
-	isDepositTx := false
-	switch tx := tx.Type(); tx {
-	case types.DepositTxType:
-		isDepositTx = true
-	}
+	isDepositTx := tx.Type() == types.DepositTxType
 
 	msg := &Message{
 		Nonce:             tx.Nonce(),
@@ -173,6 +170,11 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 	if baseFee != nil {
 		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
 	}
+	if isDepositTx {
+		msg.From = tx.From()
+		return msg, nil
+	}
+
 	var err error
 	msg.From, err = types.Sender(s, tx)
 	return msg, err
@@ -363,6 +365,7 @@ func (st *StateTransition) preCheck() error {
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a deposit tx, we only need to mint funds and no gas is used.
 	if st.msg.IsDepositTx {
+		log.Info("executing deposit tx", "from", st.msg.From, "value", st.msg.Value)
 		st.state.AddBalance(st.msg.From, st.msg.Value)
 		return &ExecutionResult{
 			UsedGas:    0,
