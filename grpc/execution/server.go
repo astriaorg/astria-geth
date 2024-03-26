@@ -172,12 +172,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
-	// Filter out any Deposit txs since we don't currently support them
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		log.Info("Processing tx", "tx", tx)
 		if deposit := tx.GetDeposit(); deposit != nil {
-			log.Info("Deposit tx found", "tx", tx)
 			address := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
 				From:  address,
