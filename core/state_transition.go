@@ -26,7 +26,6 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -365,7 +364,6 @@ func (st *StateTransition) preCheck() error {
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a deposit tx, we only need to mint funds and no gas is used.
 	if st.msg.IsDepositTx {
-		log.Info("executing deposit tx", "from", st.msg.From, "value", st.msg.Value)
 		st.state.AddBalance(st.msg.From, st.msg.Value)
 		return &ExecutionResult{
 			UsedGas:    0,
