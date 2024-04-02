@@ -7,6 +7,7 @@ package execution
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -67,8 +68,24 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServerV1Alpha2 {
+func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServerV1Alpha2, error) {
 	bc := eth.BlockChain()
+
+	if bc.Config().AstriaRollupName == "" {
+		return nil, errors.New("rollup name not set")
+	}
+
+	if bc.Config().AstriaSequencerInitialHeight == 0 {
+		return nil, errors.New("sequencer initial height not set")
+	}
+
+	if bc.Config().AstriaCelestiaInitialHeight == 0 {
+		return nil, errors.New("celestia initial height not set")
+	}
+
+	if bc.Config().AstriaCelestiaHeightVariance == 0 {
+		return nil, errors.New("celestia height variance not set")
+	}
 
 	if merger := eth.Merger(); !merger.PoSFinalized() {
 		merger.FinalizePoS()
@@ -77,7 +94,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) *ExecutionServiceServe
 	return &ExecutionServiceServerV1Alpha2{
 		eth: eth,
 		bc:  bc,
-	}
+	}, nil
 }
 
 func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
