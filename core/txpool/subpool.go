@@ -138,7 +138,7 @@ type SubPool interface {
 	// identified by their hashes.
 	Status(hash common.Hash) TxStatus
 
-	SetAstriaOrdered(rawTxs [][]byte)
+	SetAstriaOrdered(types.Transactions)
 	ClearAstriaOrdered()
 	AstriaOrdered() *types.Transactions
 }

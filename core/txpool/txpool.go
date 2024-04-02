@@ -261,9 +261,9 @@ func (p *TxPool) Get(hash common.Hash) *types.Transaction {
 }
 
 // Get returns a transaction if it is contained in the pool, or nil otherwise.
-func (p *TxPool) SetAstriaOrdered(rawTxs [][]byte) {
+func (p *TxPool) SetAstriaOrdered(txs types.Transactions) {
 	for _, subpool := range p.subpools {
-		subpool.SetAstriaOrdered(rawTxs)
+		subpool.SetAstriaOrdered(txs)
 	}
 }
 

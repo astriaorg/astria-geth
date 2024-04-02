@@ -8,9 +8,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
+	primitivev1 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/primitive/v1"
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -140,6 +142,13 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 	return res, nil
 }
 
+func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
+	lo := big.NewInt(0).SetUint64(u128.Lo)
+	hi := big.NewInt(0).SetUint64(u128.Hi)
+	hi.Lsh(hi, 64)
+	return lo.Add(lo, hi)
+}
+
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
@@ -163,13 +172,26 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
-	// Filter out any Deposit txs since we don't currently support them
-	txsToProcess := [][]byte{}
-	for idx, tx := range req.Transactions {
-		if tx.GetDeposit() != nil {
-			log.Info("Deposit transactions detected, not implemented for chain, skipping", "index", idx)
+	txsToProcess := types.Transactions{}
+	for _, tx := range req.Transactions {
+		if deposit := tx.GetDeposit(); deposit != nil {
+			address := common.HexToAddress(deposit.DestinationChainAddress)
+			txdata := types.DepositTx{
+				From:  address,
+				Value: protoU128ToBigInt(deposit.Amount),
+				Gas:   0,
+			}
+
+			tx := types.NewTx(&txdata)
+			txsToProcess = append(txsToProcess, tx)
 		} else {
-			txsToProcess = append(txsToProcess, tx.GetSequencedData())
+			ethTx := new(types.Transaction)
+			err := ethTx.UnmarshalBinary(tx.GetSequencedData())
+			if err != nil {
+				log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
+				continue
+			}
+			txsToProcess = append(txsToProcess, ethTx)
 		}
 	}
 

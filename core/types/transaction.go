@@ -45,6 +45,7 @@ const (
 	AccessListTxType = 0x01
 	DynamicFeeTxType = 0x02
 	BlobTxType       = 0x03
+	DepositTxType    = 0x04
 )
 
 // Transaction is an Ethereum transaction.
@@ -67,7 +68,7 @@ func NewTx(inner TxData) *Transaction {
 
 // TxData is the underlying data of a transaction.
 //
-// This is implemented by DynamicFeeTx, LegacyTx and AccessListTx.
+// This is implemented by DynamicFeeTx, LegacyTx, AccessListTx and DepositTx.
 type TxData interface {
 	txType() byte // returns the type ID
 	copy() TxData // creates a deep copy and initializes all fields
@@ -96,6 +97,17 @@ type TxData interface {
 
 	encode(*bytes.Buffer) error
 	decode([]byte) error
+}
+
+// From returns the sender of the transaction
+// only for deposit transactions.
+func (tx *Transaction) From() common.Address {
+	if tx.Type() != DepositTxType {
+		return common.Address{}
+	}
+
+	deposit := tx.inner.(*DepositTx)
+	return deposit.From
 }
 
 // EncodeRLP implements rlp.Encoder
@@ -202,6 +214,8 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		inner = new(DynamicFeeTx)
 	case BlobTxType:
 		inner = new(BlobTx)
+	case DepositTxType:
+		inner = new(DepositTx)
 	default:
 		return nil, ErrTxTypeNotSupported
 	}

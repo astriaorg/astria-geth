@@ -301,23 +301,15 @@ func (ao *astriaOrdered) clear() {
 	ao.parsed = types.Transactions{}
 }
 
-func (pool *LegacyPool) SetAstriaOrdered(rawTxs [][]byte) {
-	astriaRequestedMeter.Mark(int64(len(rawTxs)))
+func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
+	astriaRequestedMeter.Mark(int64(len(txs)))
 
 	valid := []*types.Transaction{}
 	parsed := []*types.Transaction{}
-	for idx, rawTx := range rawTxs {
-		tx := new(types.Transaction)
-		err := tx.UnmarshalBinary(rawTx)
+	for idx, tx := range txs {
+		err := pool.validateTxBasics(tx, false)
 		if err != nil {
-			log.Warn("failed to unmarshal raw astria tx bytes", rawTx, "at index", idx, "error:", err)
-			continue
-		}
-		parsed = append(parsed, tx)
-
-		err = pool.validateTxBasics(tx, false)
-		if err != nil {
-			log.Warn("astria tx failed validation at index: ", idx, "hash: ", tx.Hash(), "error:", err)
+			log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
 			continue
 		}
 
@@ -667,7 +659,8 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) erro
 		Accept: 0 |
 			1<<types.LegacyTxType |
 			1<<types.AccessListTxType |
-			1<<types.DynamicFeeTxType,
+			1<<types.DynamicFeeTxType |
+			1<<types.DepositTxType,
 		MaxSize: txMaxSize,
 		MinTip:  pool.gasTip.Load(),
 	}
