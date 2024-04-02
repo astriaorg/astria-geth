@@ -337,12 +337,14 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool          `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string        `json:"astriaRollupName,omitempty"`
-	AstriaSequencerInitialHeight   uint32        `json:"astriaSequencerInitialHeight"`
-	AstriaCelestiaInitialHeight    uint32        `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint32        `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaOverrideGenesisExtraData bool            `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaExtraDataOverride        hexutil.Bytes   `json:"astriaExtraDataOverride,omitempty"`
+	AstriaRollupName               string          `json:"astriaRollupName,omitempty"`
+	AstriaSequencerInitialHeight   uint32          `json:"astriaSequencerInitialHeight"`
+	AstriaCelestiaInitialHeight    uint32          `json:"astriaCelestiaInitialHeight"`
+	AstriaCelestiaHeightVariance   uint32          `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaBridgeAddresses          []hexutil.Bytes `json:"astriaBridgeAddresses,omitempty"`
+	AstriaBridgeAllowedAssetDenom  string          `json:"astriaBridgeAllowedAssetDenom,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
@@ -356,6 +358,8 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 		c.AstriaSequencerInitialHeight,
 		c.AstriaCelestiaInitialHeight,
 		c.AstriaCelestiaHeightVariance,
+		c.AstriaBridgeAddresses,
+		c.AstriaBridgeAllowedAssetDenom,
 	})
 	if uint64(len(extra)) > MaximumExtraDataSize {
 		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
