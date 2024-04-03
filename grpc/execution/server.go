@@ -5,6 +5,7 @@
 package execution
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -39,11 +40,14 @@ type ExecutionServiceServerV1Alpha2 struct {
 	eth *eth.Ethereum
 	bc  *core.BlockChain
 
-	commitementUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
-	blockExecutionLock    sync.Mutex // Lock for the NewPayload method
+	commitmentUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
+	blockExecutionLock   sync.Mutex // Lock for the NewPayload method
 
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
+
+	bridgeAddresses      map[string]struct{}
+	bridgeAllowedAssetID [32]byte
 }
 
 var (
@@ -87,13 +91,30 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		return nil, errors.New("celestia height variance not set")
 	}
 
+	if bc.Config().AstriaBridgeAddresses == nil {
+		log.Warn("bridge addresses not set")
+	}
+
+	if bc.Config().AstriaBridgeAllowedAssetDenom == "" && bc.Config().AstriaBridgeAddresses != nil {
+		return nil, errors.New("bridge allowed asset denom not set")
+	}
+
+	bridgeAddresses := make(map[string]struct{})
+	for _, addr := range bc.Config().AstriaBridgeAddresses {
+		bridgeAddresses[string(addr)] = struct{}{}
+	}
+
+	bridgeAllowedAssetID := sha256.Sum256([]byte(bc.Config().AstriaBridgeAllowedAssetDenom))
+
 	if merger := eth.Merger(); !merger.PoSFinalized() {
 		merger.FinalizePoS()
 	}
 
 	return &ExecutionServiceServerV1Alpha2{
-		eth: eth,
-		bc:  bc,
+		eth:                  eth,
+		bc:                   bc,
+		bridgeAddresses:      bridgeAddresses,
+		bridgeAllowedAssetID: bridgeAllowedAssetID,
 	}, nil
 }
 
@@ -192,6 +213,17 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
 		if deposit := tx.GetDeposit(); deposit != nil {
+			bridgeAddress := string(deposit.BridgeAddress)
+			if _, ok := s.bridgeAddresses[bridgeAddress]; !ok {
+				log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
+				continue
+			}
+
+			if !bytes.Equal(deposit.AssetId, s.bridgeAllowedAssetID[:]) {
+				log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
+				continue
+			}
+
 			address := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
 				From:  address,
@@ -295,8 +327,8 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	commitmentUpdateStart := time.Now()
 	defer commitmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
 
-	s.commitementUpdateLock.Lock()
-	defer s.commitementUpdateLock.Unlock()
+	s.commitmentUpdateLock.Lock()
+	defer s.commitmentUpdateLock.Unlock()
 
 	if !s.syncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
