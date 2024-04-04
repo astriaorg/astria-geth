@@ -208,6 +208,17 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 				log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
 				continue
 			}
+
+			if ethTx.Type() == types.DepositTxType {
+				log.Debug("ignoring deposit tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
+				continue
+			}
+
+			if ethTx.Type() == types.BlobTxType {
+				log.Debug("ignoring blob tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
+				continue
+			}
+
 			txsToProcess = append(txsToProcess, ethTx)
 		}
 	}
