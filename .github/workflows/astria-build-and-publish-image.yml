@@ -48,7 +48,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ghcr.io/astriaorg/go-ethereum
+            ghcr.io/astriaorg/astria-geth
           tags: |
             type=ref,event=pr
             type=match,pattern=v(.*),group=1
