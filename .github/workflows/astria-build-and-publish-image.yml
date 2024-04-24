@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "release/1.13"
+      - "main"
     tags:
-      - "geth1.13-v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   # trigger on pull request updates when target is `astria` branch
   pull_request:
     branches:
-      - "release/1.13"
+      - "main"
 
 jobs:
   build-and-publish-latest:
@@ -48,13 +48,13 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
-            ghcr.io/astriaorg/go-ethereum
+            ghcr.io/astriaorg/astria-geth
           tags: |
             type=ref,event=pr
-            type=match,pattern=geth1.13-v(.*),group=1
+            type=match,pattern=v(.*),group=1
             type=sha
             # set latest tag for `astria` branch
-            type=raw,value=geth1.13-latest,enable=${{ github.ref == format('refs/heads/{0}', 'release/1.13') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
@@ -63,7 +63,7 @@ jobs:
           provenance: false
           context: .
           # It takes a long time to build the arm image right now, so we only build it on tags which is what we use for releases, or on merges to the default branch.
-          platforms: ${{ (contains(github.ref, 'refs/tags/geth1.13-v') || github.ref == 'refs/heads/release/1.13') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ (contains(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
