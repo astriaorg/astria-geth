@@ -932,9 +932,6 @@ func (abc *AstriaBridgeAddressConfig) Validate() error {
 	if abc.StartHeight == 0 {
 		return fmt.Errorf("start height must be greater than 0")
 	}
-	if abc.AssetPrecision == 0 {
-		return fmt.Errorf("asset precision must be greater than 0")
-	}
 	if abc.AssetDenom == "" {
 		return fmt.Errorf("asset denom must be set")
 	}

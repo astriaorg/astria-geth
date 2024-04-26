@@ -46,10 +46,13 @@ type ExecutionServiceServerV1Alpha2 struct {
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
 
+	// astria bridge addess to config for that bridge account
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	// a set of allowed asset IDs structs are left empty
 	bridgeAllowedAssetIDs map[[32]byte]struct{}
+	// Map of the height to start using the fee collector to their address
 	feeRecipients         map[uint32]*common.Address
-	nextFeeRecipient      *common.Address
+	nextFeeRecipient      common.Address // Fee recipient for the next block
 }
 
 var (
@@ -105,11 +108,13 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
-			if cfg.Erc20Asset != nil && !nativeBridgeSeen {
-				nativeBridgeSeen = true
-			} else if cfg.Erc20Asset != nil && nativeBridgeSeen {
+			if cfg.Erc20Asset != nil && nativeBridgeSeen {
 				return nil, errors.New("only one native bridge address is allowed")
 			}
+			if cfg.Erc20Asset != nil && !nativeBridgeSeen {
+				nativeBridgeSeen = true
+			}
+
 			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
 			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
 			bridgeAllowedAssetIDs[assetID] = struct{}{}
@@ -117,7 +122,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	}
 
 	feeRecipient := make(map[uint32]*common.Address)
-	nextFeeRecipient := &common.Address{}
+	nextFeeRecipient := common.Address{}
 	if bc.Config().AstriaFeeCollectors == nil {
 		log.Warn("fee asset collectors not set, assets will be burned")
 	} else {
@@ -127,7 +132,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 			feeRecipient[height] = &collector
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
-				nextFeeRecipient = &collector
+				nextFeeRecipient = collector
 			}
 		}
 	}
@@ -248,6 +253,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 				continue
 			}
 
+			if len(deposit.AssetId) != 32 {
+				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
+			}
 			assetID := [32]byte{}
 			copy(assetID[:], deposit.AssetId[:32])
 			if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
@@ -296,7 +304,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		Parent:       prevHeadHash,
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
-		FeeRecipient: *s.nextFeeRecipient,
+		FeeRecipient: s.nextFeeRecipient,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -330,7 +338,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	}
 
 	if next, ok := s.feeRecipients[res.Number+1]; ok {
-		s.nextFeeRecipient = next
+		s.nextFeeRecipient = *next
 	}
 
 	log.Info("ExecuteBlock completed", "request", req, "response", res)
