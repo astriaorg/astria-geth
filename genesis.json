@@ -22,8 +22,8 @@
         "astriaCelestiaHeightVariance": 10,
         "astriaBridgeAddresses": [],
         "astriaBridgeAllowedAssetDenom": "nria",
-        "astriaMinBaseFees": {
-            "1": "1000000000"
+        "astriaEIP1559Params": {
+            "1": { "minBaseFee": 0, "elasticityMultiplier": 2, "BaseFeeChangeDenominator": 8 }
         }
     },
     "difficulty": "10000000",

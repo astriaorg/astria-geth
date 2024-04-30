@@ -339,15 +339,15 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool            `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes   `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string          `json:"astriaRollupName,omitempty"`
-	AstriaSequencerInitialHeight   uint32          `json:"astriaSequencerInitialHeight"`
-	AstriaCelestiaInitialHeight    uint32          `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint32          `json:"astriaCelestiaHeightVariance,omitempty"`
-	AstriaBridgeAddresses          []hexutil.Bytes `json:"astriaBridgeAddresses,omitempty"`
-	AstriaBridgeAllowedAssetDenom  string          `json:"astriaBridgeAllowedAssetDenom,omitempty"`
-	AstriaMinBaseFees              *BaseFeeConfig  `json:"astriaMinBaseFees,omitempty"`
+	AstriaOverrideGenesisExtraData bool                 `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaExtraDataOverride        hexutil.Bytes        `json:"astriaExtraDataOverride,omitempty"`
+	AstriaRollupName               string               `json:"astriaRollupName,omitempty"`
+	AstriaSequencerInitialHeight   uint32               `json:"astriaSequencerInitialHeight"`
+	AstriaCelestiaInitialHeight    uint32               `json:"astriaCelestiaInitialHeight"`
+	AstriaCelestiaHeightVariance   uint32               `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaBridgeAddresses          []hexutil.Bytes      `json:"astriaBridgeAddresses,omitempty"`
+	AstriaBridgeAllowedAssetDenom  string               `json:"astriaBridgeAllowedAssetDenom,omitempty"`
+	AstriaEIP1559Params            *AstriaEIP1559Params `json:"astriaEIP1559Params,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
@@ -371,67 +371,69 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 	return extra
 }
 
-type BaseFeeConfig struct {
-	heights     map[uint64]*big.Int
-	current     *big.Int
-	initialized bool
+type AstriaEIP1559Param struct {
+	MinBaseFee               uint64 `json:"minBaseFee"`
+	ElasticityMultiplier     uint64 `json:"elasticityMultiplier"`
+	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
 }
 
-func (c *BaseFeeConfig) ValueAt(height uint64) *big.Int {
+type AstriaEIP1559Params struct {
+	heights        map[uint64]AstriaEIP1559Param
+	orderedHeights []uint64
+}
+
+func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
 	c.init()
-	if value, exists := c.heights[height]; exists {
-		return value
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return big.NewInt(0).SetUint64(c.heights[h].MinBaseFee)
+		}
 	}
-	return c.current
+	return common.Big0
 }
 
-func (c *BaseFeeConfig) init() {
-	if c.initialized {
+func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
+	c.init()
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return c.heights[h].ElasticityMultiplier
+		}
+	}
+	return DefaultElasticityMultiplier
+}
+
+func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
+	c.init()
+	for _, h := range c.orderedHeights {
+		if height >= h {
+			return c.heights[h].BaseFeeChangeDenominator
+		}
+	}
+	return DefaultBaseFeeChangeDenominator
+}
+
+func (c *AstriaEIP1559Params) init() {
+	if len(c.orderedHeights) > 0 || len(c.heights) < 1 {
 		return
 	}
 
-	if len(c.heights) < 1 {
-		return
+	c.orderedHeights = []uint64{}
+	for k, _ := range c.heights {
+		c.orderedHeights = append(c.orderedHeights, k)
 	}
 
-	heights := []uint64{}
-	for k := range c.heights {
-		heights = append(heights, k)
-	}
-
-	sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
-
-	c.current = big.NewInt(0)
-	lastHeight := heights[len(heights)-1]
-
-	for i := uint64(0); i <= lastHeight; i++ {
-		if _, exists := c.heights[i]; exists {
-			c.current = c.heights[i]
-		} else {
-			c.heights[i] = c.current
-		}
-	}
-
-	c.initialized = true
+	sort.Slice(c.orderedHeights, func(i, j int) bool { return c.orderedHeights[i] > c.orderedHeights[j] })
 }
 
-func (c BaseFeeConfig) MarshalJSON() ([]byte, error) {
-	distinctHeights := make(map[uint64]*big.Int)
-	for k, v := range c.heights {
-		if _, exists := distinctHeights[k]; !exists {
-			distinctHeights[k] = v
-		}
-	}
-	return json.Marshal(distinctHeights)
+func (c AstriaEIP1559Params) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.heights)
 }
 
-func (c *BaseFeeConfig) UnmarshalJSON(data []byte) error {
+func (c *AstriaEIP1559Params) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &c.heights); err != nil {
 		return err
 	}
-
 	c.init()
-
 	return nil
 }
 
@@ -811,12 +813,18 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 }
 
 // BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
-func (c *ChainConfig) BaseFeeChangeDenominator() uint64 {
+func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
+	if c.AstriaEIP1559Params != nil {
+		return c.AstriaEIP1559Params.BaseFeeChangeDenominatorAt(height)
+	}
 	return DefaultBaseFeeChangeDenominator
 }
 
 // ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
-func (c *ChainConfig) ElasticityMultiplier() uint64 {
+func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
+	if c.AstriaEIP1559Params != nil {
+		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
+	}
 	return DefaultElasticityMultiplier
 }
 
