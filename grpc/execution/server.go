@@ -50,8 +50,6 @@ type ExecutionServiceServerV1Alpha2 struct {
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
 	// a set of allowed asset IDs structs are left empty
 	bridgeAllowedAssetIDs map[[32]byte]struct{}
-	// Map of the height to start using the fee collector to their address
-	feeRecipients         map[uint32]*common.Address
 	nextFeeRecipient      common.Address // Fee recipient for the next block
 }
 
@@ -121,15 +119,15 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		}
 	}
 
-	feeRecipient := make(map[uint32]*common.Address)
+	// To decrease compute cost, we identify the next fee recipient at the start
+	// and update it as we execute blocks.
 	nextFeeRecipient := common.Address{}
 	if bc.Config().AstriaFeeCollectors == nil {
 		log.Warn("fee asset collectors not set, assets will be burned")
 	} else {
 		maxHeightCollectorMatch := uint32(0)
 		nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
-		for collector, height := range bc.Config().AstriaFeeCollectors {
-			feeRecipient[height] = &collector
+		for height, collector := range bc.Config().AstriaFeeCollectors {
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
 				nextFeeRecipient = collector
@@ -146,7 +144,6 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		bc:                    bc,
 		bridgeAddresses:       bridgeAddresses,
 		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
-		feeRecipients:         feeRecipient,
 		nextFeeRecipient:      nextFeeRecipient,
 	}, nil
 }
@@ -337,8 +334,8 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		},
 	}
 
-	if next, ok := s.feeRecipients[res.Number+1]; ok {
-		s.nextFeeRecipient = *next
+	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
+		s.nextFeeRecipient = next
 	}
 
 	log.Info("ExecuteBlock completed", "request", req, "response", res)

@@ -29,7 +29,7 @@
             }
         ],
         "astriaFeeCollectors": {
-            "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30": 1
+            "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
         }
     },
     "difficulty": "10000000",

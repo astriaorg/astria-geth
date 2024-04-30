@@ -344,7 +344,7 @@ type ChainConfig struct {
 	AstriaCelestiaInitialHeight    uint32                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint32                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
-	AstriaFeeCollectors            map[common.Address]uint32   `json:"astriaFeeCollectors"`
+	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
