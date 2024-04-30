@@ -17,8 +17,10 @@
 package params
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -345,6 +347,7 @@ type ChainConfig struct {
 	AstriaCelestiaHeightVariance   uint32          `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddresses          []hexutil.Bytes `json:"astriaBridgeAddresses,omitempty"`
 	AstriaBridgeAllowedAssetDenom  string          `json:"astriaBridgeAllowedAssetDenom,omitempty"`
+	AstriaMinBaseFees              *BaseFeeConfig  `json:"astriaMinBaseFees,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
@@ -366,6 +369,70 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 		extra = nil
 	}
 	return extra
+}
+
+type BaseFeeConfig struct {
+	heights     map[uint64]*big.Int
+	current     *big.Int
+	initialized bool
+}
+
+func (c *BaseFeeConfig) ValueAt(height uint64) *big.Int {
+	c.init()
+	if value, exists := c.heights[height]; exists {
+		return value
+	}
+	return c.current
+}
+
+func (c *BaseFeeConfig) init() {
+	if c.initialized {
+		return
+	}
+
+	if len(c.heights) < 1 {
+		return
+	}
+
+	heights := []uint64{}
+	for k := range c.heights {
+		heights = append(heights, k)
+	}
+
+	sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
+
+	c.current = big.NewInt(0)
+	lastHeight := heights[len(heights)-1]
+
+	for i := uint64(0); i <= lastHeight; i++ {
+		if _, exists := c.heights[i]; exists {
+			c.current = c.heights[i]
+		} else {
+			c.heights[i] = c.current
+		}
+	}
+
+	c.initialized = true
+}
+
+func (c BaseFeeConfig) MarshalJSON() ([]byte, error) {
+	distinctHeights := make(map[uint64]*big.Int)
+	for k, v := range c.heights {
+		if _, exists := distinctHeights[k]; !exists {
+			distinctHeights[k] = v
+		}
+	}
+	return json.Marshal(distinctHeights)
+}
+
+func (c *BaseFeeConfig) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &c.heights); err != nil {
+		return err
+	}
+
+	c.init()
+
+	return nil
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

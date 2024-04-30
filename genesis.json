@@ -21,7 +21,10 @@
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
         "astriaBridgeAddresses": [],
-        "astriaBridgeAllowedAssetDenom": "nria"
+        "astriaBridgeAllowedAssetDenom": "nria",
+        "astriaMinBaseFees": {
+            "1": "1000000000"
+        }
     },
     "difficulty": "10000000",
     "gasLimit": "8000000",
