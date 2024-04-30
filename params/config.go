@@ -382,8 +382,20 @@ type AstriaEIP1559Params struct {
 	orderedHeights []uint64
 }
 
+func NewAstriaEIP1559Params(heights map[uint64]AstriaEIP1559Param) *AstriaEIP1559Params {
+	orderedHeights := []uint64{}
+	for k := range heights {
+		orderedHeights = append(orderedHeights, k)
+	}
+	sort.Slice(orderedHeights, func(i, j int) bool { return orderedHeights[i] > orderedHeights[j] })
+
+	return &AstriaEIP1559Params{
+		heights:        heights,
+		orderedHeights: orderedHeights,
+	}
+}
+
 func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
-	c.init()
 	for _, h := range c.orderedHeights {
 		if height >= h {
 			return big.NewInt(0).SetUint64(c.heights[h].MinBaseFee)
@@ -393,7 +405,6 @@ func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
 }
 
 func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
-	c.init()
 	for _, h := range c.orderedHeights {
 		if height >= h {
 			return c.heights[h].ElasticityMultiplier
@@ -403,7 +414,6 @@ func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
 }
 
 func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
-	c.init()
 	for _, h := range c.orderedHeights {
 		if height >= h {
 			return c.heights[h].BaseFeeChangeDenominator
@@ -412,28 +422,16 @@ func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
 	return DefaultBaseFeeChangeDenominator
 }
 
-func (c *AstriaEIP1559Params) init() {
-	if len(c.orderedHeights) > 0 || len(c.heights) < 1 {
-		return
-	}
-
-	c.orderedHeights = []uint64{}
-	for k, _ := range c.heights {
-		c.orderedHeights = append(c.orderedHeights, k)
-	}
-
-	sort.Slice(c.orderedHeights, func(i, j int) bool { return c.orderedHeights[i] > c.orderedHeights[j] })
-}
-
 func (c AstriaEIP1559Params) MarshalJSON() ([]byte, error) {
 	return json.Marshal(c.heights)
 }
 
 func (c *AstriaEIP1559Params) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &c.heights); err != nil {
+	var heights map[uint64]AstriaEIP1559Param
+	if err := json.Unmarshal(data, &heights); err != nil {
 		return err
 	}
-	c.init()
+	*c = *NewAstriaEIP1559Params(heights)
 	return nil
 }
 
