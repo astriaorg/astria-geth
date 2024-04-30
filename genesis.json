@@ -20,8 +20,17 @@
         "astriaSequencerInitialHeight": 2,
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
-        "astriaBridgeAddresses": [],
-        "astriaBridgeAllowedAssetDenom": "nria"
+        "astriaBridgeAddresses": [
+            {
+                "bridgeAddress": "684ae50c49a434199199c9c698115391152d7b3f",
+                "startHeight": 1,
+                "assetDenom": "nria",
+                "assetPrecision": 9
+            }
+        ],
+        "astriaFeeCollectors": {
+            "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
+        }
     },
     "difficulty": "10000000",
     "gasLimit": "8000000",

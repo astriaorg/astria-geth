@@ -5,7 +5,6 @@
 package execution
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -14,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	primitivev1 "buf.build/gen/go/astria/astria/protocolbuffers/go/astria/primitive/v1"
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -25,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
+	"github.com/ethereum/go-ethereum/params"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -46,8 +46,11 @@ type ExecutionServiceServerV1Alpha2 struct {
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
 
-	bridgeAddresses      map[string]struct{}
-	bridgeAllowedAssetID [32]byte
+	// astria bridge addess to config for that bridge account
+	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	// a set of allowed asset IDs structs are left empty
+	bridgeAllowedAssetIDs map[[32]byte]struct{}
+	nextFeeRecipient      common.Address // Fee recipient for the next block
 }
 
 var (
@@ -91,30 +94,57 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		return nil, errors.New("celestia height variance not set")
 	}
 
-	if bc.Config().AstriaBridgeAddresses == nil {
+	bridgeAddresses := make(map[string]*params.AstriaBridgeAddressConfig)
+	bridgeAllowedAssetIDs := make(map[[32]byte]struct{})
+	if bc.Config().AstriaBridgeAddressConfigs == nil {
 		log.Warn("bridge addresses not set")
+	} else {
+		nativeBridgeSeen := false
+		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
+			err := cfg.Validate()
+			if err != nil {
+				return nil, fmt.Errorf("invalid bridge address config: %w", err)
+			}
+
+			if cfg.Erc20Asset != nil && nativeBridgeSeen {
+				return nil, errors.New("only one native bridge address is allowed")
+			}
+			if cfg.Erc20Asset != nil && !nativeBridgeSeen {
+				nativeBridgeSeen = true
+			}
+
+			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
+			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
+			bridgeAllowedAssetIDs[assetID] = struct{}{}
+		}
 	}
 
-	if bc.Config().AstriaBridgeAllowedAssetDenom == "" && bc.Config().AstriaBridgeAddresses != nil {
-		return nil, errors.New("bridge allowed asset denom not set")
+	// To decrease compute cost, we identify the next fee recipient at the start
+	// and update it as we execute blocks.
+	nextFeeRecipient := common.Address{}
+	if bc.Config().AstriaFeeCollectors == nil {
+		log.Warn("fee asset collectors not set, assets will be burned")
+	} else {
+		maxHeightCollectorMatch := uint32(0)
+		nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
+		for height, collector := range bc.Config().AstriaFeeCollectors {
+			if height <= nextBlock && height > maxHeightCollectorMatch {
+				maxHeightCollectorMatch = height
+				nextFeeRecipient = collector
+			}
+		}
 	}
-
-	bridgeAddresses := make(map[string]struct{})
-	for _, addr := range bc.Config().AstriaBridgeAddresses {
-		bridgeAddresses[string(addr)] = struct{}{}
-	}
-
-	bridgeAllowedAssetID := sha256.Sum256([]byte(bc.Config().AstriaBridgeAllowedAssetDenom))
 
 	if merger := eth.Merger(); !merger.PoSFinalized() {
 		merger.FinalizePoS()
 	}
 
 	return &ExecutionServiceServerV1Alpha2{
-		eth:                  eth,
-		bc:                   bc,
-		bridgeAddresses:      bridgeAddresses,
-		bridgeAllowedAssetID: bridgeAllowedAssetID,
+		eth:                   eth,
+		bc:                    bc,
+		bridgeAddresses:       bridgeAddresses,
+		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
+		nextFeeRecipient:      nextFeeRecipient,
 	}, nil
 }
 
@@ -213,21 +243,28 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
 		if deposit := tx.GetDeposit(); deposit != nil {
-			bridgeAddress := string(deposit.BridgeAddress)
-			if _, ok := s.bridgeAddresses[bridgeAddress]; !ok {
+			bridgeAddress := string(deposit.BridgeAddress.GetInner())
+			bac, ok := s.bridgeAddresses[bridgeAddress]
+			if !ok {
 				log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
 				continue
 			}
 
-			if !bytes.Equal(deposit.AssetId, s.bridgeAllowedAssetID[:]) {
+			if len(deposit.AssetId) != 32 {
+				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
+			}
+			assetID := [32]byte{}
+			copy(assetID[:], deposit.AssetId[:32])
+			if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
 				log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
 				continue
 			}
 
+			amount := protoU128ToBigInt(deposit.Amount)
 			address := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
 				From:  address,
-				Value: protoU128ToBigInt(deposit.Amount),
+				Value: bac.ScaledDepositAmount(amount),
 				Gas:   0,
 			}
 
@@ -264,7 +301,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		Parent:       prevHeadHash,
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
-		FeeRecipient: common.Address{},
+		FeeRecipient: s.nextFeeRecipient,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -295,6 +332,10 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(block.Time()),
 		},
+	}
+
+	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
+		s.nextFeeRecipient = next
 	}
 
 	log.Info("ExecuteBlock completed", "request", req, "response", res)
