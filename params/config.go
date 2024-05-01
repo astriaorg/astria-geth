@@ -339,15 +339,15 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool                 `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes        `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string               `json:"astriaRollupName,omitempty"`
-	AstriaSequencerInitialHeight   uint32               `json:"astriaSequencerInitialHeight"`
-	AstriaCelestiaInitialHeight    uint32               `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint32               `json:"astriaCelestiaHeightVariance,omitempty"`
-	AstriaBridgeAddresses          []hexutil.Bytes      `json:"astriaBridgeAddresses,omitempty"`
-	AstriaBridgeAllowedAssetDenom  string               `json:"astriaBridgeAllowedAssetDenom,omitempty"`
-	AstriaEIP1559Params            *AstriaEIP1559Params `json:"astriaEIP1559Params,omitempty"`
+	AstriaOverrideGenesisExtraData bool                        `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
+	AstriaRollupName               string                      `json:"astriaRollupName"`
+	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
+	AstriaCelestiaInitialHeight    uint32                      `json:"astriaCelestiaInitialHeight"`
+	AstriaCelestiaHeightVariance   uint32                      `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
+	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
+	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
@@ -361,8 +361,6 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 		c.AstriaSequencerInitialHeight,
 		c.AstriaCelestiaInitialHeight,
 		c.AstriaCelestiaHeightVariance,
-		c.AstriaBridgeAddresses,
-		c.AstriaBridgeAllowedAssetDenom,
 	})
 	if uint64(len(extra)) > MaximumExtraDataSize {
 		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
@@ -985,4 +983,53 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         c.IsPrague(num, timestamp),
 		IsVerkle:         c.IsVerkle(num, timestamp),
 	}
+}
+
+type AstriaBridgeAddressConfig struct {
+	BridgeAddress  hexutil.Bytes           `json:"bridgeAddress"`
+	StartHeight    uint32                  `json:"startHeight"`
+	AssetDenom     string                  `json:"assetDenom"`
+	AssetPrecision uint16                  `json:"assetPrecision"`
+	Erc20Asset     *AstriaErc20AssetConfig `json:"erc20Asset,omitempty"`
+}
+
+type AstriaErc20AssetConfig struct {
+	Erc20Address      common.Address `json:"erc20Address"`
+	ContractPrecision uint16         `json:"contractPrecision"`
+}
+
+func (abc *AstriaBridgeAddressConfig) Validate() error {
+	if len(abc.BridgeAddress) != 20 {
+		return fmt.Errorf("bridge address must be 20 bytes")
+	}
+	if abc.StartHeight == 0 {
+		return fmt.Errorf("start height must be greater than 0")
+	}
+	if abc.AssetDenom == "" {
+		return fmt.Errorf("asset denom must be set")
+	}
+	if abc.Erc20Asset == nil && abc.AssetPrecision > 18 {
+		return fmt.Errorf("asset precision of native asset must be less than or equal to 18")
+	}
+	if abc.Erc20Asset != nil && abc.AssetPrecision > abc.Erc20Asset.ContractPrecision {
+		return fmt.Errorf("asset precision must be less than or equal to contract precision")
+	}
+	// TODO: support erc20 bridged assets
+	if abc.Erc20Asset != nil {
+		return fmt.Errorf("cannot currently process erc20 bridged assets")
+	}
+
+	return nil
+}
+
+func (abc *AstriaBridgeAddressConfig) ScaledDepositAmount(deposit *big.Int) *big.Int {
+	var exponent uint16
+	if abc.Erc20Asset != nil {
+		exponent = abc.Erc20Asset.ContractPrecision - abc.AssetPrecision
+	} else {
+		exponent = 18 - abc.AssetPrecision
+	}
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
+
+	return new(big.Int).Mul(deposit, multiplier)
 }
