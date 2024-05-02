@@ -17,7 +17,7 @@
         "ethash": {},
         "astriaRollupName": "astriachain",
         "astriaOverrideGenesisExtraData": true,
-        "astriaSequencerInitialHeight": 157125,
+        "astriaSequencerInitialHeight": 2,
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
         "astriaBridgeAddresses": [],
