@@ -1000,7 +1000,7 @@ type AstriaErc20AssetConfig struct {
 
 func (abc *AstriaBridgeAddressConfig) Validate() error {
 	if len(abc.BridgeAddress) != 20 {
-		return fmt.Errorf("bridge address must be 20 bytes")
+		return fmt.Errorf("bridge address must be 20 bytes it is %d", len(abc.BridgeAddress))
 	}
 	if abc.StartHeight == 0 {
 		return fmt.Errorf("start height must be greater than 0")
