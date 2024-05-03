@@ -458,6 +458,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		fee := new(big.Int).SetUint64(st.gasUsed())
 		fee.Mul(fee, effectiveTip)
 		st.state.AddBalance(st.evm.Context.Coinbase, fee)
+
+		// collect base fee instead of burn
+		if rules.IsLondon && st.evm.Context.Coinbase.Cmp(common.Address{}) != 0 {
+			baseFee := new(big.Int).SetUint64(st.gasUsed())
+			baseFee.Mul(baseFee, st.evm.Context.BaseFee)
+			st.state.AddBalance(st.evm.Context.Coinbase, baseFee)
+		}
 	}
 
 	return &ExecutionResult{
