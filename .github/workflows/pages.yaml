@@ -7,7 +7,6 @@ on:
       - main
 jobs:
   deploy:
-    concurrency: ci-${{ github.ref }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,16 +17,18 @@ jobs:
       - name: Build forkdiff
         uses: "docker://protolambda/forkdiff:latest"
         with:
-          args: -repo=/github/workspace -fork=/github/workspace/fork.yaml -out=/github/workspace/index.html
+          args: -repo=./ -fork=./fork.yaml -out=./index.html
 
       - name: Build pages
         run: |
           mkdir -p tmp/pages
-          mv index.html tmp/pages/index.html
-          touch tmp/pages/.nojekyll
+          mv ./index.html ./tmp/pages/index.html
+          touch ./tmp/pages/.nojekyll
 
       - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          folder: tmp/pages
-          clean: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./tmp/pages
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
