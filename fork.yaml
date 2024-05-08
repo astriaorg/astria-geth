@@ -8,7 +8,7 @@ base:
 fork:
   name: astria-geth
   url: https://github.com/astriaorg/astria-geth
-  ref: refs/heads/main
+  ref: refs/heads/quasystaty1/forkdiff
 def:
   title: "astria-geth"
   description: |

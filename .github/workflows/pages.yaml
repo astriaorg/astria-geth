@@ -21,7 +21,7 @@ jobs:
 
       - name: Build pages
         run: |
-          mkdir -p tmp/pages
+          mkdir -p ./tmp/pages
           mv ./index.html ./tmp/pages/index.html
           touch ./tmp/pages/.nojekyll
 
