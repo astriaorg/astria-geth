@@ -56,6 +56,14 @@ func (bc *BlockChain) CurrentFinalBlock() *types.Header {
 	return bc.currentFinalBlock.Load()
 }
 
+func (bc *BlockChain) CurrentBaseCelestiaHeight() uint32 {
+	return bc.currentBaseCelestiaHeight.Load()
+}
+
+func (bc *BlockChain) CurrentNextSequencerHeight() uint32 {
+	return bc.nextSequencerHeight.Load()
+}
+
 // CurrentSafeBlock retrieves the current safe block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentSafeBlock() *types.Header {

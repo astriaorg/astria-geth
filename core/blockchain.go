@@ -238,6 +238,9 @@ type BlockChain struct {
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 
+	currentBaseCelestiaHeight atomic.Uint32				// Latest finalized block height on Celestia
+	nextSequencerHeight atomic.Uint32					// Next sequencer block height
+
 	bodyCache     *lru.Cache[common.Hash, *types.Body]
 	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
 	receiptsCache *lru.Cache[common.Hash, []*types.Receipt]
@@ -323,7 +326,8 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
 	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
-
+	bc.currentBaseCelestiaHeight.Store(bc.Config().AstriaCelestiaInitialHeight)
+	bc.nextSequencerHeight.Store(bc.Config().AstriaSequencerInitialHeight)
 	// Update chain info data metrics
 	chainInfoGauge.Update(metrics.GaugeInfoValue{"chain_id": bc.chainConfig.ChainID.String()})
 
@@ -529,16 +533,27 @@ func (bc *BlockChain) loadLastState() error {
 	}
 
 	// Restore the last known finalized block and safe block
-	// Note: the safe block is not stored on disk and it is set to the last
-	// known finalized block on startup
-	if head := rawdb.ReadFinalizedBlockHash(bc.db); head != (common.Hash{}) {
+	if head := rawdb.ReadSafeBlockHash(bc.db); head != (common.Hash{}) {
 		if block := bc.GetBlockByHash(head); block != nil {
-			bc.currentFinalBlock.Store(block.Header())
-			headFinalizedBlockGauge.Update(int64(block.NumberU64()))
 			bc.currentSafeBlock.Store(block.Header())
 			headSafeBlockGauge.Update(int64(block.NumberU64()))
 		}
 	}
+	if final := rawdb.ReadFinalizedBlockHash(bc.db); final != (common.Hash{}) {
+		if block := bc.GetBlockByHash(final); block != nil {
+			bc.currentFinalBlock.Store(block.Header())
+			headFinalizedBlockGauge.Update(int64(block.NumberU64()))
+		}
+	}
+
+	// Set the Astria related sequencer height values
+	if height := rawdb.ReadBaseCelestiaBlockHeight(bc.db); *height != 0 {
+		bc.currentBaseCelestiaHeight.Store(*height)
+	}
+	if height := rawdb.ReadNextSequencerBlockHeight(bc.db); *height != 0 {
+		bc.nextSequencerHeight.Store(*height)
+	}
+
 	// Issue a status log for the user
 	var (
 		currentSnapBlock  = bc.CurrentSnapBlock()
@@ -620,14 +635,30 @@ func (bc *BlockChain) SetFinalized(header *types.Header) {
 	}
 }
 
+// SetCelestiaFinalized sets the finalized block and the lowest Celestia height to find next finalized at.
+func (bc *BlockChain) SetCelestiaFinalized(header *types.Header, celHeight uint32) {
+	rawdb.WriteBaseCelestiaBlockHeight(bc.db, celHeight)
+	bc.currentBaseCelestiaHeight.Store(celHeight)
+	bc.SetFinalized(header)
+}
+
 // SetSafe sets the safe block.
 func (bc *BlockChain) SetSafe(header *types.Header) {
 	bc.currentSafeBlock.Store(header)
 	if header != nil {
+		rawdb.WriteSafeBlockHash(bc.db, header.Hash())
 		headSafeBlockGauge.Update(int64(header.Number.Uint64()))
 	} else {
+		rawdb.WriteSafeBlockHash(bc.db, common.Hash{})
 		headSafeBlockGauge.Update(0)
 	}
+}
+
+// SetSafeSequencer sets the safe block and the next height to use for sequencer block derivation.
+func (bc *BlockChain) SetSafeSequencer(header *types.Header, seqHeight uint32) {
+	rawdb.WriteNextSequencerBlockHeight(bc.db, seqHeight)
+	bc.nextSequencerHeight.Store(seqHeight)
+	bc.SetSafe(header)
 }
 
 // setHeadBeyondRoot rewinds the local chain to a new head with the extra condition

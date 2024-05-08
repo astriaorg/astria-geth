@@ -156,8 +156,6 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 
 	res := &astriaPb.GenesisInfo{
 		RollupId:                    rollupId[:],
-		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBaseBlockHeight:     s.bc.Config().AstriaCelestiaInitialHeight,
 		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
 	}
 
@@ -363,6 +361,8 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 	res := &astriaPb.CommitmentState{
 		Soft: softBlock,
 		Firm: firmBlock,
+		BaseCelestiaHeight: s.bc.CurrentBaseCelestiaHeight(),
+		NextSequencerHeight: s.bc.CurrentNextSequencerHeight(),
 	}
 
 	log.Info("GetCommitmentState completed", "request", req, "response", res)
@@ -384,6 +384,13 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 
 	if !s.syncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
+	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.BaseCelestiaHeight {
+		return nil, status.Error(codes.InvalidArgument, "Base Celestia height cannot be decreased");
+	}
+	if s.bc.CurrentNextSequencerHeight() >= req.CommitmentState.NextSequencerHeight {
+		return nil, status.Error(codes.InvalidArgument, "Next sequencer height must be greater than current height");
 	}
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
@@ -428,11 +435,11 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	// Updating the safe and final after everything validated
 	currentSafe := s.bc.CurrentSafeBlock().Hash()
 	if currentSafe != softEthHash {
-		s.bc.SetSafe(softBlock.Header())
+		s.bc.SetSafeSequencer(softBlock.Header(), req.CommitmentState.NextSequencerHeight)
 	}
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
-		s.bc.SetFinalized(firmBlock.Header())
+		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
 	}
 
 	log.Info("UpdateCommitmentState completed", "request", req)

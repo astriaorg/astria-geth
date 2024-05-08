@@ -229,7 +229,59 @@ func ReadFinalizedBlockHash(db ethdb.KeyValueReader) common.Hash {
 // WriteFinalizedBlockHash stores the hash of the finalized block.
 func WriteFinalizedBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
 	if err := db.Put(headFinalizedBlockKey, hash.Bytes()); err != nil {
-		log.Crit("Failed to store last finalized block's hash", "err", err)
+		log.Crit("Failed to store last safe block's hash", "err", err)
+	}
+}
+
+// ReadSafeBlockHash retrieves the hash of the safe block.
+func ReadSafeBlockHash(db ethdb.KeyValueReader) common.Hash {
+	data, _ := db.Get(headSafeBlockKey)
+	if len(data) == 0 {
+		return common.Hash{}
+	}
+	return common.BytesToHash(data)
+}
+
+// WriteSafeBlockHash stores the hash of the finalized block.
+func WriteSafeBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
+	if err := db.Put(headSafeBlockKey, hash.Bytes()); err != nil {
+		log.Crit("Failed to store last safe block's hash", "err", err)
+	}
+}
+
+// ReadFinalizedCelestiaBlockHeight retrieves the height of the finalized block.
+func ReadBaseCelestiaBlockHeight(db ethdb.KeyValueReader) *uint32 {
+	data, _ := db.Get(headBaseCelestiaHeightKey)
+	if len(data) != 8 {
+		return nil
+	}
+	number := binary.BigEndian.Uint32(data)
+	return &number
+}
+
+// WriteFinalizedCelestiaBlockHeight stores the height of the finalized block.
+func WriteBaseCelestiaBlockHeight(db ethdb.KeyValueWriter, height uint32) {
+	byteHeight := encodeCometbftBlockNumber(height)
+	if err := db.Put(headBaseCelestiaHeightKey, byteHeight); err != nil {
+		log.Crit("Failed to store base celestia height", "err", err)
+	}
+}
+
+// ReadFinalizedCelestiaBlockHeight retrieves the hash of the finalized block.
+func ReadNextSequencerBlockHeight(db ethdb.KeyValueReader) *uint32 {
+	data, _ := db.Get(headNextSequencerHeightKey)
+	if len(data) != 8 {
+		return nil
+	}
+	number := binary.BigEndian.Uint32(data)
+	return &number
+}
+
+// WriteFinalizedCelestiaBlockHeight stores the hash of the finalized block.
+func WriteNextSequencerBlockHeight(db ethdb.KeyValueWriter, height uint32) {
+	byteHeight := encodeCometbftBlockNumber(height)
+	if err := db.Put(headNextSequencerHeightKey, byteHeight); err != nil {
+		log.Crit("Failed to store base celestia height", "err", err)
 	}
 }
 
