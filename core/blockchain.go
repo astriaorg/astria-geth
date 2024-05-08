@@ -238,8 +238,8 @@ type BlockChain struct {
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 
-	currentBaseCelestiaHeight atomic.Uint32				// Latest finalized block height on Celestia
-	nextSequencerHeight atomic.Uint32					// Next sequencer block height
+	currentBaseCelestiaHeight atomic.Uint32 // Latest finalized block height on Celestia
+	nextSequencerHeight       atomic.Uint32 // Next sequencer block height
 
 	bodyCache     *lru.Cache[common.Hash, *types.Body]
 	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]

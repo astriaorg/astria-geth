@@ -47,7 +47,7 @@ type ExecutionServiceServerV1Alpha2 struct {
 	getCommitmentStateCalled bool
 
 	// astria bridge addess to config for that bridge account
-	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig
 	// a set of allowed asset IDs structs are left empty
 	bridgeAllowedAssetIDs map[[32]byte]struct{}
 	nextFeeRecipient      common.Address // Fee recipient for the next block
@@ -155,8 +155,8 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
 
 	res := &astriaPb.GenesisInfo{
-		RollupId:                    rollupId[:],
-		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
+		RollupId:              rollupId[:],
+		CelestiaBlockVariance: s.bc.Config().AstriaCelestiaHeightVariance,
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)
@@ -359,9 +359,9 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 	}
 
 	res := &astriaPb.CommitmentState{
-		Soft: softBlock,
-		Firm: firmBlock,
-		BaseCelestiaHeight: s.bc.CurrentBaseCelestiaHeight(),
+		Soft:                softBlock,
+		Firm:                firmBlock,
+		BaseCelestiaHeight:  s.bc.CurrentBaseCelestiaHeight(),
 		NextSequencerHeight: s.bc.CurrentNextSequencerHeight(),
 	}
 
@@ -387,10 +387,10 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	}
 
 	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.BaseCelestiaHeight {
-		return nil, status.Error(codes.InvalidArgument, "Base Celestia height cannot be decreased");
+		return nil, status.Error(codes.InvalidArgument, "Base Celestia height cannot be decreased")
 	}
 	if s.bc.CurrentNextSequencerHeight() >= req.CommitmentState.NextSequencerHeight {
-		return nil, status.Error(codes.InvalidArgument, "Next sequencer height must be greater than current height");
+		return nil, status.Error(codes.InvalidArgument, "Next sequencer height must be greater than current height")
 	}
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
