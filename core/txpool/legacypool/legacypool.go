@@ -320,6 +320,7 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 func (pool *LegacyPool) UpdateAstriaInvalid(tx *types.Transaction) {
 	if pool.astria.invalid == nil {
 		pool.astria.invalid = types.Transactions{tx}
+		return
 	}
 
 	pool.astria.invalid = append(pool.astria.invalid, tx)
