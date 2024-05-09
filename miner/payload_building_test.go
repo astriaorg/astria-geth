@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
@@ -38,16 +39,7 @@ func TestBuildPayload(t *testing.T) {
 	defer w.close()
 
 	timestamp := uint64(time.Now().Unix())
-	args := &BuildPayloadArgs{
-		Parent:       b.chain.CurrentBlock().Hash(),
-		Timestamp:    timestamp,
-		Random:       common.Hash{},
-		FeeRecipient: recipient,
-	}
-	payload, err := w.buildPayload(args)
-	if err != nil {
-		t.Fatalf("Failed to build payload %v", err)
-	}
+
 	verify := func(outer *engine.ExecutionPayloadEnvelope, txs int) {
 		payload := outer.ExecutionPayload
 		if payload.ParentHash != b.chain.CurrentBlock().Hash() {
@@ -66,18 +58,139 @@ func TestBuildPayload(t *testing.T) {
 			t.Fatal("Unexpect transaction set")
 		}
 	}
-	empty := payload.ResolveEmpty()
-	verify(empty, 0)
 
-	full := payload.ResolveFull()
-	verify(full, len(pendingTxs))
+	txGasPrice := big.NewInt(10 * params.InitialBaseFee)
 
-	// Ensure resolve can be called multiple times and the
-	// result should be unchanged
-	dataOne := payload.Resolve()
-	dataTwo := payload.Resolve()
-	if !reflect.DeepEqual(dataOne, dataTwo) {
-		t.Fatal("Unexpected payload data")
+	tests := []struct {
+		name                 string
+		txsToBuildPayload    types.Transactions
+		expectedTxsInPayload types.Transactions
+		invalidTxs           types.Transactions
+	}{
+		{
+			name:                 "empty",
+			txsToBuildPayload:    types.Transactions{},
+			expectedTxsInPayload: types.Transactions{},
+			invalidTxs:           types.Transactions{},
+		},
+		{
+			name: "transactions with gas enough to fit into a single block",
+			txsToBuildPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+			expectedTxsInPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+			invalidTxs: types.Transactions{},
+		},
+		{
+			name: "transactions with gas which doesn't fit in a single block",
+			txsToBuildPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+			},
+			expectedTxsInPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+			},
+			invalidTxs: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+			},
+		},
+		{
+			name: "transactions with nonce too high",
+			txsToBuildPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+4, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+			expectedTxsInPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+			},
+			invalidTxs: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+4, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+		},
+		{
+			name: "transactions with nonce too low",
+			txsToBuildPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)-1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+			expectedTxsInPayload: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+			},
+			invalidTxs: types.Transactions{
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)-1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signedTxs := types.Transactions{}
+			signedInvalidTxs := types.Transactions{}
+
+			for _, tx := range tt.txsToBuildPayload {
+				signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testBankKey)
+				if err != nil {
+					t.Fatalf("Failed to sign tx %v", err)
+				}
+				signedTxs = append(signedTxs, signedTx)
+			}
+
+			for _, tx := range tt.invalidTxs {
+				signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testBankKey)
+				if err != nil {
+					t.Fatalf("Failed to sign tx %v", err)
+				}
+				signedInvalidTxs = append(signedInvalidTxs, signedTx)
+			}
+
+			// set the astria ordered txsToBuildPayload
+			b.TxPool().SetAstriaOrdered(signedTxs)
+			astriaTxs := b.TxPool().AstriaOrdered()
+
+			if astriaTxs.Len() != len(tt.txsToBuildPayload) {
+				t.Fatalf("Unexpected number of astria ordered transactions: %d", astriaTxs.Len())
+			}
+
+			txs := types.TxDifference(*astriaTxs, signedTxs)
+			if txs.Len() != 0 {
+				t.Fatalf("Unexpected transactions in astria ordered transactions: %v", txs)
+			}
+
+			args := &BuildPayloadArgs{
+				Parent:       b.chain.CurrentBlock().Hash(),
+				Timestamp:    timestamp,
+				Random:       common.Hash{},
+				FeeRecipient: recipient,
+			}
+
+			payload, err := w.buildPayload(args)
+			if err != nil {
+				t.Fatalf("Failed to build payload %v", err)
+			}
+			full := payload.ResolveFull()
+			verify(full, len(tt.expectedTxsInPayload))
+
+			// Ensure resolve can be called multiple times and the
+			// result should be unchanged
+			dataOne := payload.Resolve()
+			dataTwo := payload.Resolve()
+			if !reflect.DeepEqual(dataOne, dataTwo) {
+				t.Fatal("Unexpected payload data")
+			}
+
+			// Ensure invalid transactions are stored
+			if len(tt.invalidTxs) > 0 {
+				invalidTxs := b.TxPool().AstriaInvalid()
+				txDifference := types.TxDifference(*invalidTxs, signedInvalidTxs)
+				if txDifference.Len() != 0 {
+					t.Fatalf("Unexpected invalid transactions in astria invalid transactions: %v", txDifference)
+				}
+			}
+		})
 	}
 }
 

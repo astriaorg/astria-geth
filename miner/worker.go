@@ -810,6 +810,8 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		// If we don't have enough gas for any further transactions then we're done.
 		if env.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
+			// remove txs from the mempool if they are too big for this block
+			w.eth.TxPool().UpdateAstriaInvalid(tx)
 			break
 		}
 
@@ -821,7 +823,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.chainConfig.IsEIP155(env.header.Number) {
 			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
-
+			w.eth.TxPool().UpdateAstriaInvalid(tx)
 			continue
 		}
 		// Start executing the transaction
@@ -839,7 +841,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 
 		case errors.Is(err, core.ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			log.Trace("Skipping account with high nonce", "sender", from, "nonce", tx.Nonce())
 
 		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
@@ -854,6 +856,10 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
+		}
+		if err != nil {
+			log.Trace("Marking transaction as invalid", "hash", tx.Hash(), "err", err)
+			w.eth.TxPool().UpdateAstriaInvalid(tx)
 		}
 	}
 	if !w.isRunning() && len(coalescedLogs) > 0 {

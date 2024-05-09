@@ -103,7 +103,7 @@ var (
 
 	// Metrics related to the astria ordered txs
 	astriaValidMeter     = metrics.GetOrRegisterMeter("astria/txpool/valid", nil)
-	astriaParsedMeter    = metrics.GetOrRegisterMeter("astria/txpool/parsed", nil)
+	astriaInvalidMeter   = metrics.GetOrRegisterMeter("astria/txpool/invalid", nil)
 	astriaRequestedMeter = metrics.GetOrRegisterMeter("astria/txpool/requested", nil)
 )
 
@@ -280,32 +280,30 @@ func New(config Config, chain BlockChain) *LegacyPool {
 }
 
 type astriaOrdered struct {
-	valid  types.Transactions
-	parsed types.Transactions
-	pool   *LegacyPool
+	valid   types.Transactions
+	invalid types.Transactions
+	pool    *LegacyPool
 }
 
-func newAstriaOrdered(valid types.Transactions, parsed types.Transactions, pool *LegacyPool) *astriaOrdered {
-	astriaParsedMeter.Mark(int64(len(parsed)))
+func newAstriaOrdered(valid types.Transactions, pool *LegacyPool) *astriaOrdered {
 	astriaValidMeter.Mark(int64(len(valid)))
 
 	return &astriaOrdered{
-		valid:  valid,
-		parsed: parsed,
-		pool:   pool,
+		valid:   valid,
+		invalid: types.Transactions{},
+		pool:    pool,
 	}
 }
 
 func (ao *astriaOrdered) clear() {
 	ao.valid = types.Transactions{}
-	ao.parsed = types.Transactions{}
+	ao.invalid = types.Transactions{}
 }
 
 func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 	astriaRequestedMeter.Mark(int64(len(txs)))
 
 	valid := []*types.Transaction{}
-	parsed := []*types.Transaction{}
 	for idx, tx := range txs {
 		err := pool.validateTxBasics(tx, false)
 		if err != nil {
@@ -316,7 +314,22 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 		valid = append(valid, tx)
 	}
 
-	pool.astria = newAstriaOrdered(types.Transactions(valid), types.Transactions(parsed), pool)
+	pool.astria = newAstriaOrdered(valid, pool)
+}
+
+func (pool *LegacyPool) UpdateAstriaInvalid(tx *types.Transaction) {
+	if pool.astria.invalid == nil {
+		pool.astria.invalid = types.Transactions{tx}
+	}
+
+	pool.astria.invalid = append(pool.astria.invalid, tx)
+}
+
+func (pool *LegacyPool) AstriaInvalid() *types.Transactions {
+	if pool.astria == nil {
+		return &types.Transactions{}
+	}
+	return &pool.astria.invalid
 }
 
 func (pool *LegacyPool) ClearAstriaOrdered() {
@@ -324,7 +337,8 @@ func (pool *LegacyPool) ClearAstriaOrdered() {
 		return
 	}
 
-	for _, tx := range pool.astria.parsed {
+	astriaInvalidMeter.Mark(int64(len(pool.astria.invalid)))
+	for _, tx := range pool.astria.invalid {
 		pool.removeTx(tx.Hash(), false, true)
 	}
 

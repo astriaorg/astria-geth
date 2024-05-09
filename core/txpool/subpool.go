@@ -140,5 +140,7 @@ type SubPool interface {
 
 	SetAstriaOrdered(types.Transactions)
 	ClearAstriaOrdered()
+	UpdateAstriaInvalid(tx *types.Transaction)
+	AstriaInvalid() *types.Transactions
 	AstriaOrdered() *types.Transactions
 }

@@ -273,6 +273,23 @@ func (p *TxPool) ClearAstriaOrdered() {
 	}
 }
 
+func (p *TxPool) UpdateAstriaInvalid(tx *types.Transaction) {
+	for _, subpool := range p.subpools {
+		subpool.UpdateAstriaInvalid(tx)
+	}
+}
+
+func (p *TxPool) AstriaInvalid() *types.Transactions {
+	txs := types.Transactions{}
+
+	for _, subpool := range p.subpools {
+		subpoolTxs := subpool.AstriaInvalid()
+		txs = append(txs, *subpoolTxs...)
+	}
+
+	return &txs
+}
+
 func (p *TxPool) AstriaOrdered() *types.Transactions {
 	txs := types.Transactions{}
 
