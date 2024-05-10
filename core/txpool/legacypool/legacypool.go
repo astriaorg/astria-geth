@@ -102,9 +102,9 @@ var (
 	reheapTimer = metrics.NewRegisteredTimer("txpool/reheap", nil)
 
 	// Metrics related to the astria ordered txs
-	astriaValidMeter     = metrics.GetOrRegisterMeter("astria/txpool/valid", nil)
-	astriaInvalidMeter   = metrics.GetOrRegisterMeter("astria/txpool/invalid", nil)
-	astriaRequestedMeter = metrics.GetOrRegisterMeter("astria/txpool/requested", nil)
+	astriaValidMeter             = metrics.GetOrRegisterMeter("astria/txpool/valid", nil)
+	astriaExcludedFromBlockMeter = metrics.GetOrRegisterMeter("astria/txpool/excludedFromBlock", nil)
+	astriaRequestedMeter         = metrics.GetOrRegisterMeter("astria/txpool/requested", nil)
 )
 
 // BlockChain defines the minimal set of methods needed to back a tx pool with
@@ -280,24 +280,24 @@ func New(config Config, chain BlockChain) *LegacyPool {
 }
 
 type astriaOrdered struct {
-	valid   types.Transactions
-	invalid types.Transactions
-	pool    *LegacyPool
+	valid             types.Transactions
+	excludedFromBlock types.Transactions
+	pool              *LegacyPool
 }
 
 func newAstriaOrdered(valid types.Transactions, pool *LegacyPool) *astriaOrdered {
 	astriaValidMeter.Mark(int64(len(valid)))
 
 	return &astriaOrdered{
-		valid:   valid,
-		invalid: types.Transactions{},
-		pool:    pool,
+		valid:             valid,
+		excludedFromBlock: types.Transactions{},
+		pool:              pool,
 	}
 }
 
 func (ao *astriaOrdered) clear() {
 	ao.valid = types.Transactions{}
-	ao.invalid = types.Transactions{}
+	ao.excludedFromBlock = types.Transactions{}
 }
 
 func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
@@ -317,20 +317,20 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 	pool.astria = newAstriaOrdered(valid, pool)
 }
 
-func (pool *LegacyPool) UpdateAstriaInvalid(tx *types.Transaction) {
-	if pool.astria.invalid == nil {
-		pool.astria.invalid = types.Transactions{tx}
+func (pool *LegacyPool) UpdateAstriaExcludedFromBlock(tx *types.Transaction) {
+	if pool.astria.excludedFromBlock == nil {
+		pool.astria.excludedFromBlock = types.Transactions{tx}
 		return
 	}
 
-	pool.astria.invalid = append(pool.astria.invalid, tx)
+	pool.astria.excludedFromBlock = append(pool.astria.excludedFromBlock, tx)
 }
 
-func (pool *LegacyPool) AstriaInvalid() *types.Transactions {
+func (pool *LegacyPool) AstriaExcludedFromBlock() *types.Transactions {
 	if pool.astria == nil {
 		return &types.Transactions{}
 	}
-	return &pool.astria.invalid
+	return &pool.astria.excludedFromBlock
 }
 
 func (pool *LegacyPool) ClearAstriaOrdered() {
@@ -338,8 +338,8 @@ func (pool *LegacyPool) ClearAstriaOrdered() {
 		return
 	}
 
-	astriaInvalidMeter.Mark(int64(len(pool.astria.invalid)))
-	for _, tx := range pool.astria.invalid {
+	astriaExcludedFromBlockMeter.Mark(int64(len(pool.astria.excludedFromBlock)))
+	for _, tx := range pool.astria.excludedFromBlock {
 		pool.removeTx(tx.Hash(), false, true)
 	}
 

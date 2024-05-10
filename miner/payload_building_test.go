@@ -184,7 +184,7 @@ func TestBuildPayload(t *testing.T) {
 
 			// Ensure invalid transactions are stored
 			if len(tt.invalidTxs) > 0 {
-				invalidTxs := b.TxPool().AstriaInvalid()
+				invalidTxs := b.TxPool().AstriaExcludedFromBlock()
 				txDifference := types.TxDifference(*invalidTxs, signedInvalidTxs)
 				if txDifference.Len() != 0 {
 					t.Fatalf("Unexpected invalid transactions in astria invalid transactions: %v", txDifference)
