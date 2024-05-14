@@ -65,13 +65,13 @@ func TestBuildPayload(t *testing.T) {
 		name                 string
 		txsToBuildPayload    types.Transactions
 		expectedTxsInPayload types.Transactions
-		invalidTxs           types.Transactions
+		txsExcludedFromBlock types.Transactions
 	}{
 		{
 			name:                 "empty",
 			txsToBuildPayload:    types.Transactions{},
 			expectedTxsInPayload: types.Transactions{},
-			invalidTxs:           types.Transactions{},
+			txsExcludedFromBlock: types.Transactions{},
 		},
 		{
 			name: "transactions with gas enough to fit into a single block",
@@ -83,7 +83,7 @@ func TestBuildPayload(t *testing.T) {
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
 			},
-			invalidTxs: types.Transactions{},
+			txsExcludedFromBlock: types.Transactions{},
 		},
 		{
 			name: "transactions with gas which doesn't fit in a single block",
@@ -94,7 +94,7 @@ func TestBuildPayload(t *testing.T) {
 			expectedTxsInPayload: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 			},
-			invalidTxs: types.Transactions{
+			txsExcludedFromBlock: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 			},
 		},
@@ -107,7 +107,7 @@ func TestBuildPayload(t *testing.T) {
 			expectedTxsInPayload: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
 			},
-			invalidTxs: types.Transactions{
+			txsExcludedFromBlock: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)+4, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
 			},
 		},
@@ -120,7 +120,7 @@ func TestBuildPayload(t *testing.T) {
 			expectedTxsInPayload: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
 			},
-			invalidTxs: types.Transactions{
+			txsExcludedFromBlock: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)-1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
 			},
 		},
@@ -139,7 +139,7 @@ func TestBuildPayload(t *testing.T) {
 				signedTxs = append(signedTxs, signedTx)
 			}
 
-			for _, tx := range tt.invalidTxs {
+			for _, tx := range tt.txsExcludedFromBlock {
 				signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testBankKey)
 				if err != nil {
 					t.Fatalf("Failed to sign tx %v", err)
@@ -183,11 +183,11 @@ func TestBuildPayload(t *testing.T) {
 			}
 
 			// Ensure invalid transactions are stored
-			if len(tt.invalidTxs) > 0 {
+			if len(tt.txsExcludedFromBlock) > 0 {
 				invalidTxs := b.TxPool().AstriaExcludedFromBlock()
 				txDifference := types.TxDifference(*invalidTxs, signedInvalidTxs)
 				if txDifference.Len() != 0 {
-					t.Fatalf("Unexpected invalid transactions in astria invalid transactions: %v", txDifference)
+					t.Fatalf("Unexpected transactions in transactions excluded from block list: %v", txDifference)
 				}
 			}
 		})

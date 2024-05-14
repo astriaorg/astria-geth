@@ -140,7 +140,7 @@ type SubPool interface {
 
 	SetAstriaOrdered(types.Transactions)
 	ClearAstriaOrdered()
-	UpdateAstriaExcludedFromBlock(tx *types.Transaction)
+	AddToAstriaExcludedFromBlock(tx *types.Transaction)
 	AstriaExcludedFromBlock() *types.Transactions
 	AstriaOrdered() *types.Transactions
 }

@@ -317,7 +317,7 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 	pool.astria = newAstriaOrdered(valid, pool)
 }
 
-func (pool *LegacyPool) UpdateAstriaExcludedFromBlock(tx *types.Transaction) {
+func (pool *LegacyPool) AddToAstriaExcludedFromBlock(tx *types.Transaction) {
 	if pool.astria.excludedFromBlock == nil {
 		pool.astria.excludedFromBlock = types.Transactions{tx}
 		return
@@ -340,7 +340,12 @@ func (pool *LegacyPool) ClearAstriaOrdered() {
 
 	astriaExcludedFromBlockMeter.Mark(int64(len(pool.astria.excludedFromBlock)))
 	for _, tx := range pool.astria.excludedFromBlock {
-		pool.removeTx(tx.Hash(), false, true)
+		n := pool.removeTx(tx.Hash(), false, true)
+		if n == 0 {
+			log.Trace("astria tx excluded from block not found in mempool", "hash", tx.Hash())
+		} else {
+			log.Trace("astria tx excluded from block removed from mempool", "hash", tx.Hash())
+		}
 	}
 
 	pool.astria.clear()

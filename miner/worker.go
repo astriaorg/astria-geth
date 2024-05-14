@@ -811,7 +811,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		if env.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
 			// remove txs from the mempool if they are too big for this block
-			w.eth.TxPool().UpdateAstriaExcludedFromBlock(tx)
+			w.eth.TxPool().AddToAstriaExcludedFromBlock(tx)
 			break
 		}
 
@@ -823,7 +823,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.chainConfig.IsEIP155(env.header.Number) {
 			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
-			w.eth.TxPool().UpdateAstriaExcludedFromBlock(tx)
+			w.eth.TxPool().AddToAstriaExcludedFromBlock(tx)
 			continue
 		}
 		// Start executing the transaction
@@ -859,7 +859,7 @@ func (w *worker) commitAstriaTransactions(env *environment, txs *types.Transacti
 		}
 		if err != nil {
 			log.Trace("Marking transaction as invalid", "hash", tx.Hash(), "err", err)
-			w.eth.TxPool().UpdateAstriaExcludedFromBlock(tx)
+			w.eth.TxPool().AddToAstriaExcludedFromBlock(tx)
 		}
 	}
 	if !w.isRunning() && len(coalescedLogs) > 0 {
