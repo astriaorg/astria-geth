@@ -13,11 +13,9 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
 package catalyst
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -104,6 +102,7 @@ func TestSimulatedBeaconSendWithdrawals(t *testing.T) {
 
 	// generate a bunch of transactions
 	signer := types.NewEIP155Signer(ethService.BlockChain().Config().ChainID)
+	allTxs := types.Transactions{}
 	for i := 0; i < 20; i++ {
 		tx, err := types.SignTx(types.NewTransaction(uint64(i), common.Address{}, big.NewInt(1000), params.TxGas, big.NewInt(params.InitialBaseFee), nil), signer, testKey)
 		if err != nil {
@@ -111,10 +110,10 @@ func TestSimulatedBeaconSendWithdrawals(t *testing.T) {
 		}
 		txs[tx.Hash()] = *tx
 
-		if err := ethService.APIBackend.SendTx(context.Background(), tx); err != nil {
-			t.Fatal("SendTx failed", err)
-		}
+		allTxs = append(allTxs, tx)
 	}
+
+	ethService.TxPool().SetAstriaOrdered(allTxs)
 
 	includedTxs := make(map[common.Hash]struct{})
 	var includedWithdrawals []uint64
