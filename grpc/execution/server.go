@@ -47,7 +47,7 @@ type ExecutionServiceServerV1Alpha2 struct {
 	getCommitmentStateCalled bool
 
 	// astria bridge addess to config for that bridge account
-	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig
 	// a set of allowed asset IDs structs are left empty
 	bridgeAllowedAssetIDs map[[32]byte]struct{}
 	nextFeeRecipient      common.Address // Fee recipient for the next block
