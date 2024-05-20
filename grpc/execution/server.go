@@ -46,11 +46,9 @@ type ExecutionServiceServerV1Alpha2 struct {
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
 
-	// astria bridge addess to config for that bridge account
-	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
-	// a set of allowed asset IDs structs are left empty
-	bridgeAllowedAssetIDs map[[32]byte]struct{}
-	nextFeeRecipient      common.Address // Fee recipient for the next block
+	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
+	bridgeAllowedAssetIDs map[[32]byte]struct{}                        // a set of allowed asset IDs structs are left empty
+	nextFeeRecipient      common.Address                               // Fee recipient for the next block
 }
 
 var (
@@ -149,7 +147,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 }
 
 func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
-	log.Info("GetGenesisInfo called", "request", req)
+	log.Debug("GetGenesisInfo called")
 	getGenesisInfoRequestCount.Inc(1)
 
 	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
@@ -169,7 +167,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 
 // GetBlock will return a block given an identifier.
 func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
-	log.Info("GetBlock called", "request", req)
+	log.Debug("GetBlock called", "request", req)
 	getBlockRequestCount.Inc(1)
 
 	res, err := s.getBlockFromIdentifier(req.GetIdentifier())
@@ -178,7 +176,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 		return nil, err
 	}
 
-	log.Info("GetBlock completed", "request", req, "response", res)
+	log.Debug("GetBlock completed", "request", req, "response", res)
 	getBlockSuccessCount.Inc(1)
 	return res, nil
 }
@@ -186,7 +184,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 // BatchGetBlocks will return an array of Blocks given an array of block
 // identifiers.
 func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
-	log.Info("BatchGetBlocks called", "request", req)
+	log.Debug("BatchGetBlocks called", "first block", req.Identifiers[0], "last block", req.Identifiers[len(req.Identifiers)-1], "total blocks", len(req.Identifiers))
 	batchGetBlockRequestCount.Inc(1)
 	var blocks []*astriaPb.Block
 
@@ -205,7 +203,7 @@ func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req
 		Blocks: blocks,
 	}
 
-	log.Info("BatchGetBlocks completed", "request", req, "response", res)
+	log.Info("BatchGetBlocks completed")
 	batchGetBlockSuccessCount.Inc(1)
 	return res, nil
 }
@@ -220,7 +218,7 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
-	log.Info("ExecuteBlock called", "request", req)
+	log.Debug("ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
 
 	s.blockExecutionLock.Lock()
@@ -338,7 +336,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		s.nextFeeRecipient = next
 	}
 
-	log.Info("ExecuteBlock completed", "request", req, "response", res)
+	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
@@ -346,7 +344,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 // GetCommitmentState fetches the current CommitmentState of the chain.
 func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
-	log.Info("GetCommitmentState called", "request", req)
+	log.Info("GetCommitmentState called")
 	getCommitmentStateRequestCount.Inc(1)
 
 	softBlock, err := ethHeaderToExecutionBlock(s.bc.CurrentSafeBlock())
@@ -365,7 +363,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 		Firm: firmBlock,
 	}
 
-	log.Info("GetCommitmentState completed", "request", req, "response", res)
+	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number)
 	getCommitmentStateSuccessCount.Inc(1)
 	s.getCommitmentStateCalled = true
 	return res, nil
@@ -374,7 +372,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 // UpdateCommitmentState replaces the whole CommitmentState with a new
 // CommitmentState.
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
-	log.Info("UpdateCommitmentState called", "request", req)
+	log.Debug("UpdateCommitmentState called", "request_soft_height", req.CommitmentState.Soft.Number, "request_firm_height", req.CommitmentState.Firm.Number)
 	updateCommitmentStateRequestCount.Inc(1)
 	commitmentUpdateStart := time.Now()
 	defer commitmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
@@ -435,7 +433,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 		s.bc.SetFinalized(firmBlock.Header())
 	}
 
-	log.Info("UpdateCommitmentState completed", "request", req)
+	log.Info("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
 	softCommitmentHeight.Update(int64(softBlock.NumberU64()))
 	firmCommitmentHeight.Update(int64(firmBlock.NumberU64()))
 	updateCommitmentStateSuccessCount.Inc(1)
