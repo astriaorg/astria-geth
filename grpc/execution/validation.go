@@ -57,7 +57,7 @@ func (s *ExecutionServiceServerV1Alpha2) SequencerTxValidation(tx *sequencerbloc
 			log.Debug("ignoring blob tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
 			return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
 		}
-	}
 
-	return nil, fmt.Errorf("unknown sequencer tx type")
+		return ethTx, nil
+	}
 }

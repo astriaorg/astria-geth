@@ -286,7 +286,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
 	n, ethservice, _ := setupExecutionService(t, 10)
-
+	
 	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to dial gRPC: %v", err)
