@@ -7,6 +7,7 @@ import (
 	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,7 +42,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
+func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecdsa.PrivateKey, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -64,14 +65,20 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
 		{
 			BridgeAddress:  bridgeAddress.Bytes(),
 			StartHeight:    2,
-			AssetDenom:     "0000000000000000000000000000nria",
+			AssetDenom:     "nria",
 			AssetPrecision: 18,
 			Erc20Asset:     nil,
 		},
 	}
 
+	feeCollectorKey, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
+
 	astriaFeeCollectors := make(map[uint32]common.Address)
-	astriaFeeCollectors[1] = common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a")
+	astriaFeeCollectors[1] = feeCollector
 	config.AstriaFeeCollectors = astriaFeeCollectors
 
 	genesis := &core.Genesis{
@@ -103,7 +110,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block) {
 		config.TerminalTotalDifficulty = totalDifficulty
 	}
 
-	return genesis, blocks
+	return genesis, blocks, bridgeAddressKey, feeCollectorKey
 }
 
 func getFreePort() (int, error) {
@@ -122,8 +129,6 @@ func getFreePort() (int, error) {
 
 // startEthService creates a full node instance for testing.
 func startEthService(t *testing.T, genesis *core.Genesis) (*node.Node, *eth.Ethereum) {
-	t.Helper()
-
 	freePort, err := getFreePort()
 	if err != nil {
 		t.Fatal("can't get free port:", err)
@@ -154,12 +159,30 @@ func startEthService(t *testing.T, genesis *core.Genesis) (*node.Node, *eth.Ethe
 }
 
 func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*node.Node, *eth.Ethereum, *ExecutionServiceServerV1Alpha2) {
-	genesis, blocks := generateMergeChain(noOfBlocksToGenerate, true)
+	t.Helper()
+	genesis, blocks, bridgeAddressKey, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
 	n, ethservice := startEthService(t, genesis)
 
 	serviceV1Alpha1, err := NewExecutionServiceServerV1Alpha2(ethservice)
 	if err != nil {
 		t.Fatal("can't create execution service:", err)
+	}
+
+	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
+	if serviceV1Alpha1.nextFeeRecipient != feeCollector {
+		t.Fatalf("nextFeeRecipient not set correctly")
+	}
+
+	bridgeAsset := sha256.Sum256([]byte(genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom))
+	_, ok := serviceV1Alpha1.bridgeAllowedAssetIDs[bridgeAsset]
+	if !ok {
+		t.Fatalf("bridgeAllowedAssetIDs does not contain bridge asset id")
+	}
+
+	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
+	_, ok = serviceV1Alpha1.bridgeAddresses[string(bridgeAddress.Bytes())]
+	if !ok {
+		t.Fatalf("bridgeAddress not set correctly")
 	}
 
 	utils.RegisterGRPCExecutionService(n, serviceV1Alpha1, n.Config())
