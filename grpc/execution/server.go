@@ -250,6 +250,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 			if len(deposit.AssetId) != 32 {
 				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
+				continue
 			}
 			assetID := [32]byte{}
 			copy(assetID[:], deposit.AssetId[:32])
