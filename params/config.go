@@ -359,8 +359,6 @@ func (c *ChainConfig) AstriaExtraData() []byte {
 	extra, _ := rlp.EncodeToBytes([]interface{}{
 		c.AstriaRollupName,
 		c.AstriaSequencerInitialHeight,
-		c.AstriaCelestiaInitialHeight,
-		c.AstriaCelestiaHeightVariance,
 	})
 	if uint64(len(extra)) > MaximumExtraDataSize {
 		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
