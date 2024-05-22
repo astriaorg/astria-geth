@@ -1584,6 +1584,7 @@ func testEIP155Transition(t *testing.T, scheme string) {
 				EIP150Block:    big.NewInt(0),
 				EIP155Block:    big.NewInt(2),
 				HomesteadBlock: new(big.Int),
+				AstriaConfig:   new(params.AstriaChainConfig),
 			},
 			Alloc: GenesisAlloc{address: {Balance: funds}, deleteAddr: {Balance: new(big.Int)}},
 		}
@@ -1699,6 +1700,7 @@ func testEIP161AccountRemoval(t *testing.T, scheme string) {
 				EIP155Block:    new(big.Int),
 				EIP150Block:    new(big.Int),
 				EIP158Block:    big.NewInt(2),
+				AstriaConfig:   new(params.AstriaChainConfig),
 			},
 			Alloc: GenesisAlloc{address: {Balance: funds}},
 		}
@@ -4325,6 +4327,7 @@ func TestCreateThenDeletePreByzantium(t *testing.T) {
 		EIP155Block:    big.NewInt(10),
 		EIP158Block:    big.NewInt(10),
 		ByzantiumBlock: big.NewInt(1_700_000),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	})
 }
 func TestCreateThenDeletePostByzantium(t *testing.T) {

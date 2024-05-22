@@ -91,8 +91,8 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header) *big.Int {
 		baseFee := num.Sub(parent.BaseFee, num)
 
 		lowerBound := common.Big0
-		if config.AstriaEIP1559Params != nil {
-			lowerBound = config.AstriaEIP1559Params.MinBaseFeeAt(parent.Number.Uint64() + 1)
+		if config.AstriaEIP1559Params() != nil {
+			lowerBound = config.AstriaEIP1559Params().MinBaseFeeAt(parent.Number.Uint64() + 1)
 		}
 
 		return math.BigMax(baseFee, lowerBound)

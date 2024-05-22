@@ -61,10 +61,10 @@ func TestSequenceTxValidation(t *testing.T) {
 	}
 	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
 
-	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs()[0].AssetDenom))
 	invalidBridgeAssetDenom := sha256.Sum256([]byte("invalid-asset-denom"))
 
-	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs()[0].BridgeAddress
 
 	tests := []struct {
 		description string

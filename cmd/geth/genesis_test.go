@@ -42,7 +42,8 @@ var customGenesisTests = []struct {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config"     : {
-				"terminalTotalDifficultyPassed": true
+				"terminalTotalDifficultyPassed": true,
+                "astriaConfig": {}
 			}
 		}`,
 		query:  "eth.getBlock(0).nonce",
@@ -64,7 +65,8 @@ var customGenesisTests = []struct {
 				"homesteadBlock"                : 42,
 				"daoForkBlock"                  : 141,
 				"daoForkSupport"                : true,
-				"terminalTotalDifficultyPassed" : true
+				"terminalTotalDifficultyPassed" : true,
+                "astriaConfig": {}
 			}
 		}`,
 		query:  "eth.getBlock(0).nonce",
@@ -115,7 +117,8 @@ func TestCustomBackend(t *testing.T) {
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config"     : {
-				"terminalTotalDifficultyPassed": true
+				"terminalTotalDifficultyPassed": true,
+                "astriaConfig": {}
 			}
 		}`
 	type backendTest struct {

@@ -34,11 +34,13 @@ var Forks = map[string]*params.ChainConfig{
 	"Homestead": {
 		ChainID:        big.NewInt(1),
 		HomesteadBlock: big.NewInt(0),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"EIP150": {
 		ChainID:        big.NewInt(1),
 		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"EIP158": {
 		ChainID:        big.NewInt(1),
@@ -46,6 +48,7 @@ var Forks = map[string]*params.ChainConfig{
 		EIP150Block:    big.NewInt(0),
 		EIP155Block:    big.NewInt(0),
 		EIP158Block:    big.NewInt(0),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"Byzantium": {
 		ChainID:        big.NewInt(1),
@@ -55,6 +58,7 @@ var Forks = map[string]*params.ChainConfig{
 		EIP158Block:    big.NewInt(0),
 		DAOForkBlock:   big.NewInt(0),
 		ByzantiumBlock: big.NewInt(0),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"Constantinople": {
 		ChainID:             big.NewInt(1),
@@ -66,6 +70,7 @@ var Forks = map[string]*params.ChainConfig{
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(10000000),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"ConstantinopleFix": {
 		ChainID:             big.NewInt(1),
@@ -77,6 +82,7 @@ var Forks = map[string]*params.ChainConfig{
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"Istanbul": {
 		ChainID:             big.NewInt(1),
@@ -89,6 +95,7 @@ var Forks = map[string]*params.ChainConfig{
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"MuirGlacier": {
 		ChainID:             big.NewInt(1),
@@ -102,21 +109,25 @@ var Forks = map[string]*params.ChainConfig{
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"FrontierToHomesteadAt5": {
 		ChainID:        big.NewInt(1),
 		HomesteadBlock: big.NewInt(5),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"HomesteadToEIP150At5": {
 		ChainID:        big.NewInt(1),
 		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(5),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"HomesteadToDaoAt5": {
 		ChainID:        big.NewInt(1),
 		HomesteadBlock: big.NewInt(0),
 		DAOForkBlock:   big.NewInt(5),
 		DAOForkSupport: true,
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"EIP158ToByzantiumAt5": {
 		ChainID:        big.NewInt(1),
@@ -125,6 +136,7 @@ var Forks = map[string]*params.ChainConfig{
 		EIP155Block:    big.NewInt(0),
 		EIP158Block:    big.NewInt(0),
 		ByzantiumBlock: big.NewInt(5),
+		AstriaConfig:   new(params.AstriaChainConfig),
 	},
 	"ByzantiumToConstantinopleAt5": {
 		ChainID:             big.NewInt(1),
@@ -134,6 +146,7 @@ var Forks = map[string]*params.ChainConfig{
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(5),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"ByzantiumToConstantinopleFixAt5": {
 		ChainID:             big.NewInt(1),
@@ -144,6 +157,7 @@ var Forks = map[string]*params.ChainConfig{
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(5),
 		PetersburgBlock:     big.NewInt(5),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"ConstantinopleFixToIstanbulAt5": {
 		ChainID:             big.NewInt(1),
@@ -155,6 +169,7 @@ var Forks = map[string]*params.ChainConfig{
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(5),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"Berlin": {
 		ChainID:             big.NewInt(1),
@@ -168,6 +183,7 @@ var Forks = map[string]*params.ChainConfig{
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"BerlinToLondonAt5": {
 		ChainID:             big.NewInt(1),
@@ -182,6 +198,7 @@ var Forks = map[string]*params.ChainConfig{
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(5),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"London": {
 		ChainID:             big.NewInt(1),
@@ -196,6 +213,7 @@ var Forks = map[string]*params.ChainConfig{
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"ArrowGlacier": {
 		ChainID:             big.NewInt(1),
@@ -211,6 +229,7 @@ var Forks = map[string]*params.ChainConfig{
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"ArrowGlacierToMergeAtDiffC0000": {
 		ChainID:                 big.NewInt(1),
@@ -229,6 +248,7 @@ var Forks = map[string]*params.ChainConfig{
 		GrayGlacierBlock:        big.NewInt(0),
 		MergeNetsplitBlock:      big.NewInt(0),
 		TerminalTotalDifficulty: big.NewInt(0xC0000),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 	"GrayGlacier": {
 		ChainID:             big.NewInt(1),
@@ -245,6 +265,7 @@ var Forks = map[string]*params.ChainConfig{
 		LondonBlock:         big.NewInt(0),
 		ArrowGlacierBlock:   big.NewInt(0),
 		GrayGlacierBlock:    big.NewInt(0),
+		AstriaConfig:        new(params.AstriaChainConfig),
 	},
 	"Merge": {
 		ChainID:                 big.NewInt(1),
@@ -262,6 +283,7 @@ var Forks = map[string]*params.ChainConfig{
 		ArrowGlacierBlock:       big.NewInt(0),
 		MergeNetsplitBlock:      big.NewInt(0),
 		TerminalTotalDifficulty: big.NewInt(0),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 	"Shanghai": {
 		ChainID:                 big.NewInt(1),
@@ -280,6 +302,7 @@ var Forks = map[string]*params.ChainConfig{
 		MergeNetsplitBlock:      big.NewInt(0),
 		TerminalTotalDifficulty: big.NewInt(0),
 		ShanghaiTime:            u64(0),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 	"MergeToShanghaiAtTime15k": {
 		ChainID:                 big.NewInt(1),
@@ -298,6 +321,7 @@ var Forks = map[string]*params.ChainConfig{
 		MergeNetsplitBlock:      big.NewInt(0),
 		TerminalTotalDifficulty: big.NewInt(0),
 		ShanghaiTime:            u64(15_000),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 	"Cancun": {
 		ChainID:                 big.NewInt(1),
@@ -317,6 +341,7 @@ var Forks = map[string]*params.ChainConfig{
 		TerminalTotalDifficulty: big.NewInt(0),
 		ShanghaiTime:            u64(0),
 		CancunTime:              u64(0),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 	"ShanghaiToCancunAtTime15k": {
 		ChainID:                 big.NewInt(1),
@@ -336,6 +361,7 @@ var Forks = map[string]*params.ChainConfig{
 		TerminalTotalDifficulty: big.NewInt(0),
 		ShanghaiTime:            u64(0),
 		CancunTime:              u64(15_000),
+		AstriaConfig:            new(params.AstriaChainConfig),
 	},
 }
 

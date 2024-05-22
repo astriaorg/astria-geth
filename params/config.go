@@ -63,6 +63,7 @@ var (
 		TerminalTotalDifficultyPassed: true,
 		ShanghaiTime:                  newUint64(1681338455),
 		Ethash:                        new(EthashConfig),
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 	// HoleskyChainConfig contains the chain parameters to run a node on the Holesky test network.
 	HoleskyChainConfig = &ChainConfig{
@@ -87,6 +88,7 @@ var (
 		MergeNetsplitBlock:            nil,
 		ShanghaiTime:                  newUint64(1696000704),
 		Ethash:                        new(EthashConfig),
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 	// SepoliaChainConfig contains the chain parameters to run a node on the Sepolia test network.
 	SepoliaChainConfig = &ChainConfig{
@@ -111,6 +113,7 @@ var (
 		MergeNetsplitBlock:            big.NewInt(1735371),
 		ShanghaiTime:                  newUint64(1677557088),
 		Ethash:                        new(EthashConfig),
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 	// GoerliChainConfig contains the chain parameters to run a node on the Görli test network.
 	GoerliChainConfig = &ChainConfig{
@@ -136,6 +139,7 @@ var (
 			Period: 15,
 			Epoch:  30000,
 		},
+		AstriaConfig: new(AstriaChainConfig),
 	}
 	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Ethash consensus.
@@ -165,6 +169,7 @@ var (
 		TerminalTotalDifficultyPassed: true,
 		Ethash:                        new(EthashConfig),
 		Clique:                        nil,
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 
 	AllDevChainProtocolChanges = &ChainConfig{
@@ -186,6 +191,7 @@ var (
 		TerminalTotalDifficulty:       big.NewInt(0),
 		TerminalTotalDifficultyPassed: true,
 		IsDevMode:                     true,
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
@@ -216,6 +222,7 @@ var (
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        nil,
 		Clique:                        &CliqueConfig{Period: 0, Epoch: 30000},
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 
 	// TestChainConfig contains every protocol change (EIPs) introduced
@@ -246,6 +253,7 @@ var (
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        new(EthashConfig),
 		Clique:                        nil,
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 
 	// NonActivatedConfig defines the chain configuration without activating
@@ -276,6 +284,7 @@ var (
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        new(EthashConfig),
 		Clique:                        nil,
+		AstriaConfig:                  new(AstriaChainConfig),
 	}
 	TestRules = TestChainConfig.Rules(new(big.Int), false, 0)
 )
@@ -339,20 +348,60 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool                        `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string                      `json:"astriaRollupName"`
-	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
-	AstriaCelestiaInitialHeight    uint32                      `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint32                      `json:"astriaCelestiaHeightVariance,omitempty"`
-	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
-	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
-	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
+	AstriaConfig *AstriaChainConfig `json:"astriaConfig,omitempty"`
+}
+
+type AstriaChainConfig struct {
+	OverrideGenesisExtraData bool                        `json:"overrideGenesisExtraData,omitempty"`
+	ExtraDataOverride        hexutil.Bytes               `json:"extraDataOverride,omitempty"`
+	RollupName               string                      `json:"rollupName"`
+	SequencerInitialHeight   uint32                      `json:"sequencerInitialHeight"`
+	CelestiaInitialHeight    uint32                      `json:"celestiaInitialHeight"`
+	CelestiaHeightVariance   uint32                      `json:"celestiaHeightVariance,omitempty"`
+	BridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+	FeeCollectors            map[uint32]common.Address   `json:"feeCollectors"`
+	EIP1559Params            *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
+}
+
+func (c *ChainConfig) AstriaOverrideGenesisExtraData() bool {
+	return c.AstriaConfig.OverrideGenesisExtraData
+}
+
+func (c *ChainConfig) AstriaExtraDataOverride() []byte {
+	return c.AstriaConfig.ExtraDataOverride
+}
+
+func (c *ChainConfig) AstriaRollupName() string {
+	return c.AstriaConfig.RollupName
+}
+
+func (c *ChainConfig) AstriaSequencerInitialHeight() uint32 {
+	return c.AstriaConfig.SequencerInitialHeight
+}
+
+func (c *ChainConfig) AstriaCelestiaInitialHeight() uint32 {
+	return c.AstriaConfig.CelestiaInitialHeight
+}
+
+func (c *ChainConfig) AstriaCelestiaHeightVariance() uint32 {
+	return c.AstriaConfig.CelestiaHeightVariance
+}
+
+func (c *ChainConfig) AstriaBridgeAddressConfigs() []AstriaBridgeAddressConfig {
+	return c.AstriaConfig.BridgeAddressConfigs
+}
+
+func (c *ChainConfig) AstriaFeeCollectors() map[uint32]common.Address {
+	return c.AstriaConfig.FeeCollectors
+}
+
+func (c *ChainConfig) AstriaEIP1559Params() *AstriaEIP1559Params {
+	return c.AstriaConfig.EIP1559Params
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
-	if c.AstriaExtraDataOverride != nil {
-		return c.AstriaExtraDataOverride
+	if c.AstriaExtraDataOverride() != nil {
+		return c.AstriaExtraDataOverride()
 	}
 
 	// create default extradata
@@ -808,16 +857,16 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 
 // BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
 func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.BaseFeeChangeDenominatorAt(height)
+	if c.AstriaEIP1559Params() != nil {
+		return c.AstriaEIP1559Params().BaseFeeChangeDenominatorAt(height)
 	}
 	return DefaultBaseFeeChangeDenominator
 }
 
 // ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
 func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
+	if c.AstriaEIP1559Params() != nil {
+		return c.AstriaEIP1559Params().ElasticityMultiplierAt(height)
 	}
 	return DefaultElasticityMultiplier
 }

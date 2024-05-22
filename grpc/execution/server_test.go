@@ -34,18 +34,18 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 		t.Fatalf("GetGenesisInfo failed: %v", err)
 	}
 
-	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
+	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName()))
 
 	if bytes.Compare(genesisInfo.RollupId, hashedRollupId[:]) != 0 {
 		t.Fatalf("RollupId is not correct")
 	}
-	if genesisInfo.GetSequencerGenesisBlockHeight() != ethservice.BlockChain().Config().AstriaSequencerInitialHeight {
+	if genesisInfo.GetSequencerGenesisBlockHeight() != ethservice.BlockChain().Config().AstriaSequencerInitialHeight() {
 		t.Fatalf("SequencerInitialHeight is not correct")
 	}
-	if genesisInfo.GetCelestiaBaseBlockHeight() != ethservice.BlockChain().Config().AstriaCelestiaInitialHeight {
+	if genesisInfo.GetCelestiaBaseBlockHeight() != ethservice.BlockChain().Config().AstriaCelestiaInitialHeight() {
 		t.Fatalf("CelestiaInitialHeight is not correct")
 	}
-	if genesisInfo.GetCelestiaBlockVariance() != ethservice.BlockChain().Config().AstriaCelestiaHeightVariance {
+	if genesisInfo.GetCelestiaBlockVariance() != ethservice.BlockChain().Config().AstriaCelestiaHeightVariance() {
 		t.Fatalf("CelestiaHeightVariance is not correct")
 	}
 
@@ -286,7 +286,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
 	n, ethservice, _ := setupExecutionService(t, 10)
-	
+
 	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to dial gRPC: %v", err)
@@ -479,8 +479,8 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithDepos
 
 	amountToDeposit := big.NewInt(1000000000000000000)
 	depositAmount := bigIntToProtoU128(big.NewInt(1000000000000000000))
-	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs()[0].BridgeAddress
+	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs()[0].AssetDenom))
 
 	// create new chain destination address for better testing
 	chainDestinationAddressPrivKey, err := crypto.GenerateKey()
