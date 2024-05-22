@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: MIT or Apache-2.0
+pragma solidity ^0.8.21;
+
+interface IAstriaMintableERC20 {
+    function mint(address _to, uint256 _amount) external;
+    function burn(address _from, uint256 _amount) external;
+}

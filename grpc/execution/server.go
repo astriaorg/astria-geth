@@ -18,6 +18,7 @@ import (
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
@@ -252,17 +253,50 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
 				continue
 			}
+
 			assetID := [32]byte{}
 			copy(assetID[:], deposit.AssetId[:32])
+
 			if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
 				log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
 				continue
 			}
 
+			if bac.Erc20Asset != nil {
+				log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
+				abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
+				if err != nil {
+					// this should never happen, as the abi is hardcoded in the contract bindings
+					return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)
+				}
+
+				recipient := common.HexToAddress(deposit.DestinationChainAddress)
+				amount := protoU128ToBigInt(deposit.Amount)
+
+				// pack arguments for calling the `mint` function on the ERC20 contract
+				args := []interface{}{recipient, bac.ScaledDepositAmount(amount)}
+				calldata, err := abi.Pack("mint", args...)
+				if err != nil {
+					return nil, err
+				}
+
+				txdata := types.DepositTx{
+					From:  common.Address{}, // don't need to set this
+					Value: new(big.Int),     // don't need to set this
+					Gas:   0,
+					To:    &bac.Erc20Asset.ContractAddress,
+					Data:  calldata,
+				}
+
+				tx := types.NewTx(&txdata)
+				txsToProcess = append(txsToProcess, tx)
+				continue
+			}
+
 			amount := protoU128ToBigInt(deposit.Amount)
-			address := common.HexToAddress(deposit.DestinationChainAddress)
+			recipient := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
-				From:  address,
+				From:  recipient,
 				Value: bac.ScaledDepositAmount(amount),
 				Gas:   0,
 			}
