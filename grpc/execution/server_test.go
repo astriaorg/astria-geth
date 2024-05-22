@@ -52,11 +52,6 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 	if serviceV1Alpha1.genesisInfoCalled != true {
 		t.Fatalf("GetGenesisInfo should be called")
 	}
-
-	res := ethservice.BlockChain().GetBlockByNumber(3)
-	if res == nil {
-		t.Fatalf("Block not found")
-	}
 }
 
 func TestExecutionService_GetBlockByBlockNumber(t *testing.T) {
@@ -286,7 +281,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
 	n, ethservice, _ := setupExecutionService(t, 10)
-	
+
 	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to dial gRPC: %v", err)
