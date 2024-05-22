@@ -240,55 +240,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		if deposit := tx.GetDeposit(); deposit != nil {
-			bridgeAddress := string(deposit.BridgeAddress.GetInner())
-			bac, ok := s.bridgeAddresses[bridgeAddress]
-			if !ok {
-				log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
-				continue
-			}
-
-			if len(deposit.AssetId) != 32 {
-				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
-				continue
-			}
-			assetID := [32]byte{}
-			copy(assetID[:], deposit.AssetId[:32])
-			if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
-				log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
-				continue
-			}
-
-			amount := protoU128ToBigInt(deposit.Amount)
-			address := common.HexToAddress(deposit.DestinationChainAddress)
-			txdata := types.DepositTx{
-				From:  address,
-				Value: bac.ScaledDepositAmount(amount),
-				Gas:   0,
-			}
-
-			tx := types.NewTx(&txdata)
-			txsToProcess = append(txsToProcess, tx)
-		} else {
-			ethTx := new(types.Transaction)
-			err := ethTx.UnmarshalBinary(tx.GetSequencedData())
-			if err != nil {
-				log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
-				continue
-			}
-
-			if ethTx.Type() == types.DepositTxType {
-				log.Debug("ignoring deposit tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
-				continue
-			}
-
-			if ethTx.Type() == types.BlobTxType {
-				log.Debug("ignoring blob tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
-				continue
-			}
-
-			txsToProcess = append(txsToProcess, ethTx)
+		unmarshalledTx, err := s.ValidateAndUnmarshalSequencerTx(tx)
+		if err != nil {
+			log.Error("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			continue
 		}
+		txsToProcess = append(txsToProcess, unmarshalledTx)
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
