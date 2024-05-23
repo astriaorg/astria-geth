@@ -49,7 +49,9 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssetIDs map[[32]byte]struct{}                        // a set of allowed asset IDs structs are left empty
-	nextFeeRecipient      common.Address                               // Fee recipient for the next block
+	bridgeSenderAddress   common.Address                               // address from which AstriaMintableERC20 contracts are called
+
+	nextFeeRecipient common.Address // Fee recipient for the next block
 }
 
 var (
@@ -105,11 +107,15 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
-			if cfg.Erc20Asset != nil && nativeBridgeSeen {
+			if cfg.Erc20Asset == nil && nativeBridgeSeen {
 				return nil, errors.New("only one native bridge address is allowed")
 			}
-			if cfg.Erc20Asset != nil && !nativeBridgeSeen {
+			if cfg.Erc20Asset == nil && !nativeBridgeSeen {
 				nativeBridgeSeen = true
+			}
+
+			if cfg.Erc20Asset != nil && bc.Config().AstriaBridgeSenderAddress == (common.Address{}) {
+				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
 			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
@@ -143,6 +149,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		bc:                    bc,
 		bridgeAddresses:       bridgeAddresses,
 		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
+		bridgeSenderAddress: bc.Config().AstriaBridgeSenderAddress,
 		nextFeeRecipient:      nextFeeRecipient,
 	}, nil
 }

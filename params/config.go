@@ -346,6 +346,7 @@ type ChainConfig struct {
 	AstriaCelestiaInitialHeight    uint32                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint32                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
+	AstriaBridgeSenderAddress      common.Address              `json:"astriaBridgeSenderAddress,omitempty"`
 	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
 	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
 }

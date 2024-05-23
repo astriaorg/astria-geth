@@ -38,6 +38,7 @@
                 }
             }
         ],
+        "astriaBridgeSenderAddress": "0x0000000000000000000000000000000000000000",
         "astriaFeeCollectors": {
             "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
         },
