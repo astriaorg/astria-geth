@@ -65,7 +65,12 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool, isDepositTx bool) (uint64, error) {
+	if isDepositTx {
+		// deposit txs are gasless
+		return 0, nil
+	}
+
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if isContractCreation && isHomestead {
@@ -274,6 +279,12 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
+	if st.msg.IsDepositTx {
+		// deposit txs do not require checks as they are part of rollup consensus,
+		// not txs that originate externally.
+		return nil
+	}
+
 	// Only check transactions that are not fake
 	msg := st.msg
 	if !msg.SkipAccountChecks {
@@ -362,9 +373,9 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
-	// if this is a deposit tx, we only need to mint funds and no gas is used.
-	if st.msg.IsDepositTx {
-		st.state.AddBalance(st.msg.From, st.msg.Value)
+	// if this is a native asset deposit tx, we only need to mint funds.
+	if st.msg.IsDepositTx && len(st.msg.Data) == 0 {
+		st.state.AddBalance(*st.msg.To, st.msg.Value)
 		return &ExecutionResult{
 			UsedGas:    0,
 			Err:        nil,
@@ -402,7 +413,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai)
+	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai, msg.IsDepositTx)
 	if err != nil {
 		return nil, err
 	}
@@ -436,6 +447,16 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, msg.Value)
+	}
+
+	// if this is a deposit tx, don't refund gas and also don't pay to the coinbase,
+	// as no gas was used.
+	if st.msg.IsDepositTx {
+		return &ExecutionResult{
+			UsedGas:    st.gasUsed(),
+			Err:        vmerr,
+			ReturnData: ret,
+		}, nil
 	}
 
 	if !rules.IsLondon {

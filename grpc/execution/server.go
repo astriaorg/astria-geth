@@ -149,7 +149,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		bc:                    bc,
 		bridgeAddresses:       bridgeAddresses,
 		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
-		bridgeSenderAddress: bc.Config().AstriaBridgeSenderAddress,
+		bridgeSenderAddress:   bc.Config().AstriaBridgeSenderAddress,
 		nextFeeRecipient:      nextFeeRecipient,
 	}, nil
 }
@@ -269,6 +269,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 				continue
 			}
 
+			recipient := common.HexToAddress(deposit.DestinationChainAddress)
+			amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
+
 			if bac.Erc20Asset != nil {
 				log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
 				abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
@@ -277,20 +280,17 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 					return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)
 				}
 
-				recipient := common.HexToAddress(deposit.DestinationChainAddress)
-				amount := protoU128ToBigInt(deposit.Amount)
-
 				// pack arguments for calling the `mint` function on the ERC20 contract
-				args := []interface{}{recipient, bac.ScaledDepositAmount(amount)}
+				args := []interface{}{recipient, amount}
 				calldata, err := abi.Pack("mint", args...)
 				if err != nil {
 					return nil, err
 				}
 
 				txdata := types.DepositTx{
-					From:  common.Address{}, // don't need to set this
-					Value: new(big.Int),     // don't need to set this
-					Gas:   0,
+					From:  s.bridgeSenderAddress,
+					Value: new(big.Int), // don't need to set this
+					Gas:   0,            // TODO: ensure this is gasless
 					To:    &bac.Erc20Asset.ContractAddress,
 					Data:  calldata,
 				}
@@ -300,11 +300,10 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 				continue
 			}
 
-			amount := protoU128ToBigInt(deposit.Amount)
-			recipient := common.HexToAddress(deposit.DestinationChainAddress)
 			txdata := types.DepositTx{
-				From:  recipient,
-				Value: bac.ScaledDepositAmount(amount),
+				From:  s.bridgeSenderAddress,
+				To:    &recipient,
+				Value: amount,
 				Gas:   0,
 			}
 

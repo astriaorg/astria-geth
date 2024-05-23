@@ -11,15 +11,18 @@ import (
 var _ TxData = &DepositTx{}
 
 type DepositTx struct {
-	// the address of the account that initiated the deposit
+	// the bridge sender address set in the genesis file
+	// ie. the minter or the caller of the ERC20 contract
 	From common.Address
-	// value to be minted to `From`
+	// value to be minted to the recipient, if this is a native asset mint
 	Value *big.Int
 	// gas limit
 	Gas uint64
-
-	// if this is an ERC20 mint, the following fields are set
-	To   *common.Address
+	// if this is a native asset mint, this is set to the mint recipient
+	// if this is an ERC20 mint, this is set to the ERC20 contract address
+	To *common.Address
+	// if this is an ERC20 mint, the following field is set
+	// to the `mint` function calldata.
 	Data []byte
 }
 
