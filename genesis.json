@@ -30,7 +30,7 @@
             {
                 "bridgeAddress": "34fec43c7fcab9aef3b3cf8aba855e41ee69ca3a",
                 "startHeight": 1,
-                "assetDenom": "usdc",
+                "assetDenom": "transfer/channel-1/usdc",
                 "assetPrecision": 6,
                 "erc20asset": {
                     "contractAddress":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
