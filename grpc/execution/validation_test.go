@@ -45,7 +45,8 @@ func TestSequenceTxValidation(t *testing.T) {
 		t.Fatalf("failed to marshal random deposit tx: %v", err)
 	}
 
-	tx, err := types.SignTx(types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 	if err != nil {
 		t.Fatalf("Failed to sign tx: %v", err)
 	}
@@ -76,7 +77,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "unmarshallable sequencer tx",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{
 				Value: &sequencerblockv1alpha1.RollupData_SequencedData{
-					SequencedData: []byte("blob tx"),
+					SequencedData: []byte("unmarshallable tx"),
 				},
 			},
 			wantErr: "failed to unmarshal sequenced data into transaction",
