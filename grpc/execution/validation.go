@@ -7,13 +7,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // if sequencer tx is valid, then a unmarshalled ethereum transaction is returned. if not valid, nil is returned
-func (s *ExecutionServiceServerV1Alpha2) ValidateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData) (*types.Transaction, error) {
+func ValidateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig, bridgeAllowedAssetIDs map[[32]byte]struct{}) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := string(deposit.BridgeAddress.GetInner())
-		bac, ok := s.bridgeAddresses[bridgeAddress]
+		bac, ok := bridgeAddresses[bridgeAddress]
 		if !ok {
 			log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
@@ -25,7 +26,7 @@ func (s *ExecutionServiceServerV1Alpha2) ValidateAndUnmarshalSequencerTx(tx *seq
 		}
 		assetID := [32]byte{}
 		copy(assetID[:], deposit.AssetId[:32])
-		if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
+		if _, ok := bridgeAllowedAssetIDs[assetID]; !ok {
 			log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
 			return nil, fmt.Errorf("disallowed asset ID: %x", deposit.AssetId)
 		}

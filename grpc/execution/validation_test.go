@@ -163,7 +163,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := serviceV1Alpha1.ValidateAndUnmarshalSequencerTx(test.sequencerTx)
+			_, err := ValidateAndUnmarshalSequencerTx(test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssetIDs)
 			if test.wantErr != "" && err == nil {
 				t.Errorf("expected error, got nil")
 			}
