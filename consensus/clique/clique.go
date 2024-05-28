@@ -474,7 +474,6 @@ func (c *Clique) verifySeal(snap *Snapshot, header *types.Header, parents []*typ
 		return err
 	}
 	if _, ok := snap.Signers[signer]; !ok {
-		fmt.Printf("Failing here")
 		return errUnauthorizedSigner
 	}
 	for seen, recent := range snap.Recents {
