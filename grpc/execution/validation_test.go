@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/require"
 	"math/big"
-	"strings"
 	"testing"
 )
 
@@ -33,33 +33,23 @@ func randomDepositTx() *types.Transaction {
 }
 
 func TestSequenceTxValidation(t *testing.T) {
-	_, ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
 	blobTx, err := randomBlobTx().MarshalBinary()
-	if err != nil {
-		t.Fatalf("failed to marshal random blob tx: %v", err)
-	}
+	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
 
 	depositTx, err := randomDepositTx().MarshalBinary()
-	if err != nil {
-		t.Fatalf("failed to marshal random deposit tx: %v", err)
-	}
+	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
-	if err != nil {
-		t.Fatalf("Failed to sign tx: %v", err)
-	}
+	require.Nil(t, err, "failed to sign tx: %v", err)
 
 	validMarshalledTx, err := tx.MarshalBinary()
-	if err != nil {
-		t.Fatalf("failed to marshal valid tx: %v", err)
-	}
+	require.Nil(t, err, "failed to marshal valid tx: %v", err)
 
 	chainDestinationKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("failed to generate chain destination key: %v", err)
-	}
+	require.Nil(t, err, "failed to generate chain destination key: %v", err)
 	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
 
 	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
@@ -164,16 +154,11 @@ func TestSequenceTxValidation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			_, err := validateAndUnmarshalSequencerTx(test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssetIDs)
-			if test.wantErr != "" && err == nil {
-				t.Errorf("expected error, got nil")
+			if test.wantErr == "" && err == nil {
+				return
 			}
-			if test.wantErr == "" && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			// check if wantErr is in err.Error()
-			if test.wantErr != "" && !strings.Contains(err.Error(), test.wantErr) {
-				t.Errorf("expected error to contain %q, got %q", test.wantErr, err.Error())
-			}
+			require.False(t, test.wantErr == "" && err != nil, "expected error, got nil")
+			require.Contains(t, err.Error(), test.wantErr)
 		})
 	}
 }

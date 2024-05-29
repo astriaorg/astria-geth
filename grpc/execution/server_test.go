@@ -1,7 +1,6 @@
 package execution
 
 import (
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
@@ -13,9 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"math/big"
@@ -23,14 +20,9 @@ import (
 )
 
 func TestExecutionService_GetGenesisInfo(t *testing.T) {
-	n, ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
-
-	genesisInfo, err := client.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed: %v", err)
 
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
@@ -43,14 +35,9 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
-	n, ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
-
-	commitmentState, err := client.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed: %v", err)
 
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
@@ -73,12 +60,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 }
 
 func TestExecutionService_GetBlock(t *testing.T) {
-	n, ethservice, _ := setupExecutionService(t, 10)
-
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
 	tests := []struct {
 		description        string
@@ -110,7 +92,7 @@ func TestExecutionService_GetBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			blockInfo, err := client.GetBlock(context.Background(), tt.getBlockRequst)
+			blockInfo, err := serviceV1Alpha1.GetBlock(context.Background(), tt.getBlockRequst)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "GetBlock should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "GetBlock failed: %v", err)
@@ -137,12 +119,7 @@ func TestExecutionService_GetBlock(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
-	n, ethservice, _ := setupExecutionService(t, 10)
-
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
 	tests := []struct {
 		description          string
@@ -192,7 +169,7 @@ func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			batchBlocksRes, err := client.BatchGetBlocks(context.Background(), tt.batchGetBlockRequest)
+			batchBlocksRes, err := serviceV1Alpha1.BatchGetBlocks(context.Background(), tt.batchGetBlockRequest)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "BatchGetBlocks should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "BatchGetBlocks failed: %v", err)
@@ -219,12 +196,7 @@ func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
 }
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
-	n, ethservice, _ := setupExecutionService(t, 10)
-
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
+	ethservice, _ := setupExecutionService(t, 10)
 
 	tests := []struct {
 		description                          string
@@ -276,22 +248,18 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
-			n, ethservice, _ = setupExecutionService(t, 10)
+			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
-			conn, err = grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-			require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-			client = astriaGrpc.NewExecutionServiceClient(conn)
-
+			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
 			var genesisInfo *astriaPb.GenesisInfo
 			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
 			if tt.callGenesisInfoAndGetCommitmentState {
 				// call getGenesisInfo and getCommitmentState before calling executeBlock
-				genesisInfo, err = client.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 				require.Nil(t, err, "GetGenesisInfo failed: %v", err)
 				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
-				commitmentStateBeforeExecuteBlock, err = client.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed: %v", err)
 				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
 			}
@@ -346,7 +314,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				Transactions: marshalledTxs,
 			}
 
-			executeBlockRes, err := client.ExecuteBlock(context.Background(), executeBlockReq)
+			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "ExecuteBlock should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed: %v", err)
@@ -358,7 +326,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
 				// check if commitment state is not updated
-				commitmentStateAfterExecuteBlock, err := client.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed: %v", err)
 
 				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
@@ -369,20 +337,15 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
-	n, ethservice, _ := setupExecutionService(t, 10)
-
-	conn, err := grpc.Dial(GrpcEndpointWithoutPrefix(n), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.Nil(t, err, "Failed to dial gRPC: %v", err)
-
-	client := astriaGrpc.NewExecutionServiceClient(conn)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
 	// call genesis info
-	genesisInfo, err := client.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed: %v", err)
 	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
 	// call get commitment state
-	commitmentState, err := client.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed: %v", err)
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
@@ -443,7 +406,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		Transactions: marshalledTxs,
 	}
 
-	executeBlockRes, err := client.ExecuteBlock(context.Background(), executeBlockReq)
+	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
 	require.Nil(t, err, "ExecuteBlock failed: %v", err)
 
 	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
@@ -470,7 +433,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 	}
 
-	updateCommitmentStateRes, err := client.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
+	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
 	require.Nil(t, err, "UpdateCommitmentState failed: %v", err)
 	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
 
@@ -496,5 +459,5 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	chainDestinationAddressBalanceAfter := stateDb.GetBalance(chainDestinationAddress)
 
 	balanceDiff := new(big.Int).Sub(chainDestinationAddressBalanceAfter, chainDestinationAddressBalanceBefore)
-	require.True(t, balanceDiff.Cmp(big.NewInt(0)) > 0, "Chain destination address balance is not correct")
+	require.True(t, balanceDiff.Cmp(big.NewInt(1000000000000000000)) == 0, "Chain destination address balance is not correct")
 }

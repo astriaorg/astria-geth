@@ -3,7 +3,6 @@ package execution
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	beaconConsensus "github.com/ethereum/go-ethereum/consensus/beacon"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
 	"math/big"
-	"net"
 	"testing"
 	"time"
 )
@@ -104,34 +102,14 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 	return genesis, blocks, bridgeAddressKey, feeCollectorKey
 }
 
-func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, err
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
-}
-
 // startEthService creates a full node instance for testing.
-func startEthService(t *testing.T, genesis *core.Genesis) (*node.Node, *eth.Ethereum) {
-	freePort, err := getFreePort()
-	if err != nil {
-		t.Fatal("can't get free port:", err)
-	}
+func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	n, err := node.New(&node.Config{
 		P2P: p2p.Config{
 			ListenAddr:  "0.0.0.0:0",
 			NoDiscovery: true,
 			MaxPeers:    25,
 		},
-		GRPCHost: "127.0.0.1",
-		GRPCPort: freePort,
 	})
 	if err != nil {
 		t.Fatal("can't create node:", err)
@@ -146,13 +124,13 @@ func startEthService(t *testing.T, genesis *core.Genesis) (*node.Node, *eth.Ethe
 	ethservice.SetEtherbase(testAddr)
 	ethservice.SetSynced()
 
-	return n, ethservice
+	return ethservice
 }
 
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*node.Node, *eth.Ethereum, *ExecutionServiceServerV1Alpha2) {
+func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1Alpha2) {
 	t.Helper()
 	genesis, blocks, bridgeAddressKey, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
-	n, ethservice := startEthService(t, genesis)
+	ethservice := startEthService(t, genesis)
 
 	serviceV1Alpha1, err := NewExecutionServiceServerV1Alpha2(ethservice)
 	if err != nil {
@@ -176,17 +154,11 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*node.Node, 
 		t.Fatalf("bridgeAddress not set correctly")
 	}
 
-	utils.RegisterGRPCExecutionService(n, serviceV1Alpha1, n.Config())
-
-	if err := n.Start(); err != nil {
-		t.Fatal("can't start node:", err)
-	}
 	if _, err := ethservice.BlockChain().InsertChain(blocks); err != nil {
-		n.Close()
 		t.Fatal("can't import test blocks:", err)
 	}
 
-	return n, ethservice, serviceV1Alpha1
+	return ethservice, serviceV1Alpha1
 
 }
 
