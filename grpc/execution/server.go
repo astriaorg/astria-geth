@@ -121,6 +121,10 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
 			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
 			bridgeAllowedAssetIDs[assetID] = struct{}{}
+			log.Info("new bridge address", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
+			if cfg.Erc20Asset != nil {
+				log.Info("new bridge ERC20 asset", "contractAddress", cfg.Erc20Asset.ContractAddress)
+			}
 		}
 	}
 
@@ -273,7 +277,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
 
 			if bac.Erc20Asset != nil {
-				log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
+				log.Info("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
 				abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
 				if err != nil {
 					// this should never happen, as the abi is hardcoded in the contract bindings

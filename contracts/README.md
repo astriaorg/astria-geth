@@ -1,66 +1,51 @@
-## Foundry
+# astria bridgeable erc20s
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Forge project for the `AstriaMintableERC20` contract.
 
-Foundry consists of:
+Requirements:
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- foundry
 
-## Documentation
+Build:
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
+```sh
+forge build
 ```
 
-### Test
+Copy the example .env:
 
-```shell
-$ forge test
+`cp local.env.example .env && source .env`
+
+Deploy `AstriaMintableERC20.sol`:
+
+```sh
+forge script script/AstriaMintableERC20.s.sol:AstriaMintableERC20Script \
+   --rpc-url $RPC_URL --broadcast --sig "deploy()" -vvvv
 ```
 
-### Format
+Take note of the deployed address.
 
-```shell
-$ forge fmt
+Add the following to the genesis file under `astriaBridgeAddresses`:
+
+```
+"astriaBridgeAddresses": [
+    {
+        "bridgeAddress": "0x1c0c490f1b5528d8173c5de46d131160e4b2c0c3",
+        "startHeight": 1,
+        "assetDenom": "nria",
+        "assetPrecision": 6,
+        "erc20asset": {
+            "contractAddress":"0x9Aae647A1CB2ec6b39afd552aD149F6A26Bb2aD6",
+            "contractPrecision": 6
+        }
+    }
+],
 ```
 
-### Gas Snapshots
+Note: this mints `nria` as an erc20 instead of the native asset.
 
-```shell
-$ forge snapshot
-```
+`bridgeAddress` is the bridge address that corresponds to this asset on the sequencer chain.
+`assetDenom` does not need to match the name of the token in the deployed contract, but it does need to match the denom of the token on the sequencer.
+`contractAddress` in `erc20asset` is the address of the contract deployed above.
 
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Stop and restart the geth node.
