@@ -131,10 +131,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				nextFeeRecipient = collector
 			}
 		}
-	}
 
-	if merger := eth.Merger(); !merger.PoSFinalized() {
-		merger.FinalizePoS()
 	}
 
 	return &ExecutionServiceServerV1Alpha2{
