@@ -46,7 +46,6 @@ type BuildPayloadArgs struct {
 
 // Id computes an 8-byte identifier by hashing the components of the payload arguments.
 func (args *BuildPayloadArgs) Id() engine.PayloadID {
-	// Hash
 	hasher := sha256.New()
 	hasher.Write(args.Parent[:])
 	binary.Write(hasher, binary.BigEndian, args.Timestamp)
@@ -177,7 +176,10 @@ func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 }
 
 // buildPayload builds the payload according to the provided parameters.
-func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
+func (miner *Miner) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
+	// Build the initial version with no transaction included. It should be fast
+	// enough to run. The empty payload can at least make sure there is something
+	// to deliver for not missing slot.
 	fullParams := &generateParams{
 		timestamp:   args.Timestamp,
 		forceTime:   true,
@@ -188,8 +190,9 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		beaconRoot:  args.BeaconRoot,
 		noTxs:       false,
 	}
+
 	start := time.Now()
-	full := w.getSealingBlock(fullParams)
+	full := miner.generateWork(fullParams)
 	if full.err != nil {
 		return nil, full.err
 	}
@@ -200,5 +203,6 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 	// Add the updated block to the payload
 	payload.update(full, time.Since(start))
 	log.Info("Stopping work on payload", "id", payload.id, "reason", "delivery")
+
 	return payload, nil
 }
