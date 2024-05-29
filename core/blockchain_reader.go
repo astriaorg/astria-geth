@@ -62,6 +62,12 @@ func (bc *BlockChain) CurrentSafeBlock() *types.Header {
 	return bc.currentSafeBlock.Load()
 }
 
+// CurrentBaseCelestiaHeight retrieves the current base celestia height of the
+// canonical chain. The height is retrieved from the blockchain's internal cache.
+func (bc *BlockChain) CurrentBaseCelestiaHeight() uint32 {
+	return bc.currentBaseCelestiaHeight.Load()
+}
+
 // HasHeader checks if a block header is present in the database or not, caching
 // it if present.
 func (bc *BlockChain) HasHeader(hash common.Hash, number uint64) bool {

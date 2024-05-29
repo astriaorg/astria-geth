@@ -43,6 +43,9 @@ var (
 	// headFinalizedBlockKey tracks the latest known finalized block hash.
 	headFinalizedBlockKey = []byte("LastFinalized")
 
+	// headBaseCelestiaHeightKey tracks the lowest celestia height from which to attempt derivation.
+	headBaseCelestiaHeightKey = []byte("LastBaseCelestiaHeight")
+
 	// persistentStateIDKey tracks the id of latest stored state(for path-based only).
 	persistentStateIDKey = []byte("LastStateID")
 
@@ -148,6 +151,13 @@ type LegacyTxLookupEntry struct {
 func encodeBlockNumber(number uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, number)
+	return enc
+}
+
+// encodeCometbftBlockNumber encodes a block number as big endian uint32
+func encodeCometbftBlockNumber(number uint32) []byte {
+	enc := make([]byte, 4)
+	binary.BigEndian.PutUint32(enc, number)
 	return enc
 }
 

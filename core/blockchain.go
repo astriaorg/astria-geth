@@ -238,6 +238,8 @@ type BlockChain struct {
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 
+	currentBaseCelestiaHeight atomic.Uint32 // Latest finalized block height on Celestia
+
 	bodyCache     *lru.Cache[common.Hash, *types.Body]
 	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
 	receiptsCache *lru.Cache[common.Hash, []*types.Receipt]
@@ -323,6 +325,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
 	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
+	bc.currentBaseCelestiaHeight.Store(bc.Config().AstriaCelestiaInitialHeight)
 
 	// Update chain info data metrics
 	chainInfoGauge.Update(metrics.GaugeInfoValue{"chain_id": bc.chainConfig.ChainID.String()})
@@ -539,6 +542,11 @@ func (bc *BlockChain) loadLastState() error {
 			headSafeBlockGauge.Update(int64(block.NumberU64()))
 		}
 	}
+
+	if height := rawdb.ReadBaseCelestiaHeight(bc.db); height != 0 {
+		bc.currentBaseCelestiaHeight.Store(height)
+	}
+
 	// Issue a status log for the user
 	var (
 		currentSnapBlock  = bc.CurrentSnapBlock()
@@ -547,6 +555,7 @@ func (bc *BlockChain) loadLastState() error {
 		headerTd = bc.GetTd(headHeader.Hash(), headHeader.Number.Uint64())
 		blockTd  = bc.GetTd(headBlock.Hash(), headBlock.NumberU64())
 	)
+	log.Info("Loaded celestia base height", "height", bc.currentBaseCelestiaHeight.Load())
 	if headHeader.Hash() != headBlock.Hash() {
 		log.Info("Loaded most recent local header", "number", headHeader.Number, "hash", headHeader.Hash(), "td", headerTd, "age", common.PrettyAge(time.Unix(int64(headHeader.Time), 0)))
 	}
@@ -618,6 +627,13 @@ func (bc *BlockChain) SetFinalized(header *types.Header) {
 		rawdb.WriteFinalizedBlockHash(bc.db, common.Hash{})
 		headFinalizedBlockGauge.Update(0)
 	}
+}
+
+// SetCelestiaFinalized sets the finalized block and the lowest Celestia height to find next finalized at.
+func (bc *BlockChain) SetCelestiaFinalized(header *types.Header, celHeight uint32) {
+	rawdb.WriteBaseCelestiaHeight(bc.db, celHeight)
+	bc.currentBaseCelestiaHeight.Store(celHeight)
+	bc.SetFinalized(header)
 }
 
 // SetSafe sets the safe block.
