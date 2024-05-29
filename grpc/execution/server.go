@@ -361,8 +361,8 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
 
 	res := &astriaPb.CommitmentState{
-		Soft: softBlock,
-		Firm: firmBlock,
+		Soft:               softBlock,
+		Firm:               firmBlock,
 		BaseCelestiaHeight: celestiaBlock,
 	}
 
