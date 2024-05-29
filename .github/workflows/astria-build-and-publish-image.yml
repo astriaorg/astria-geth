@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+<<<<<<< HEAD
       - "main"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
@@ -34,6 +35,31 @@ jobs:
         with:
           go-version: "^1.21.x" # The Go version to download (if necessary) and use.
       - run: go version
+=======
+      - "astria"
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"
+  # trigger on pull request updates when target is `astria` branch
+  pull_request:
+    branches:
+      - "astria"
+
+jobs:
+  build-and-publish-latest:
+    runs-on: ubuntu-latest
+    steps:
+      # Checking out the repo
+      - uses: actions/checkout@v3
+      # Setting up Go
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "^1.20.x" # The Go version to download (if necessary) and use.
+      - run: go version
+
+>>>>>>> 315c87d76 (Feature/grpc execution api (#1))
       # https://github.com/docker/setup-qemu-action
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -53,6 +79,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: |
+<<<<<<< HEAD
             ghcr.io/astriaorg/astria-geth
           tags: |
             type=ref,event=pr
@@ -60,6 +87,15 @@ jobs:
             type=sha
             # set latest tag for `astria` branch
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+=======
+            ghcr.io/astriaorg/go-ethereum
+          tags: |
+            type=ref,event=pr
+            type=semver,pattern={{major}}.{{minor}}.{{patch}}
+            type=sha
+            # set latest tag for `astria` branch
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'astria') }}
+>>>>>>> 315c87d76 (Feature/grpc execution api (#1))
       - name: Build and push
         uses: depot/build-push-action@v1
         with:
@@ -68,7 +104,11 @@ jobs:
           provenance: false
           context: .
           # It takes a long time to build the arm image right now, so we only build it on tags which is what we use for releases, or on merges to the default branch.
+<<<<<<< HEAD
           platforms: ${{ (contains(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+=======
+          platforms: ${{ (contains(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/astria') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+>>>>>>> 315c87d76 (Feature/grpc execution api (#1))
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}

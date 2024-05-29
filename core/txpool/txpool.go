@@ -75,6 +75,8 @@ type TxPool struct {
 	term chan struct{}           // Termination channel to detect a closed pool
 
 	sync chan chan error // Testing / simulator channel to block until internal reset is done
+
+	astria *astriaOrdered
 }
 
 // New creates a new transaction pool to gather, sort and filter inbound
@@ -520,4 +522,18 @@ func (p *TxPool) Sync() error {
 	case <-p.term:
 		return errors.New("pool already terminated")
 	}
+}
+
+type astriaOrdered struct {
+	txs types.Transactions
+}
+
+func newAstriaOrdered(txs types.Transactions) *astriaOrdered {
+	return &astriaOrdered{
+		txs: txs,
+	}
+}
+
+func (ao *astriaOrdered) clear() {
+	ao.txs = *&types.Transactions{}
 }
