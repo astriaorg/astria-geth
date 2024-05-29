@@ -26,6 +26,7 @@ import (
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -375,12 +376,19 @@ func (st *StateTransition) preCheck() error {
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a native asset deposit tx, we only need to mint funds.
 	if st.msg.IsDepositTx && len(st.msg.Data) == 0 {
+		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
 		st.state.AddBalance(*st.msg.To, st.msg.Value)
 		return &ExecutionResult{
 			UsedGas:    0,
 			Err:        nil,
 			ReturnData: nil,
 		}, nil
+	}
+
+	if st.msg.IsDepositTx {
+		st.initialGas = st.msg.GasLimit
+		st.gasRemaining = st.msg.GasLimit
+		log.Debug("deposit tx minting erc20", "to", *st.msg.To, "value", st.msg.Value)
 	}
 
 	// First check this message satisfies all consensus rules before
@@ -452,6 +460,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a deposit tx, don't refund gas and also don't pay to the coinbase,
 	// as no gas was used.
 	if st.msg.IsDepositTx {
+		log.Debug("deposit tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
 		return &ExecutionResult{
 			UsedGas:    st.gasUsed(),
 			Err:        vmerr,

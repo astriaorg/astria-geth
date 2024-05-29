@@ -121,9 +121,10 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
 			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
 			bridgeAllowedAssetIDs[assetID] = struct{}{}
-			log.Info("new bridge address", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
-			if cfg.Erc20Asset != nil {
-				log.Info("new bridge ERC20 asset", "contractAddress", cfg.Erc20Asset.ContractAddress)
+			if cfg.Erc20Asset == nil {
+				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
+			} else {
+				log.Info("bridge for ERC20 asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom, "contractAddress", cfg.Erc20Asset.ContractAddress)
 			}
 		}
 	}
@@ -277,7 +278,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
 
 			if bac.Erc20Asset != nil {
-				log.Info("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
+				log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
 				abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
 				if err != nil {
 					// this should never happen, as the abi is hardcoded in the contract bindings
@@ -293,8 +294,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 				txdata := types.DepositTx{
 					From:  s.bridgeSenderAddress,
-					Value: new(big.Int), // don't need to set this
-					Gas:   0,            // TODO: ensure this is gasless
+					Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
+					// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
+					//
+					// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
+					// address defined by consensus, so the gas cost is not actually deducted from any account.
+					Gas:   16000,    
 					To:    &bac.Erc20Asset.ContractAddress,
 					Data:  calldata,
 				}

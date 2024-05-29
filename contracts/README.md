@@ -36,7 +36,7 @@ Add the following to the genesis file under `astriaBridgeAddresses`:
         "assetPrecision": 6,
         "erc20asset": {
             "contractAddress":"0x9Aae647A1CB2ec6b39afd552aD149F6A26Bb2aD6",
-            "contractPrecision": 6
+            "contractPrecision": 18
         }
     }
 ],
@@ -48,4 +48,6 @@ Note: this mints `nria` as an erc20 instead of the native asset.
 `assetDenom` does not need to match the name of the token in the deployed contract, but it does need to match the denom of the token on the sequencer.
 `contractAddress` in `erc20asset` is the address of the contract deployed above.
 
-Stop and restart the geth node.
+Stop the geth node and rerun `geth init --genesis genesis.json`. Restart the node.
+
+
