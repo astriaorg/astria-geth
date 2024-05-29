@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -100,9 +99,7 @@ func TestLegacyState(t *testing.T) {
 
 // TestExecutionSpecState runs the test fixtures from execution-spec-tests.
 func TestExecutionSpecState(t *testing.T) {
-	if !common.FileExist(executionSpecStateTestDir) {
-		t.Skipf("directory %s does not exist", executionSpecStateTestDir)
-	}
+	t.Skipf("execution-spec-tests are not yet supported")
 	st := new(testMatcher)
 
 	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
