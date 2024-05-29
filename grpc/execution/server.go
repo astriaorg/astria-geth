@@ -299,9 +299,9 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 					//
 					// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
 					// address defined by consensus, so the gas cost is not actually deducted from any account.
-					Gas:   16000,    
-					To:    &bac.Erc20Asset.ContractAddress,
-					Data:  calldata,
+					Gas:  16000,
+					To:   &bac.Erc20Asset.ContractAddress,
+					Data: calldata,
 				}
 
 				tx := types.NewTx(&txdata)

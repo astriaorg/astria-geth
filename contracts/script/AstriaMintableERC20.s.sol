@@ -20,4 +20,11 @@ contract AstriaMintableERC20Script is Script {
 
         vm.stopBroadcast();
     }
+
+    function getBalance() public {
+        AstriaMintableERC20 astriaMintableERC20 = AstriaMintableERC20(vm.envAddress("ASTRIA_MINTABLE_ERC20_ADDRESS"));
+        address account = vm.envAddress("USER_ADDRESS");
+        uint256 balance = astriaMintableERC20.balanceOf(account);
+        console.logUint(balance);
+    }
 }
