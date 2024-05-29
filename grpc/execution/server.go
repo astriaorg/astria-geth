@@ -131,7 +131,6 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				nextFeeRecipient = collector
 			}
 		}
-
 	}
 
 	return &ExecutionServiceServerV1Alpha2{
