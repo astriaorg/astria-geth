@@ -71,6 +71,26 @@ func TestBlockchain(t *testing.T) {
 //	})
 //}
 
+// TestExecutionSpecBlocktests runs the test fixtures from execution-spec-tests.
+//func TestExecutionSpecBlocktests(t *testing.T) {
+//	if !common.FileExist(executionSpecBlockchainTestDir) {
+//		t.Skipf("directory %s does not exist", executionSpecBlockchainTestDir)
+//	}
+//	bt := new(testMatcher)
+//
+//	// These tests fail as of https://github.com/ethereum/go-ethereum/pull/28666, since we
+//	// no longer delete "leftover storage" when deploying a contract.
+//	bt.skipLoad(`^cancun/eip6780_selfdestruct/selfdestruct/self_destructing_initcode_create_tx.json`)
+//	bt.skipLoad(`^cancun/eip6780_selfdestruct/selfdestruct/self_destructing_initcode.json`)
+//	bt.skipLoad(`^cancun/eip6780_selfdestruct/selfdestruct/recreate_self_destructed_contract_different_txs.json`)
+//	bt.skipLoad(`^cancun/eip6780_selfdestruct/selfdestruct/delegatecall_from_new_contract_to_pre_existing_contract.json`)
+//	bt.skipLoad(`^cancun/eip6780_selfdestruct/selfdestruct/create_selfdestruct_same_tx.json`)
+//
+//	bt.walk(t, executionSpecBlockchainTestDir, func(t *testing.T, name string, test *BlockTest) {
+//		execBlockTest(t, bt, test)
+//	})
+//}
+
 func execBlockTest(t *testing.T, bt *testMatcher, test *BlockTest) {
 	// If -short flag is used, we don't execute all four permutations, only one.
 	executionMask := 0xf
