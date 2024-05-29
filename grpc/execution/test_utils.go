@@ -112,7 +112,6 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	ethservice, err := eth.New(n, ethcfg)
 	require.Nil(t, err, "can't create eth service")
 
-	ethservice.SetEtherbase(testAddr)
 	ethservice.SetSynced()
 
 	return ethservice
