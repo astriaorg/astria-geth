@@ -41,6 +41,7 @@ import (
 // chain ends up losing the recent state and needs to regenerate it from blocks
 // already in the database. The bug was that processing the block *prior* to an
 // empty one **also completes** the empty one, ending up in a known-block error.
+
 //func TestReimportMirroredState(t *testing.T) {
 //	// Initialize a Clique chain with a single signer
 //	var (
