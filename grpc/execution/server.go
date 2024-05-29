@@ -240,7 +240,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := ValidateAndUnmarshalSequencerTx(tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs)
 		if err != nil {
 			log.Error("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue

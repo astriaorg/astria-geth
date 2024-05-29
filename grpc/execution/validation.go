@@ -6,28 +6,27 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// if sequencer tx is valid, then a unmarshalled ethereum transaction is returned. if not valid, nil is returned
-func ValidateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig, bridgeAllowedAssetIDs map[[32]byte]struct{}) (*types.Transaction, error) {
+// `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction.
+// If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
+// If the sequencer transaction is not a deposit tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
+// tx is not a blob tx or a deposit tx.
+func validateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig, bridgeAllowedAssetIDs map[[32]byte]struct{}) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := string(deposit.BridgeAddress.GetInner())
 		bac, ok := bridgeAddresses[bridgeAddress]
 		if !ok {
-			log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
 		}
 
 		if len(deposit.AssetId) != 32 {
-			log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
 			return nil, fmt.Errorf("invalid asset ID: %x", deposit.AssetId)
 		}
 		assetID := [32]byte{}
 		copy(assetID[:], deposit.AssetId[:32])
 		if _, ok := bridgeAllowedAssetIDs[assetID]; !ok {
-			log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
 			return nil, fmt.Errorf("disallowed asset ID: %x", deposit.AssetId)
 		}
 
@@ -45,17 +44,14 @@ func ValidateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData, brid
 		ethTx := new(types.Transaction)
 		err := ethTx.UnmarshalBinary(tx.GetSequencedData())
 		if err != nil {
-			log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
 			return nil, fmt.Errorf("failed to unmarshal sequenced data into transaction: %w. tx hash: %s", err, sha256.Sum256(tx.GetSequencedData()))
 		}
 
 		if ethTx.Type() == types.DepositTxType {
-			log.Debug("ignoring deposit tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
 			return nil, fmt.Errorf("deposit tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
 		}
 
 		if ethTx.Type() == types.BlobTxType {
-			log.Debug("ignoring blob tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
 			return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
 		}
 
