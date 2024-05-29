@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params/forks"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -855,6 +856,23 @@ func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
 		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
 	}
 	return DefaultElasticityMultiplier
+}
+
+// LatestFork returns the latest time-based fork that would be active for the given time.
+func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
+	// Assume last non-time-based fork has passed.
+	london := c.LondonBlock
+
+	switch {
+	case c.IsPrague(london, time):
+		return forks.Prague
+	case c.IsCancun(london, time):
+		return forks.Cancun
+	case c.IsShanghai(london, time):
+		return forks.Shanghai
+	default:
+		return forks.Paris
+	}
 }
 
 // isForkBlockIncompatible returns true if a fork scheduled at block s1 cannot be
