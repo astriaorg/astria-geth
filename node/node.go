@@ -309,6 +309,9 @@ func (n *Node) stopServices(running []Lifecycle) error {
 	// Stop p2p networking.
 	n.server.Stop()
 
+	// Stop GRPC server
+	n.stopGRPC()
+
 	if len(failure.Services) > 0 {
 		return failure
 	}
