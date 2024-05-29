@@ -346,6 +346,26 @@ func (p *TxPool) AstriaOrdered() *types.Transactions {
 	return &txs
 }
 
+func (p *TxPool) AstriaOrderedTotalLen() int {
+	totalSize := 0
+
+	for _, subpool := range p.subpools {
+		totalSize += subpool.AstriaOrderedTotalLen()
+	}
+
+	return totalSize
+}
+
+func (p *TxPool) AstriaOrderedValidLen() int {
+	totalSize := 0
+
+	for _, subpool := range p.subpools {
+		totalSize += subpool.AstriaOrderedValidLen()
+	}
+
+	return totalSize
+}
+
 // Add enqueues a batch of transactions into the pool if they are valid. Due
 // to the large transaction churn, add may postpone fully integrating the tx
 // to a later point to batch multiple ones together.
