@@ -315,7 +315,7 @@ func TestEth2NewBlock(t *testing.T) {
 			Timestamp: parent.Time() + 5,
 		}, 1)
 		if err != nil {
-			t.Fatalf("Failed to create the executable data %v", err)
+			t.Fatalf("Failed to create the executable data, block %d: %v", i, err)
 		}
 		block, err := engine.ExecutableDataToBlock(*execData, nil, nil)
 		if err != nil {
