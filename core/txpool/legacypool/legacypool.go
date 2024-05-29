@@ -334,22 +334,6 @@ func (pool *LegacyPool) AstriaExcludedFromBlock() *types.Transactions {
 	return &pool.astria.excludedFromBlock
 }
 
-func (pool *LegacyPool) AstriaOrderedTotalLen() int {
-	if pool.astria == nil {
-		return 0
-	}
-
-	return pool.astria.parsed.Len()
-}
-
-func (pool *LegacyPool) AstriaOrderedValidLen() int {
-	if pool.astria == nil {
-		return 0
-	}
-
-	return pool.astria.valid.Len()
-}
-
 func (pool *LegacyPool) ClearAstriaOrdered() {
 	if pool.astria == nil {
 		return
