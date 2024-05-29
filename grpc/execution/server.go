@@ -405,6 +405,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	if currentSafe != softEthHash {
 		s.bc.SetSafe(softBlock.Header())
 	}
+
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
 		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
