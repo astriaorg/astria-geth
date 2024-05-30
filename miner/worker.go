@@ -246,12 +246,10 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
 	}
 
-	for i, tx := range *txs {
-		fmt.Printf("CUSTOM: Tx(%d): %v\n", i, tx)
+	for _, tx := range *txs {
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
 			if signal := interrupt.Load(); signal != commitInterruptNone {
-				fmt.Printf("Exited with signal: %v\n", signal)
 				return signalToErr(signal)
 			}
 		}

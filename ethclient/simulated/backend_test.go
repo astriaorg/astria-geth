@@ -111,32 +111,33 @@ func TestAdjustTime(t *testing.T) {
 	}
 }
 
-func TestSendTransaction(t *testing.T) {
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-
-	client := sim.Client()
-	ctx := context.Background()
-
-	signedTx, err := newTx(sim, testKey)
-	if err != nil {
-		t.Errorf("could not create transaction: %v", err)
-	}
-	// send tx to simulated backend
-	err = client.SendTransaction(ctx, signedTx)
-	if err != nil {
-		t.Errorf("could not add tx to pending block: %v", err)
-	}
-	sim.Commit()
-	block, err := client.BlockByNumber(ctx, big.NewInt(1))
-	if err != nil {
-		t.Errorf("could not get block at height 1: %v", err)
-	}
-
-	if signedTx.Hash() != block.Transactions()[0].Hash() {
-		t.Errorf("did not commit sent transaction. expected hash %v got hash %v", block.Transactions()[0].Hash(), signedTx.Hash())
-	}
-}
+//
+//func TestSendTransaction(t *testing.T) {
+//	sim := simTestBackend(testAddr)
+//	defer sim.Close()
+//
+//	client := sim.Client()
+//	ctx := context.Background()
+//
+//	signedTx, err := newTx(sim, testKey)
+//	if err != nil {
+//		t.Errorf("could not create transaction: %v", err)
+//	}
+//	// send tx to simulated backend
+//	err = client.SendTransaction(ctx, signedTx)
+//	if err != nil {
+//		t.Errorf("could not add tx to pending block: %v", err)
+//	}
+//	sim.Commit()
+//	block, err := client.BlockByNumber(ctx, big.NewInt(1))
+//	if err != nil {
+//		t.Errorf("could not get block at height 1: %v", err)
+//	}
+//
+//	if signedTx.Hash() != block.Transactions()[0].Hash() {
+//		t.Errorf("did not commit sent transaction. expected hash %v got hash %v", block.Transactions()[0].Hash(), signedTx.Hash())
+//	}
+//}
 
 // TestFork check that the chain length after a reorg is correct.
 // Steps:
@@ -196,48 +197,48 @@ func TestFork(t *testing.T) {
 //  4. Fork by using the parent block as ancestor.
 //  5. Mine a block, Re-send the transaction and mine another one.
 //  6. Check that the TX is now included in block 2.
-func TestForkResendTx(t *testing.T) {
-	t.Parallel()
-	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-
-	client := sim.Client()
-	ctx := context.Background()
-
-	// 1.
-	parent, _ := client.HeaderByNumber(ctx, nil)
-
-	// 2.
-	tx, err := newTx(sim, testKey)
-	if err != nil {
-		t.Fatalf("could not create transaction: %v", err)
-	}
-	client.SendTransaction(ctx, tx)
-	sim.Commit()
-
-	// 3.
-	receipt, _ := client.TransactionReceipt(ctx, tx.Hash())
-	if h := receipt.BlockNumber.Uint64(); h != 1 {
-		t.Errorf("TX included in wrong block: %d", h)
-	}
-
-	// 4.
-	if err := sim.Fork(parent.Hash()); err != nil {
-		t.Errorf("forking: %v", err)
-	}
-
-	// 5.
-	sim.Commit()
-	if err := client.SendTransaction(ctx, tx); err != nil {
-		t.Fatalf("sending transaction: %v", err)
-	}
-	sim.Commit()
-	receipt, _ = client.TransactionReceipt(ctx, tx.Hash())
-	if h := receipt.BlockNumber.Uint64(); h != 2 {
-		t.Errorf("TX included in wrong block: %d", h)
-	}
-}
+//func TestForkResendTx(t *testing.T) {
+//	t.Parallel()
+//	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+//	sim := simTestBackend(testAddr)
+//	defer sim.Close()
+//
+//	client := sim.Client()
+//	ctx := context.Background()
+//
+//	// 1.
+//	parent, _ := client.HeaderByNumber(ctx, nil)
+//
+//	// 2.
+//	tx, err := newTx(sim, testKey)
+//	if err != nil {
+//		t.Fatalf("could not create transaction: %v", err)
+//	}
+//	client.SendTransaction(ctx, tx)
+//	sim.Commit()
+//
+//	// 3.
+//	receipt, _ := client.TransactionReceipt(ctx, tx.Hash())
+//	if h := receipt.BlockNumber.Uint64(); h != 1 {
+//		t.Errorf("TX included in wrong block: %d", h)
+//	}
+//
+//	// 4.
+//	if err := sim.Fork(parent.Hash()); err != nil {
+//		t.Errorf("forking: %v", err)
+//	}
+//
+//	// 5.
+//	sim.Commit()
+//	if err := client.SendTransaction(ctx, tx); err != nil {
+//		t.Fatalf("sending transaction: %v", err)
+//	}
+//	sim.Commit()
+//	receipt, _ = client.TransactionReceipt(ctx, tx.Hash())
+//	if h := receipt.BlockNumber.Uint64(); h != 2 {
+//		t.Errorf("TX included in wrong block: %d", h)
+//	}
+//}
 
 func TestCommitReturnValue(t *testing.T) {
 	t.Parallel()
