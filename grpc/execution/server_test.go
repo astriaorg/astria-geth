@@ -56,7 +56,6 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 	require.Equal(t, uint64(commitmentState.Firm.Number), firmBlock.Number.Uint64(), "Firm Block Number do not match")
 	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaCelestiaInitialHeight, "BaseCelestiaHeight is not correct")
 
-
 	require.True(t, serviceV1Alpha1.getCommitmentStateCalled, "GetCommitmentState should be called")
 }
 
@@ -431,12 +430,14 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 				Number:          executeBlockRes.Number,
 				Timestamp:       executeBlockRes.Timestamp,
 			},
+			BaseCelestiaHeight: commitmentState.BaseCelestiaHeight + 1,
 		},
 	}
 
 	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
 	require.Nil(t, err, "UpdateCommitmentState failed")
 	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
+	require.Equal(t, updateCommitmentStateRes, updateCommitmentStateReq.CommitmentState, "CommitmentState response should match request")
 
 	// get the soft and firm block
 	softBlock := ethservice.BlockChain().CurrentSafeBlock()
@@ -452,6 +453,9 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.True(t, bytes.Equal(firmBlock.Hash().Bytes(), updateCommitmentStateRes.Firm.Hash), "Firm Block Hashes do not match")
 	require.True(t, bytes.Equal(firmBlock.ParentHash.Bytes(), updateCommitmentStateRes.Firm.ParentBlockHash), "Firm Block Parent Hash do not match")
 	require.Equal(t, firmBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Firm.Number), "Firm Block Number do not match")
+
+	celestiaBaseHeight := ethservice.BlockChain().CurrentBaseCelestiaHeight()
+	require.Equal(t, celestiaBaseHeight, updateCommitmentStateRes.BaseCelestiaHeight, "BaseCelestiaHeight should be updated in db")
 
 	// check the difference in balances after deposit tx
 	stateDb, err = ethservice.BlockChain().State()
