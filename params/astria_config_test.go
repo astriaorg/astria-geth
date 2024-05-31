@@ -2,6 +2,8 @@ package params
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"reflect"
 	"testing"
@@ -93,5 +95,125 @@ func TestAstriaEIP1559Params(t *testing.T) {
 		if got := eip1559Params.BaseFeeChangeDenominatorAt(height); got != expected {
 			t.Errorf("BaseFeeChangeDenominatorAt(%d): expected %v, got %v", height, expected, got)
 		}
+	}
+}
+
+func TestAstriaBridgeConfigValidation(t *testing.T) {
+	bridgeAddressKey, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
+
+	erc20AssetKey, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	erc20Asset := crypto.PubkeyToAddress(erc20AssetKey.PublicKey)
+
+	tests := []struct {
+		description string
+		config      AstriaBridgeAddressConfig
+		wantErr     error
+	}{
+		{
+			description: "invalid bridge address",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  []byte("rand address"),
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("bridge address must be 20 bytes"),
+		},
+		{
+			description: "invalid start height",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    0,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("start height must be greater than 0"),
+		},
+		{
+			description: "invalid asset denom",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    2,
+				AssetDenom:     "",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("asset denom must be set"),
+		},
+		{
+			description: "invalid asset precision",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 22,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("asset precision of native asset must be less than or equal to 18"),
+		},
+		{
+			description: "invalid contract precision",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 22,
+				Erc20Asset: &AstriaErc20AssetConfig{
+					Erc20Address:      erc20Asset,
+					ContractPrecision: 18,
+				},
+			},
+			wantErr: fmt.Errorf("asset precision must be less than or equal to contract precision"),
+		},
+		{
+			description: "erc20 assets not supported",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset: &AstriaErc20AssetConfig{
+					Erc20Address:      erc20Asset,
+					ContractPrecision: 18,
+				},
+			},
+			wantErr: fmt.Errorf("cannot currently process erc20 bridged assets"),
+		},
+		{
+			description: "valid config",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  bridgeAddress.Bytes(),
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			err := test.config.Validate()
+			if test.wantErr != nil && err == nil {
+				t.Errorf("expected error, got nil")
+			}
+			if test.wantErr == nil && err != nil {
+				t.Errorf("unexpected error %v", err)
+			}
+
+			if !reflect.DeepEqual(err, test.wantErr) {
+				t.Errorf("error mismatch:\nconfig: %v\nerr: %v\nwant: %v", test.config, err, test.wantErr)
+			}
+		})
 	}
 }

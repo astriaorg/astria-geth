@@ -6,6 +6,7 @@ require (
 	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-00000000000000-84e5e35facb9.3
 	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-00000000000000-84e5e35facb9.1
 	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.1-20240529204957-2697e2110d78.1
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.1-20240529204957-1b3cb2034833.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -80,7 +81,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.1-20240529204957-1b3cb2034833.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
