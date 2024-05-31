@@ -38,6 +38,7 @@ func validateAndUnmarshalSequencerTx(tx *sequencerblockv1alpha1.RollupData, brid
 			Gas:   0,
 		}
 
+		fmt.Printf("CUSTOM: Returning a deposit tx")
 		tx := types.NewTx(&txdata)
 		return tx, nil
 	} else {
