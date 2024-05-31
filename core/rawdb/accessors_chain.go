@@ -234,18 +234,18 @@ func WriteFinalizedBlockHash(db ethdb.KeyValueWriter, hash common.Hash) {
 }
 
 // ReadFinalizedCelestiaBlockHeight retrieves the height of the finalized block.
-func ReadBaseCelestiaHeight(db ethdb.KeyValueReader) uint32 {
+func ReadBaseCelestiaHeight(db ethdb.KeyValueReader) uint64 {
 	data, _ := db.Get(headBaseCelestiaHeightKey)
-	if len(data) != 4 {
+	if len(data) != 8 {
 		return 0
 	}
-	number := binary.BigEndian.Uint32(data)
+	number := binary.BigEndian.Uint64(data)
 	return number
 }
 
 // WriteFinalizedCelestiaBlockHeight stores the height of the finalized block.
-func WriteBaseCelestiaHeight(db ethdb.KeyValueWriter, height uint32) {
-	byteHeight := encodeCometbftBlockNumber(height)
+func WriteBaseCelestiaHeight(db ethdb.KeyValueWriter, height uint64) {
+	byteHeight := encodeBlockNumber(height)
 	if err := db.Put(headBaseCelestiaHeightKey, byteHeight); err != nil {
 		log.Crit("Failed to store base celestia height", "err", err)
 	}

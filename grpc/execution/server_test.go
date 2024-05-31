@@ -29,7 +29,6 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 
 	require.True(t, bytes.Equal(genesisInfo.RollupId, hashedRollupId[:]), "RollupId is not correct")
 	require.Equal(t, genesisInfo.GetSequencerGenesisBlockHeight(), ethservice.BlockChain().Config().AstriaSequencerInitialHeight, "SequencerInitialHeight is not correct")
-	require.Equal(t, genesisInfo.GetCelestiaBaseBlockHeight(), ethservice.BlockChain().Config().AstriaCelestiaInitialHeight, "CelestiaInitialHeight is not correct")
 	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaCelestiaHeightVariance, "CelestiaHeightVariance is not correct")
 	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
 }
@@ -55,6 +54,8 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 	require.True(t, bytes.Equal(commitmentState.Firm.Hash, firmBlock.Hash().Bytes()), "Firm Block Hashes do not match")
 	require.True(t, bytes.Equal(commitmentState.Firm.ParentBlockHash, firmBlock.ParentHash.Bytes()), "Firm Block Parent Hash do not match")
 	require.Equal(t, uint64(commitmentState.Firm.Number), firmBlock.Number.Uint64(), "Firm Block Number do not match")
+	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaCelestiaInitialHeight, "BaseCelestiaHeight is not correct")
+
 
 	require.True(t, serviceV1Alpha1.getCommitmentStateCalled, "GetCommitmentState should be called")
 }

@@ -154,13 +154,6 @@ func encodeBlockNumber(number uint64) []byte {
 	return enc
 }
 
-// encodeCometbftBlockNumber encodes a block number as big endian uint32
-func encodeCometbftBlockNumber(number uint32) []byte {
-	enc := make([]byte, 4)
-	binary.BigEndian.PutUint32(enc, number)
-	return enc
-}
-
 // headerKeyPrefix = headerPrefix + num (uint64 big endian)
 func headerKeyPrefix(number uint64) []byte {
 	return append(headerPrefix, encodeBlockNumber(number)...)

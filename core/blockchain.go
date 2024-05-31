@@ -238,7 +238,7 @@ type BlockChain struct {
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 
-	currentBaseCelestiaHeight atomic.Uint32 // Latest finalized block height on Celestia
+	currentBaseCelestiaHeight atomic.Uint64 // Latest finalized block height on Celestia
 
 	bodyCache     *lru.Cache[common.Hash, *types.Body]
 	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
@@ -630,7 +630,7 @@ func (bc *BlockChain) SetFinalized(header *types.Header) {
 }
 
 // SetCelestiaFinalized sets the finalized block and the lowest Celestia height to find next finalized at.
-func (bc *BlockChain) SetCelestiaFinalized(header *types.Header, celHeight uint32) {
+func (bc *BlockChain) SetCelestiaFinalized(header *types.Header, celHeight uint64) {
 	rawdb.WriteBaseCelestiaHeight(bc.db, celHeight)
 	bc.currentBaseCelestiaHeight.Store(celHeight)
 	bc.SetFinalized(header)
