@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func randomBlobTx() *types.Transaction {
+func testBlobTx() *types.Transaction {
 	return types.NewTx(&types.BlobTx{
 		Nonce: 1,
 		To:    testAddr,
@@ -24,7 +24,7 @@ func randomBlobTx() *types.Transaction {
 	})
 }
 
-func randomDepositTx() *types.Transaction {
+func testDepositTx() *types.Transaction {
 	return types.NewTx(&types.DepositTx{
 		From:  testAddr,
 		Value: big.NewInt(1000),
@@ -35,10 +35,10 @@ func randomDepositTx() *types.Transaction {
 func TestSequenceTxValidation(t *testing.T) {
 	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
-	blobTx, err := randomBlobTx().MarshalBinary()
+	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
 
-	depositTx, err := randomDepositTx().MarshalBinary()
+	depositTx, err := testDepositTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)

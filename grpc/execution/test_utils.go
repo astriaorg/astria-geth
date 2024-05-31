@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 	"time"
@@ -27,6 +27,8 @@ var (
 
 	// testAddr is the Ethereum address of the tester account.
 	testAddr = crypto.PubkeyToAddress(testKey.PublicKey)
+
+	testToAddress = common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a")
 
 	testBalance = big.NewInt(2e18)
 )
@@ -73,8 +75,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 	genesis := &core.Genesis{
 		Config: &config,
 		Alloc: core.GenesisAlloc{
-			testAddr:                         {Balance: testBalance},
-			params.BeaconRootsStorageAddress: {Balance: common.Big0, Code: common.Hex2Bytes("3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b6201800042064281555f359062018000015500")},
+			testAddr: {Balance: testBalance},
 		},
 		ExtraData:  []byte("test genesis"),
 		Timestamp:  9000,
@@ -85,7 +86,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
-		tx, _ := types.SignTx(types.NewTransaction(testNonce, common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(&config), testKey)
+		tx, _ := types.SignTx(types.NewTransaction(testNonce, testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(&config), testKey)
 		g.AddTx(tx)
 		testNonce++
 	}
@@ -104,22 +105,12 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 
 // startEthService creates a full node instance for testing.
 func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
-	n, err := node.New(&node.Config{
-		P2P: p2p.Config{
-			ListenAddr:  "0.0.0.0:0",
-			NoDiscovery: true,
-			MaxPeers:    25,
-		},
-	})
-	if err != nil {
-		t.Fatal("can't create node:", err)
-	}
+	n, err := node.New(&node.Config{})
+	require.Nil(t, err, "can't create node")
 
 	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256}
 	ethservice, err := eth.New(n, ethcfg)
-	if err != nil {
-		t.Fatal("can't create eth service:", err)
-	}
+	require.Nil(t, err, "can't create eth service")
 
 	ethservice.SetEtherbase(testAddr)
 	ethservice.SetSynced()
@@ -133,37 +124,22 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	ethservice := startEthService(t, genesis)
 
 	serviceV1Alpha1, err := NewExecutionServiceServerV1Alpha2(ethservice)
-	if err != nil {
-		t.Fatal("can't create execution service:", err)
-	}
+	require.Nil(t, err, "can't create execution service")
 
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
-	if serviceV1Alpha1.nextFeeRecipient != feeCollector {
-		t.Fatalf("nextFeeRecipient not set correctly")
-	}
+	require.Equal(t, feeCollector, serviceV1Alpha1.nextFeeRecipient, "nextFeeRecipient not set correctly")
 
 	bridgeAsset := sha256.Sum256([]byte(genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom))
 	_, ok := serviceV1Alpha1.bridgeAllowedAssetIDs[bridgeAsset]
-	if !ok {
-		t.Fatalf("bridgeAllowedAssetIDs does not contain bridge asset id")
-	}
+	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
 
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
 	_, ok = serviceV1Alpha1.bridgeAddresses[string(bridgeAddress.Bytes())]
-	if !ok {
-		t.Fatalf("bridgeAddress not set correctly")
-	}
+	require.True(t, ok, "bridgeAddress not set correctly")
 
-	if _, err := ethservice.BlockChain().InsertChain(blocks); err != nil {
-		t.Fatal("can't import test blocks:", err)
-	}
+	_, err = ethservice.BlockChain().InsertChain(blocks)
+	require.Nil(t, err, "can't insert blocks")
 
 	return ethservice, serviceV1Alpha1
 
-}
-
-func GrpcEndpointWithoutPrefix(n *node.Node) string {
-	grpcEndpoint := n.GRPCEndpoint()
-	// remove the http:// prefix
-	return grpcEndpoint[7:]
 }
