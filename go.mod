@@ -3,9 +3,10 @@ module github.com/ethereum/go-ethereum
 go 1.21
 
 require (
-	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240515213934-11def93fe8c2.3
-	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-20240515213934-11def93fe8c2.1
-	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.1-20240515213932-4cda3260523c.1
+	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240601032207-1bcb86793146.3
+	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-20240601032207-1bcb86793146.1
+	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.1-20240529204957-2697e2110d78.1
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.1-20240529204957-1b3cb2034833.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -80,7 +81,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.1-20240515213933-356887db1177.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect

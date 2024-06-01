@@ -155,7 +155,6 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 	res := &astriaPb.GenesisInfo{
 		RollupId:                    rollupId[:],
 		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBaseBlockHeight:     s.bc.Config().AstriaCelestiaInitialHeight,
 		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
 	}
 
@@ -316,12 +315,15 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 		return nil, status.Error(codes.Internal, "could not locate firm block")
 	}
 
+	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
+
 	res := &astriaPb.CommitmentState{
-		Soft: softBlock,
-		Firm: firmBlock,
+		Soft:               softBlock,
+		Firm:               firmBlock,
+		BaseCelestiaHeight: celestiaBlock,
 	}
 
-	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number)
+	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
 	getCommitmentStateSuccessCount.Inc(1)
 	s.getCommitmentStateCalled = true
 	return res, nil
@@ -340,6 +342,11 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 
 	if !s.syncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
+	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.BaseCelestiaHeight {
+		errStr := fmt.Sprintf("Base Celestia height cannot be decreased, current_base_celestia_height: %d, new_base_celestia_height: %d", s.bc.CurrentBaseCelestiaHeight(), req.CommitmentState.BaseCelestiaHeight)
+		return nil, status.Error(codes.InvalidArgument, errStr)
 	}
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
@@ -388,7 +395,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	}
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
-		s.bc.SetFinalized(firmBlock.Header())
+		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
 	}
 
 	log.Info("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
