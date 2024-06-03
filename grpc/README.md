@@ -3,16 +3,11 @@
 This package provides a gRPC server as an entrypoint to the EVM.
 
 ## Build and run from source:
-
 ```
 
 See [private_network.md](../private_network.md) for running a local geth node.
 
 ### Running with remote Docker image:
-<<<<<<< HEAD
-
-=======
->>>>>>> 315c87d76 (Feature/grpc execution api (#1))
 ```bash
 docker run --rm \
   -p 8545:8545 -p 30303:30303 -p 50051:50051 \
@@ -21,6 +16,7 @@ docker run --rm \
 ```
 
 ### Local Docker workflow:
+
 ```bash
 # build local docker image
 docker build \
