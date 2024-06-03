@@ -68,8 +68,9 @@ func waitWatcherStart(ks *KeyStore) bool {
 
 func waitForAccounts(wantAccounts []accounts.Account, ks *KeyStore) error {
 	var list []accounts.Account
-	for t0 := time.Now(); time.Since(t0) < 10*time.Second; time.Sleep(100 * time.Millisecond) {
+	for t0 := time.Now(); time.Since(t0) < 5*time.Second; time.Sleep(100 * time.Millisecond) {
 		list = ks.Accounts()
+		fmt.Printf("list: %v\n", list)
 		if reflect.DeepEqual(list, wantAccounts) {
 			// ks should have also received change notifications
 			select {
@@ -348,6 +349,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	// ks should see the account.
 	wantAccounts := []accounts.Account{cachetestAccounts[0]}
 	wantAccounts[0].URL = accounts.URL{Scheme: KeyStoreScheme, Path: file}
+	fmt.Printf("At index 0")
 	if err := waitForAccounts(wantAccounts, ks); err != nil {
 		t.Error(err)
 		return
@@ -362,6 +364,7 @@ func TestUpdatedKeyfileContents(t *testing.T) {
 	}
 	wantAccounts = []accounts.Account{cachetestAccounts[1]}
 	wantAccounts[0].URL = accounts.URL{Scheme: KeyStoreScheme, Path: file}
+	fmt.Printf("At index 1")
 	if err := waitForAccounts(wantAccounts, ks); err != nil {
 		t.Errorf("First replacement failed")
 		t.Error(err)
