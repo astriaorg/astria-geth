@@ -2,7 +2,7 @@
 pragma solidity ^0.8.21;
 
 interface IAstriaMintableERC20 {
-    function getSequencerAssetId() external view returns (uint256);
     function mint(address _to, uint256 _amount) external;
-    function burn(address _from, uint256 _amount) external;
+    function withdrawToSequencer(uint256 _amount, address _destinationChainAddress) external;
+    function withdrawToIbcChain(uint256 _amount, string calldata _destinationChainAddress, string calldata _memo) external;
 }
