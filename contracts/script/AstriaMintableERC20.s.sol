@@ -11,17 +11,15 @@ contract AstriaMintableERC20Script is Script {
         string memory name = vm.envString("NAME");
         string memory symbol = vm.envString("SYMBOL");
         address bridge = vm.envAddress("BRIDGE");
+        address withdrawer = vm.envAddress("WITHDRAWER");
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-
-        AstriaMintableERC20 astriaMintableERC20 = new AstriaMintableERC20(bridge, name, symbol);
-        console.logAddress(address(astriaMintableERC20));
-
+        new AstriaMintableERC20(bridge, withdrawer, name, symbol);
         vm.stopBroadcast();
     }
 
-    function getBalance() public {
+    function getBalance() public view {
         AstriaMintableERC20 astriaMintableERC20 = AstriaMintableERC20(vm.envAddress("ASTRIA_MINTABLE_ERC20_ADDRESS"));
         address account = vm.envAddress("USER_ADDRESS");
         uint256 balance = astriaMintableERC20.balanceOf(account);
