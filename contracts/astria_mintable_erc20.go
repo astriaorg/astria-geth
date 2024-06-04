@@ -31,8 +31,8 @@ var (
 
 // AstriaMintableERC20MetaData contains all meta data concerning the AstriaMintableERC20 contract.
 var AstriaMintableERC20MetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridge\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_symbol\",\"type\":\"string\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"allowance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"needed\",\"type\":\"uint256\"}],\"name\":\"ERC20InsufficientAllowance\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"balance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"needed\",\"type\":\"uint256\"}],\"name\":\"ERC20InsufficientBalance\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"approver\",\"type\":\"address\"}],\"name\":\"ERC20InvalidApprover\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"}],\"name\":\"ERC20InvalidReceiver\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"ERC20InvalidSender\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"ERC20InvalidSpender\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Approval\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Burn\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Mint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"BRIDGE\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"burn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"decimals\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"mint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"symbol\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60a060405234801562000010575f80fd5b5060405162000c9138038062000c9183398101604081905262000033916200012a565b818160036200004383826200023a565b5060046200005282826200023a565b5050506001600160a01b0390921660805250620003029050565b634e487b7160e01b5f52604160045260245ffd5b5f82601f83011262000090575f80fd5b81516001600160401b0380821115620000ad57620000ad6200006c565b604051601f8301601f19908116603f01168101908282118183101715620000d857620000d86200006c565b81604052838152602092508683858801011115620000f4575f80fd5b5f91505b83821015620001175785820183015181830184015290820190620000f8565b5f93810190920192909252949350505050565b5f805f606084860312156200013d575f80fd5b83516001600160a01b038116811462000154575f80fd5b60208501519093506001600160401b038082111562000171575f80fd5b6200017f8783880162000080565b9350604086015191508082111562000195575f80fd5b50620001a48682870162000080565b9150509250925092565b600181811c90821680620001c357607f821691505b602082108103620001e257634e487b7160e01b5f52602260045260245ffd5b50919050565b601f82111562000235575f81815260208120601f850160051c81016020861015620002105750805b601f850160051c820191505b8181101562000231578281556001016200021c565b5050505b505050565b81516001600160401b038111156200025657620002566200006c565b6200026e81620002678454620001ae565b84620001e8565b602080601f831160018114620002a4575f84156200028c5750858301515b5f19600386901b1c1916600185901b17855562000231565b5f85815260208120601f198616915b82811015620002d457888601518255948401946001909101908401620002b3565b5085821015620002f257878501515f19600388901b60f8161c191681555b5050505050600190811b01905550565b608051610968620003295f395f81816101d2015281816102e3015261039401526109685ff3fe608060405234801561000f575f80fd5b50600436106100b1575f3560e01c806370a082311161006e57806370a082311461013f57806395d89b41146101675780639dc29fac1461016f578063a9059cbb14610182578063dd62ed3e14610195578063ee9a31a2146101cd575f80fd5b806306fdde03146100b5578063095ea7b3146100d357806318160ddd146100f657806323b872dd14610108578063313ce5671461011b57806340c10f191461012a575b5f80fd5b6100bd61020c565b6040516100ca9190610771565b60405180910390f35b6100e66100e13660046107d7565b61029c565b60405190151581526020016100ca565b6002545b6040519081526020016100ca565b6100e66101163660046107ff565b6102b5565b604051601281526020016100ca565b61013d6101383660046107d7565b6102d8565b005b6100fa61014d366004610838565b6001600160a01b03165f9081526020819052604090205490565b6100bd61037a565b61013d61017d3660046107d7565b610389565b6100e66101903660046107d7565b610416565b6100fa6101a3366004610858565b6001600160a01b039182165f90815260016020908152604080832093909416825291909152205490565b6101f47f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020016100ca565b60606003805461021b90610889565b80601f016020809104026020016040519081016040528092919081815260200182805461024790610889565b80156102925780601f1061026957610100808354040283529160200191610292565b820191905f5260205f20905b81548152906001019060200180831161027557829003601f168201915b5050505050905090565b5f336102a9818585610423565b60019150505b92915050565b5f336102c2858285610435565b6102cd8585856104b0565b506001949350505050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146103295760405162461bcd60e51b8152600401610320906108c1565b60405180910390fd5b610333828261050d565b816001600160a01b03167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858260405161036e91815260200190565b60405180910390a25050565b60606004805461021b90610889565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146103d15760405162461bcd60e51b8152600401610320906108c1565b6103db8282610545565b816001600160a01b03167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca58260405161036e91815260200190565b5f336102a98185856104b0565b6104308383836001610579565b505050565b6001600160a01b038381165f908152600160209081526040808320938616835292905220545f1981146104aa578181101561049c57604051637dc7a0d960e11b81526001600160a01b03841660048201526024810182905260448101839052606401610320565b6104aa84848484035f610579565b50505050565b6001600160a01b0383166104d957604051634b637e8f60e11b81525f6004820152602401610320565b6001600160a01b0382166105025760405163ec442f0560e01b81525f6004820152602401610320565b61043083838361064b565b6001600160a01b0382166105365760405163ec442f0560e01b81525f6004820152602401610320565b6105415f838361064b565b5050565b6001600160a01b03821661056e57604051634b637e8f60e11b81525f6004820152602401610320565b610541825f8361064b565b6001600160a01b0384166105a25760405163e602df0560e01b81525f6004820152602401610320565b6001600160a01b0383166105cb57604051634a1406b160e11b81525f6004820152602401610320565b6001600160a01b038085165f90815260016020908152604080832093871683529290522082905580156104aa57826001600160a01b0316846001600160a01b03167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b9258460405161063d91815260200190565b60405180910390a350505050565b6001600160a01b038316610675578060025f82825461066a9190610913565b909155506106e59050565b6001600160a01b0383165f90815260208190526040902054818110156106c75760405163391434e360e21b81526001600160a01b03851660048201526024810182905260448101839052606401610320565b6001600160a01b0384165f9081526020819052604090209082900390555b6001600160a01b0382166107015760028054829003905561071f565b6001600160a01b0382165f9081526020819052604090208054820190555b816001600160a01b0316836001600160a01b03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef8360405161076491815260200190565b60405180910390a3505050565b5f6020808352835180828501525f5b8181101561079c57858101830151858201604001528201610780565b505f604082860101526040601f19601f8301168501019250505092915050565b80356001600160a01b03811681146107d2575f80fd5b919050565b5f80604083850312156107e8575f80fd5b6107f1836107bc565b946020939093013593505050565b5f805f60608486031215610811575f80fd5b61081a846107bc565b9250610828602085016107bc565b9150604084013590509250925092565b5f60208284031215610848575f80fd5b610851826107bc565b9392505050565b5f8060408385031215610869575f80fd5b610872836107bc565b9150610880602084016107bc565b90509250929050565b600181811c9082168061089d57607f821691505b6020821081036108bb57634e487b7160e01b5f52602260045260245ffd5b50919050565b60208082526032908201527f4173747269614d696e7461626c6545524332303a206f6e6c79206272696467656040820152711031b0b71036b4b73a1030b73210313ab93760711b606082015260800190565b808201808211156102af57634e487b7160e01b5f52601160045260245ffdfea264697066735822122014c66589442b8d35131eb4d14de96201d92d56c50cece5e9151d0ca979053a8864736f6c63430008150033",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridge\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"_name\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_symbol\",\"type\":\"string\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"allowance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"needed\",\"type\":\"uint256\"}],\"name\":\"ERC20InsufficientAllowance\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"balance\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"needed\",\"type\":\"uint256\"}],\"name\":\"ERC20InsufficientBalance\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"approver\",\"type\":\"address\"}],\"name\":\"ERC20InvalidApprover\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"}],\"name\":\"ERC20InvalidReceiver\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"ERC20InvalidSender\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"ERC20InvalidSpender\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Approval\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"destinationChainAddress\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"memo\",\"type\":\"string\"}],\"name\":\"Ics20Withdrawal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"Mint\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"destinationChainAddress\",\"type\":\"address\"}],\"name\":\"SequencerWithdrawal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"BRIDGE\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"decimals\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"mint\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"symbol\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"string\",\"name\":\"_destinationChainAddress\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"_memo\",\"type\":\"string\"}],\"name\":\"withdrawToIbcChain\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_destinationChainAddress\",\"type\":\"address\"}],\"name\":\"withdrawToSequencer\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60a060405234801562000010575f80fd5b5060405162000df038038062000df083398101604081905262000033916200012a565b818160036200004383826200023a565b5060046200005282826200023a565b5050506001600160a01b0390921660805250620003029050565b634e487b7160e01b5f52604160045260245ffd5b5f82601f83011262000090575f80fd5b81516001600160401b0380821115620000ad57620000ad6200006c565b604051601f8301601f19908116603f01168101908282118183101715620000d857620000d86200006c565b81604052838152602092508683858801011115620000f4575f80fd5b5f91505b83821015620001175785820183015181830184015290820190620000f8565b5f93810190920192909252949350505050565b5f805f606084860312156200013d575f80fd5b83516001600160a01b038116811462000154575f80fd5b60208501519093506001600160401b038082111562000171575f80fd5b6200017f8783880162000080565b9350604086015191508082111562000195575f80fd5b50620001a48682870162000080565b9150509250925092565b600181811c90821680620001c357607f821691505b602082108103620001e257634e487b7160e01b5f52602260045260245ffd5b50919050565b601f82111562000235575f81815260208120601f850160051c81016020861015620002105750805b601f850160051c820191505b8181101562000231578281556001016200021c565b5050505b505050565b81516001600160401b038111156200025657620002566200006c565b6200026e81620002678454620001ae565b84620001e8565b602080601f831160018114620002a4575f84156200028c5750858301515b5f19600386901b1c1916600185901b17855562000231565b5f85815260208120601f198616915b82811015620002d457888601518255948401946001909101908401620002b3565b5085821015620002f257878501515f19600388901b60f8161c191681555b5050505050600190811b01905550565b608051610ace620003225f395f81816101ff01526103100152610ace5ff3fe608060405234801561000f575f80fd5b50600436106100cb575f3560e01c80635fe56b091161008857806395d89b411161006357806395d89b41146101a7578063a9059cbb146101af578063dd62ed3e146101c2578063ee9a31a2146101fa575f80fd5b80635fe56b091461015957806370a082311461016c578063757e987414610194575f80fd5b806306fdde03146100cf578063095ea7b3146100ed57806318160ddd1461011057806323b872dd14610122578063313ce5671461013557806340c10f1914610144575b5f80fd5b6100d7610239565b6040516100e491906107f6565b60405180910390f35b6101006100fb36600461085c565b6102c9565b60405190151581526020016100e4565b6002545b6040519081526020016100e4565b610100610130366004610884565b6102e2565b604051601281526020016100e4565b61015761015236600461085c565b610305565b005b610157610167366004610902565b6103e5565b61011461017a366004610976565b6001600160a01b03165f9081526020819052604090205490565b6101576101a2366004610996565b61043e565b6100d761048c565b6101006101bd36600461085c565b61049b565b6101146101d03660046109c0565b6001600160a01b039182165f90815260016020908152604080832093909416825291909152205490565b6102217f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020016100e4565b606060038054610248906109e8565b80601f0160208091040260200160405190810160405280929190818152602001828054610274906109e8565b80156102bf5780601f10610296576101008083540402835291602001916102bf565b820191905f5260205f20905b8154815290600101906020018083116102a257829003601f168201915b5050505050905090565b5f336102d68185856104a8565b60019150505b92915050565b5f336102ef8582856104ba565b6102fa858585610535565b506001949350505050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146103945760405162461bcd60e51b815260206004820152602960248201527f4173747269614d696e7461626c6545524332303a206f6e6c79206272696467656044820152680818d85b881b5a5b9d60ba1b60648201526084015b60405180910390fd5b61039e8282610592565b816001600160a01b03167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d4121396885826040516103d991815260200190565b60405180910390a25050565b6103ef33866105ca565b84336001600160a01b03167f0c64e29a5254a71c7f4e52b3d2d236348c80e00a00ba2e1961962bd2827c03fb8686868660405161042f9493929190610a48565b60405180910390a35050505050565b61044833836105ca565b6040516001600160a01b0382168152829033907fae8e66664d108544509c9a5b6a9f33c3b5fef3f88e5d3fa680706a6feb1360e39060200160405180910390a35050565b606060048054610248906109e8565b5f336102d6818585610535565b6104b583838360016105fe565b505050565b6001600160a01b038381165f908152600160209081526040808320938616835292905220545f19811461052f578181101561052157604051637dc7a0d960e11b81526001600160a01b0384166004820152602481018290526044810183905260640161038b565b61052f84848484035f6105fe565b50505050565b6001600160a01b03831661055e57604051634b637e8f60e11b81525f600482015260240161038b565b6001600160a01b0382166105875760405163ec442f0560e01b81525f600482015260240161038b565b6104b58383836106d0565b6001600160a01b0382166105bb5760405163ec442f0560e01b81525f600482015260240161038b565b6105c65f83836106d0565b5050565b6001600160a01b0382166105f357604051634b637e8f60e11b81525f600482015260240161038b565b6105c6825f836106d0565b6001600160a01b0384166106275760405163e602df0560e01b81525f600482015260240161038b565b6001600160a01b03831661065057604051634a1406b160e11b81525f600482015260240161038b565b6001600160a01b038085165f908152600160209081526040808320938716835292905220829055801561052f57826001600160a01b0316846001600160a01b03167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925846040516106c291815260200190565b60405180910390a350505050565b6001600160a01b0383166106fa578060025f8282546106ef9190610a79565b9091555061076a9050565b6001600160a01b0383165f908152602081905260409020548181101561074c5760405163391434e360e21b81526001600160a01b0385166004820152602481018290526044810183905260640161038b565b6001600160a01b0384165f9081526020819052604090209082900390555b6001600160a01b038216610786576002805482900390556107a4565b6001600160a01b0382165f9081526020819052604090208054820190555b816001600160a01b0316836001600160a01b03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef836040516107e991815260200190565b60405180910390a3505050565b5f6020808352835180828501525f5b8181101561082157858101830151858201604001528201610805565b505f604082860101526040601f19601f8301168501019250505092915050565b80356001600160a01b0381168114610857575f80fd5b919050565b5f806040838503121561086d575f80fd5b61087683610841565b946020939093013593505050565b5f805f60608486031215610896575f80fd5b61089f84610841565b92506108ad60208501610841565b9150604084013590509250925092565b5f8083601f8401126108cd575f80fd5b50813567ffffffffffffffff8111156108e4575f80fd5b6020830191508360208285010111156108fb575f80fd5b9250929050565b5f805f805f60608688031215610916575f80fd5b85359450602086013567ffffffffffffffff80821115610934575f80fd5b61094089838a016108bd565b90965094506040880135915080821115610958575f80fd5b50610965888289016108bd565b969995985093965092949392505050565b5f60208284031215610986575f80fd5b61098f82610841565b9392505050565b5f80604083850312156109a7575f80fd5b823591506109b760208401610841565b90509250929050565b5f80604083850312156109d1575f80fd5b6109da83610841565b91506109b760208401610841565b600181811c908216806109fc57607f821691505b602082108103610a1a57634e487b7160e01b5f52602260045260245ffd5b50919050565b81835281816020850137505f828201602090810191909152601f909101601f19169091010190565b604081525f610a5b604083018688610a20565b8281036020840152610a6e818587610a20565b979650505050505050565b808201808211156102dc57634e487b7160e01b5f52601160045260245ffdfea264697066735822122011621167ab4de45ec6d8cbd0d773af54a01b2fe1b6017481c3c7a5eadf62a1d364736f6c63430008150033",
 }
 
 // AstriaMintableERC20ABI is the input ABI used to generate the binding from.
@@ -440,27 +440,6 @@ func (_AstriaMintableERC20 *AstriaMintableERC20TransactorSession) Approve(spende
 	return _AstriaMintableERC20.Contract.Approve(&_AstriaMintableERC20.TransactOpts, spender, value)
 }
 
-// Burn is a paid mutator transaction binding the contract method 0x9dc29fac.
-//
-// Solidity: function burn(address _from, uint256 _amount) returns()
-func (_AstriaMintableERC20 *AstriaMintableERC20Transactor) Burn(opts *bind.TransactOpts, _from common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _AstriaMintableERC20.contract.Transact(opts, "burn", _from, _amount)
-}
-
-// Burn is a paid mutator transaction binding the contract method 0x9dc29fac.
-//
-// Solidity: function burn(address _from, uint256 _amount) returns()
-func (_AstriaMintableERC20 *AstriaMintableERC20Session) Burn(_from common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _AstriaMintableERC20.Contract.Burn(&_AstriaMintableERC20.TransactOpts, _from, _amount)
-}
-
-// Burn is a paid mutator transaction binding the contract method 0x9dc29fac.
-//
-// Solidity: function burn(address _from, uint256 _amount) returns()
-func (_AstriaMintableERC20 *AstriaMintableERC20TransactorSession) Burn(_from common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _AstriaMintableERC20.Contract.Burn(&_AstriaMintableERC20.TransactOpts, _from, _amount)
-}
-
 // Mint is a paid mutator transaction binding the contract method 0x40c10f19.
 //
 // Solidity: function mint(address _to, uint256 _amount) returns()
@@ -522,6 +501,48 @@ func (_AstriaMintableERC20 *AstriaMintableERC20Session) TransferFrom(from common
 // Solidity: function transferFrom(address from, address to, uint256 value) returns(bool)
 func (_AstriaMintableERC20 *AstriaMintableERC20TransactorSession) TransferFrom(from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
 	return _AstriaMintableERC20.Contract.TransferFrom(&_AstriaMintableERC20.TransactOpts, from, to, value)
+}
+
+// WithdrawToIbcChain is a paid mutator transaction binding the contract method 0x5fe56b09.
+//
+// Solidity: function withdrawToIbcChain(uint256 _amount, string _destinationChainAddress, string _memo) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20Transactor) WithdrawToIbcChain(opts *bind.TransactOpts, _amount *big.Int, _destinationChainAddress string, _memo string) (*types.Transaction, error) {
+	return _AstriaMintableERC20.contract.Transact(opts, "withdrawToIbcChain", _amount, _destinationChainAddress, _memo)
+}
+
+// WithdrawToIbcChain is a paid mutator transaction binding the contract method 0x5fe56b09.
+//
+// Solidity: function withdrawToIbcChain(uint256 _amount, string _destinationChainAddress, string _memo) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20Session) WithdrawToIbcChain(_amount *big.Int, _destinationChainAddress string, _memo string) (*types.Transaction, error) {
+	return _AstriaMintableERC20.Contract.WithdrawToIbcChain(&_AstriaMintableERC20.TransactOpts, _amount, _destinationChainAddress, _memo)
+}
+
+// WithdrawToIbcChain is a paid mutator transaction binding the contract method 0x5fe56b09.
+//
+// Solidity: function withdrawToIbcChain(uint256 _amount, string _destinationChainAddress, string _memo) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20TransactorSession) WithdrawToIbcChain(_amount *big.Int, _destinationChainAddress string, _memo string) (*types.Transaction, error) {
+	return _AstriaMintableERC20.Contract.WithdrawToIbcChain(&_AstriaMintableERC20.TransactOpts, _amount, _destinationChainAddress, _memo)
+}
+
+// WithdrawToSequencer is a paid mutator transaction binding the contract method 0x757e9874.
+//
+// Solidity: function withdrawToSequencer(uint256 _amount, address _destinationChainAddress) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20Transactor) WithdrawToSequencer(opts *bind.TransactOpts, _amount *big.Int, _destinationChainAddress common.Address) (*types.Transaction, error) {
+	return _AstriaMintableERC20.contract.Transact(opts, "withdrawToSequencer", _amount, _destinationChainAddress)
+}
+
+// WithdrawToSequencer is a paid mutator transaction binding the contract method 0x757e9874.
+//
+// Solidity: function withdrawToSequencer(uint256 _amount, address _destinationChainAddress) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20Session) WithdrawToSequencer(_amount *big.Int, _destinationChainAddress common.Address) (*types.Transaction, error) {
+	return _AstriaMintableERC20.Contract.WithdrawToSequencer(&_AstriaMintableERC20.TransactOpts, _amount, _destinationChainAddress)
+}
+
+// WithdrawToSequencer is a paid mutator transaction binding the contract method 0x757e9874.
+//
+// Solidity: function withdrawToSequencer(uint256 _amount, address _destinationChainAddress) returns()
+func (_AstriaMintableERC20 *AstriaMintableERC20TransactorSession) WithdrawToSequencer(_amount *big.Int, _destinationChainAddress common.Address) (*types.Transaction, error) {
+	return _AstriaMintableERC20.Contract.WithdrawToSequencer(&_AstriaMintableERC20.TransactOpts, _amount, _destinationChainAddress)
 }
 
 // AstriaMintableERC20ApprovalIterator is returned from FilterApproval and is used to iterate over the raw logs and unpacked data for Approval events raised by the AstriaMintableERC20 contract.
@@ -678,9 +699,9 @@ func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) ParseApproval(log types
 	return event, nil
 }
 
-// AstriaMintableERC20BurnIterator is returned from FilterBurn and is used to iterate over the raw logs and unpacked data for Burn events raised by the AstriaMintableERC20 contract.
-type AstriaMintableERC20BurnIterator struct {
-	Event *AstriaMintableERC20Burn // Event containing the contract specifics and raw log
+// AstriaMintableERC20Ics20WithdrawalIterator is returned from FilterIcs20Withdrawal and is used to iterate over the raw logs and unpacked data for Ics20Withdrawal events raised by the AstriaMintableERC20 contract.
+type AstriaMintableERC20Ics20WithdrawalIterator struct {
+	Event *AstriaMintableERC20Ics20Withdrawal // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -694,7 +715,7 @@ type AstriaMintableERC20BurnIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *AstriaMintableERC20BurnIterator) Next() bool {
+func (it *AstriaMintableERC20Ics20WithdrawalIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -703,7 +724,7 @@ func (it *AstriaMintableERC20BurnIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(AstriaMintableERC20Burn)
+			it.Event = new(AstriaMintableERC20Ics20Withdrawal)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -718,7 +739,7 @@ func (it *AstriaMintableERC20BurnIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(AstriaMintableERC20Burn)
+		it.Event = new(AstriaMintableERC20Ics20Withdrawal)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -734,52 +755,62 @@ func (it *AstriaMintableERC20BurnIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *AstriaMintableERC20BurnIterator) Error() error {
+func (it *AstriaMintableERC20Ics20WithdrawalIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *AstriaMintableERC20BurnIterator) Close() error {
+func (it *AstriaMintableERC20Ics20WithdrawalIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// AstriaMintableERC20Burn represents a Burn event raised by the AstriaMintableERC20 contract.
-type AstriaMintableERC20Burn struct {
-	Account common.Address
-	Amount  *big.Int
-	Raw     types.Log // Blockchain specific contextual infos
+// AstriaMintableERC20Ics20Withdrawal represents a Ics20Withdrawal event raised by the AstriaMintableERC20 contract.
+type AstriaMintableERC20Ics20Withdrawal struct {
+	Sender                  common.Address
+	Amount                  *big.Int
+	DestinationChainAddress string
+	Memo                    string
+	Raw                     types.Log // Blockchain specific contextual infos
 }
 
-// FilterBurn is a free log retrieval operation binding the contract event 0xcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5.
+// FilterIcs20Withdrawal is a free log retrieval operation binding the contract event 0x0c64e29a5254a71c7f4e52b3d2d236348c80e00a00ba2e1961962bd2827c03fb.
 //
-// Solidity: event Burn(address indexed account, uint256 amount)
-func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) FilterBurn(opts *bind.FilterOpts, account []common.Address) (*AstriaMintableERC20BurnIterator, error) {
+// Solidity: event Ics20Withdrawal(address indexed sender, uint256 indexed amount, string destinationChainAddress, string memo)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) FilterIcs20Withdrawal(opts *bind.FilterOpts, sender []common.Address, amount []*big.Int) (*AstriaMintableERC20Ics20WithdrawalIterator, error) {
 
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var amountRule []interface{}
+	for _, amountItem := range amount {
+		amountRule = append(amountRule, amountItem)
 	}
 
-	logs, sub, err := _AstriaMintableERC20.contract.FilterLogs(opts, "Burn", accountRule)
+	logs, sub, err := _AstriaMintableERC20.contract.FilterLogs(opts, "Ics20Withdrawal", senderRule, amountRule)
 	if err != nil {
 		return nil, err
 	}
-	return &AstriaMintableERC20BurnIterator{contract: _AstriaMintableERC20.contract, event: "Burn", logs: logs, sub: sub}, nil
+	return &AstriaMintableERC20Ics20WithdrawalIterator{contract: _AstriaMintableERC20.contract, event: "Ics20Withdrawal", logs: logs, sub: sub}, nil
 }
 
-// WatchBurn is a free log subscription operation binding the contract event 0xcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5.
+// WatchIcs20Withdrawal is a free log subscription operation binding the contract event 0x0c64e29a5254a71c7f4e52b3d2d236348c80e00a00ba2e1961962bd2827c03fb.
 //
-// Solidity: event Burn(address indexed account, uint256 amount)
-func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchBurn(opts *bind.WatchOpts, sink chan<- *AstriaMintableERC20Burn, account []common.Address) (event.Subscription, error) {
+// Solidity: event Ics20Withdrawal(address indexed sender, uint256 indexed amount, string destinationChainAddress, string memo)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchIcs20Withdrawal(opts *bind.WatchOpts, sink chan<- *AstriaMintableERC20Ics20Withdrawal, sender []common.Address, amount []*big.Int) (event.Subscription, error) {
 
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var amountRule []interface{}
+	for _, amountItem := range amount {
+		amountRule = append(amountRule, amountItem)
 	}
 
-	logs, sub, err := _AstriaMintableERC20.contract.WatchLogs(opts, "Burn", accountRule)
+	logs, sub, err := _AstriaMintableERC20.contract.WatchLogs(opts, "Ics20Withdrawal", senderRule, amountRule)
 	if err != nil {
 		return nil, err
 	}
@@ -789,8 +820,8 @@ func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchBurn(opts *bind.Wa
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(AstriaMintableERC20Burn)
-				if err := _AstriaMintableERC20.contract.UnpackLog(event, "Burn", log); err != nil {
+				event := new(AstriaMintableERC20Ics20Withdrawal)
+				if err := _AstriaMintableERC20.contract.UnpackLog(event, "Ics20Withdrawal", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -811,12 +842,12 @@ func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchBurn(opts *bind.Wa
 	}), nil
 }
 
-// ParseBurn is a log parse operation binding the contract event 0xcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5.
+// ParseIcs20Withdrawal is a log parse operation binding the contract event 0x0c64e29a5254a71c7f4e52b3d2d236348c80e00a00ba2e1961962bd2827c03fb.
 //
-// Solidity: event Burn(address indexed account, uint256 amount)
-func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) ParseBurn(log types.Log) (*AstriaMintableERC20Burn, error) {
-	event := new(AstriaMintableERC20Burn)
-	if err := _AstriaMintableERC20.contract.UnpackLog(event, "Burn", log); err != nil {
+// Solidity: event Ics20Withdrawal(address indexed sender, uint256 indexed amount, string destinationChainAddress, string memo)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) ParseIcs20Withdrawal(log types.Log) (*AstriaMintableERC20Ics20Withdrawal, error) {
+	event := new(AstriaMintableERC20Ics20Withdrawal)
+	if err := _AstriaMintableERC20.contract.UnpackLog(event, "Ics20Withdrawal", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -962,6 +993,160 @@ func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchMint(opts *bind.Wa
 func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) ParseMint(log types.Log) (*AstriaMintableERC20Mint, error) {
 	event := new(AstriaMintableERC20Mint)
 	if err := _AstriaMintableERC20.contract.UnpackLog(event, "Mint", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// AstriaMintableERC20SequencerWithdrawalIterator is returned from FilterSequencerWithdrawal and is used to iterate over the raw logs and unpacked data for SequencerWithdrawal events raised by the AstriaMintableERC20 contract.
+type AstriaMintableERC20SequencerWithdrawalIterator struct {
+	Event *AstriaMintableERC20SequencerWithdrawal // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *AstriaMintableERC20SequencerWithdrawalIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AstriaMintableERC20SequencerWithdrawal)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(AstriaMintableERC20SequencerWithdrawal)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *AstriaMintableERC20SequencerWithdrawalIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *AstriaMintableERC20SequencerWithdrawalIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// AstriaMintableERC20SequencerWithdrawal represents a SequencerWithdrawal event raised by the AstriaMintableERC20 contract.
+type AstriaMintableERC20SequencerWithdrawal struct {
+	Sender                  common.Address
+	Amount                  *big.Int
+	DestinationChainAddress common.Address
+	Raw                     types.Log // Blockchain specific contextual infos
+}
+
+// FilterSequencerWithdrawal is a free log retrieval operation binding the contract event 0xae8e66664d108544509c9a5b6a9f33c3b5fef3f88e5d3fa680706a6feb1360e3.
+//
+// Solidity: event SequencerWithdrawal(address indexed sender, uint256 indexed amount, address destinationChainAddress)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) FilterSequencerWithdrawal(opts *bind.FilterOpts, sender []common.Address, amount []*big.Int) (*AstriaMintableERC20SequencerWithdrawalIterator, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var amountRule []interface{}
+	for _, amountItem := range amount {
+		amountRule = append(amountRule, amountItem)
+	}
+
+	logs, sub, err := _AstriaMintableERC20.contract.FilterLogs(opts, "SequencerWithdrawal", senderRule, amountRule)
+	if err != nil {
+		return nil, err
+	}
+	return &AstriaMintableERC20SequencerWithdrawalIterator{contract: _AstriaMintableERC20.contract, event: "SequencerWithdrawal", logs: logs, sub: sub}, nil
+}
+
+// WatchSequencerWithdrawal is a free log subscription operation binding the contract event 0xae8e66664d108544509c9a5b6a9f33c3b5fef3f88e5d3fa680706a6feb1360e3.
+//
+// Solidity: event SequencerWithdrawal(address indexed sender, uint256 indexed amount, address destinationChainAddress)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) WatchSequencerWithdrawal(opts *bind.WatchOpts, sink chan<- *AstriaMintableERC20SequencerWithdrawal, sender []common.Address, amount []*big.Int) (event.Subscription, error) {
+
+	var senderRule []interface{}
+	for _, senderItem := range sender {
+		senderRule = append(senderRule, senderItem)
+	}
+	var amountRule []interface{}
+	for _, amountItem := range amount {
+		amountRule = append(amountRule, amountItem)
+	}
+
+	logs, sub, err := _AstriaMintableERC20.contract.WatchLogs(opts, "SequencerWithdrawal", senderRule, amountRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(AstriaMintableERC20SequencerWithdrawal)
+				if err := _AstriaMintableERC20.contract.UnpackLog(event, "SequencerWithdrawal", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseSequencerWithdrawal is a log parse operation binding the contract event 0xae8e66664d108544509c9a5b6a9f33c3b5fef3f88e5d3fa680706a6feb1360e3.
+//
+// Solidity: event SequencerWithdrawal(address indexed sender, uint256 indexed amount, address destinationChainAddress)
+func (_AstriaMintableERC20 *AstriaMintableERC20Filterer) ParseSequencerWithdrawal(log types.Log) (*AstriaMintableERC20SequencerWithdrawal, error) {
+	event := new(AstriaMintableERC20SequencerWithdrawal)
+	if err := _AstriaMintableERC20.contract.UnpackLog(event, "SequencerWithdrawal", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
