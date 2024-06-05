@@ -11,10 +11,11 @@ contract AstriaMintableERC20Script is Script {
         string memory name = vm.envString("NAME");
         string memory symbol = vm.envString("SYMBOL");
         address bridge = vm.envAddress("BRIDGE");
+        uint32 assetWithdrawalDecimals = uint32(vm.envUint("ASSET_WITHDRAWAL_DECIMALS"));
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        new AstriaMintableERC20(bridge, name, symbol);
+        new AstriaMintableERC20(bridge, assetWithdrawalDecimals, name, symbol);
         vm.stopBroadcast();
     }
 
