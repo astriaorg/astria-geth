@@ -343,8 +343,8 @@ type ChainConfig struct {
 	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
 	AstriaRollupName               string                      `json:"astriaRollupName"`
 	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
-	AstriaCelestiaInitialHeight    uint32                      `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint32                      `json:"astriaCelestiaHeightVariance,omitempty"`
+	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
+	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
 	AstriaBridgeSenderAddress      common.Address              `json:"astriaBridgeSenderAddress,omitempty"`
 	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`

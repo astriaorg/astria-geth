@@ -18,7 +18,6 @@ import (
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
@@ -168,7 +167,6 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 	res := &astriaPb.GenesisInfo{
 		RollupId:                    rollupId[:],
 		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBaseBlockHeight:     s.bc.Config().AstriaCelestiaInitialHeight,
 		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
 	}
 
@@ -253,91 +251,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		if deposit := tx.GetDeposit(); deposit != nil {
-			bridgeAddress := string(deposit.BridgeAddress.GetInner())
-			bac, ok := s.bridgeAddresses[bridgeAddress]
-			if !ok {
-				log.Debug("ignoring deposit tx from unknown bridge", "bridgeAddress", bridgeAddress)
-				continue
-			}
-
-			if len(deposit.AssetId) != 32 {
-				log.Debug("ignoring deposit tx with invalid asset ID", "assetID", deposit.AssetId)
-				continue
-			}
-
-			assetID := [32]byte{}
-			copy(assetID[:], deposit.AssetId[:32])
-
-			if _, ok := s.bridgeAllowedAssetIDs[assetID]; !ok {
-				log.Debug("ignoring deposit tx with disallowed asset ID", "assetID", deposit.AssetId)
-				continue
-			}
-
-			recipient := common.HexToAddress(deposit.DestinationChainAddress)
-			amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
-
-			if bac.Erc20Asset != nil {
-				log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
-				abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
-				if err != nil {
-					// this should never happen, as the abi is hardcoded in the contract bindings
-					return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)
-				}
-
-				// pack arguments for calling the `mint` function on the ERC20 contract
-				args := []interface{}{recipient, amount}
-				calldata, err := abi.Pack("mint", args...)
-				if err != nil {
-					return nil, err
-				}
-
-				txdata := types.DepositTx{
-					From:  s.bridgeSenderAddress,
-					Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
-					// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
-					//
-					// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
-					// address defined by consensus, so the gas cost is not actually deducted from any account.
-					Gas:  16000,
-					To:   &bac.Erc20Asset.ContractAddress,
-					Data: calldata,
-				}
-
-				tx := types.NewTx(&txdata)
-				txsToProcess = append(txsToProcess, tx)
-				continue
-			}
-
-			txdata := types.DepositTx{
-				From:  s.bridgeSenderAddress,
-				To:    &recipient,
-				Value: amount,
-				Gas:   0,
-			}
-
-			tx := types.NewTx(&txdata)
-			txsToProcess = append(txsToProcess, tx)
-		} else {
-			ethTx := new(types.Transaction)
-			err := ethTx.UnmarshalBinary(tx.GetSequencedData())
-			if err != nil {
-				log.Error("failed to unmarshal sequenced data into transaction, ignoring", "tx hash", sha256.Sum256(tx.GetSequencedData()), "err", err)
-				continue
-			}
-
-			if ethTx.Type() == types.DepositTxType {
-				log.Debug("ignoring deposit tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
-				continue
-			}
-
-			if ethTx.Type() == types.BlobTxType {
-				log.Debug("ignoring blob tx in sequenced data", "tx hash", sha256.Sum256(tx.GetSequencedData()))
-				continue
-			}
-
-			txsToProcess = append(txsToProcess, ethTx)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs, s.bridgeSenderAddress)
+		if err != nil {
+			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			continue
 		}
+		txsToProcess = append(txsToProcess, unmarshalledTx)
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
@@ -408,12 +327,15 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 		return nil, status.Error(codes.Internal, "could not locate firm block")
 	}
 
+	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
+
 	res := &astriaPb.CommitmentState{
-		Soft: softBlock,
-		Firm: firmBlock,
+		Soft:               softBlock,
+		Firm:               firmBlock,
+		BaseCelestiaHeight: celestiaBlock,
 	}
 
-	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number)
+	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
 	getCommitmentStateSuccessCount.Inc(1)
 	s.getCommitmentStateCalled = true
 	return res, nil
@@ -432,6 +354,11 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 
 	if !s.syncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
+	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.BaseCelestiaHeight {
+		errStr := fmt.Sprintf("Base Celestia height cannot be decreased, current_base_celestia_height: %d, new_base_celestia_height: %d", s.bc.CurrentBaseCelestiaHeight(), req.CommitmentState.BaseCelestiaHeight)
+		return nil, status.Error(codes.InvalidArgument, errStr)
 	}
 
 	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
@@ -480,7 +407,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	}
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
-		s.bc.SetFinalized(firmBlock.Header())
+		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
 	}
 
 	log.Info("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
