@@ -55,6 +55,14 @@ func TestSequenceTxValidation(t *testing.T) {
 	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
 	invalidBridgeAssetDenom := sha256.Sum256([]byte("invalid-asset-denom"))
 
+	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
+	invalidHeightBridgeAssetDenomID := sha256.Sum256([]byte(invalidHeightBridgeAssetDenom))
+	invalidHeightBridgeAddress := "invalid-height-bridge-address"
+	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddress] = &params.AstriaBridgeAddressConfig{
+		AssetDenom:  invalidHeightBridgeAssetDenom,
+		StartHeight: 100,
+	}
+
 	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
 
 	tests := []struct {
@@ -130,6 +138,19 @@ func TestSequenceTxValidation(t *testing.T) {
 			wantErr: "disallowed asset ID",
 		},
 		{
+			description: "deposit tx with a height and asset below the bridge start height",
+			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+				BridgeAddress: &primitivev1.Address{
+					Inner: []byte(invalidHeightBridgeAddress),
+				},
+				AssetId:                 invalidHeightBridgeAssetDenomID[:],
+				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+				DestinationChainAddress: chainDestinationAddress.String(),
+			}}},
+			wantErr: "not allowed before height",
+		},
+		{
 			description: "valid deposit tx",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
@@ -153,7 +174,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssetIDs, common.Address{})
+			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssetIDs, common.Address{})
 			if test.wantErr == "" && err == nil {
 				return
 			}

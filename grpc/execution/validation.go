@@ -17,6 +17,7 @@ import (
 // If the sequencer transaction is not a deposit tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
 // tx is not a blob tx or a deposit tx.
 func validateAndUnmarshalSequencerTx(
+	height uint64,
 	tx *sequencerblockv1alpha1.RollupData,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssetIDs map[[32]byte]struct{},
@@ -29,6 +30,10 @@ func validateAndUnmarshalSequencerTx(
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
 		}
 
+		if height < uint64(bac.StartHeight) {
+			return nil, fmt.Errorf("bridging asset %s from bridge %s not allowed before height %d", bac.AssetDenom, bridgeAddress, bac.StartHeight)
+		}
+
 		if len(deposit.AssetId) != 32 {
 			return nil, fmt.Errorf("invalid asset ID: %x", deposit.AssetId)
 		}
@@ -38,6 +43,11 @@ func validateAndUnmarshalSequencerTx(
 
 		if _, ok := bridgeAllowedAssetIDs[assetID]; !ok {
 			return nil, fmt.Errorf("disallowed asset ID %x in deposit tx", deposit.AssetId)
+		}
+
+		expectedAssetID := sha256.Sum256([]byte(bac.AssetDenom))
+		if assetID != expectedAssetID {
+			return nil, fmt.Errorf("asset ID %x does not match bridge address %s asset", deposit.AssetId, bridgeAddress)
 		}
 
 		recipient := common.HexToAddress(deposit.DestinationChainAddress)
