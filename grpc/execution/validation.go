@@ -55,7 +55,7 @@ func validateAndUnmarshalSequencerTx(
 
 		if bac.Erc20Asset != nil {
 			log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
-			abi, err := contracts.AstriaMintableERC20MetaData.GetAbi()
+			abi, err := contracts.AstriaBridgeableERC20MetaData.GetAbi()
 			if err != nil {
 				// this should never happen, as the abi is hardcoded in the contract bindings
 				return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)

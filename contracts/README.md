@@ -1,6 +1,8 @@
 # astria bridgeable erc20s
 
-Forge project for the `AstriaMintableERC20` contract.
+Package for the `AstriaBridgeableERC20` contract.
+
+## Initializing
 
 Requirements:
 
@@ -9,8 +11,21 @@ Requirements:
 Build:
 
 ```sh
+git submodule update --init --recursive
+cd astria-bridge-contracts
 forge build
 ```
+
+## Go bindings
+
+If you change the contract and wish to update the go bindings, run:
+
+```sh
+chmod +x 
+./generate-bindings.sh
+```
+
+## Testing
 
 To test the full end-to-end flow, run the sequencer, cometbft, composer, and conductor. Ensure the configured chain IDs are correct.
 
@@ -20,10 +35,10 @@ Copy the example .env:
 cp local.env.example .env && source .env
 ```
 
-Deploy `AstriaMintableERC20.sol`:
+Deploy `AstriaBridgeableERC20.sol`:
 
 ```sh
-forge script script/AstriaMintableERC20.s.sol:AstriaMintableERC20Script \
+forge script script/AstriaBridgeableERC20.s.sol:AstriaBridgeableERC20Script \
    --rpc-url $RPC_URL --broadcast --sig "deploy()" -vvvv
 ```
 
@@ -69,7 +84,7 @@ This initializes the bridge account and also transfer funds over.
 Check your ERC20 balance:
 
 ```sh
-forge script script/AstriaMintableERC20.s.sol:AstriaMintableERC20Script \
+forge script script/AstriaBridgeableERC20.s.sol:AstriaBridgeableERC20Script \
    --rpc-url $RPC_URL --sig "getBalance()" -vvvv
 ```
 

@@ -48,7 +48,7 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssetIDs map[[32]byte]struct{}                        // a set of allowed asset IDs structs are left empty
-	bridgeSenderAddress   common.Address                               // address from which AstriaMintableERC20 contracts are called
+	bridgeSenderAddress   common.Address                               // address from which AstriaBridgeableERC20 contracts are called
 
 	nextFeeRecipient common.Address // Fee recipient for the next block
 }
