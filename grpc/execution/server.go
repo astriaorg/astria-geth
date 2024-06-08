@@ -106,10 +106,10 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
-			if cfg.Erc20Asset == nil && nativeBridgeSeen {
-				return nil, errors.New("only one native bridge address is allowed")
-			}
-			if cfg.Erc20Asset == nil && !nativeBridgeSeen {
+			if cfg.Erc20Asset == nil {
+				if nativeBridgeSeen {
+						return nil, errors.New("only one native bridge address is allowed")
+				}
 				nativeBridgeSeen = true
 			}
 
