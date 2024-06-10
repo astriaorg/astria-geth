@@ -76,29 +76,30 @@ var (
 func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServerV1Alpha2, error) {
 	bc := eth.BlockChain()
 
-	if bc.Config().AstriaRollupName == "" {
+	if bc.Config().AstriaRollupName() == "" {
 		return nil, errors.New("rollup name not set")
 	}
 
-	if bc.Config().AstriaSequencerInitialHeight == 0 {
+	if bc.Config().AstriaSequencerInitialHeight() == 0 {
 		return nil, errors.New("sequencer initial height not set")
 	}
 
-	if bc.Config().AstriaCelestiaInitialHeight == 0 {
+	if bc.Config().AstriaCelestiaInitialHeight() == 0 {
 		return nil, errors.New("celestia initial height not set")
 	}
 
-	if bc.Config().AstriaCelestiaHeightVariance == 0 {
+	if bc.Config().AstriaCelestiaHeightVariance() == 0 {
 		return nil, errors.New("celestia height variance not set")
 	}
 
 	bridgeAddresses := make(map[string]*params.AstriaBridgeAddressConfig)
 	bridgeAllowedAssetIDs := make(map[[32]byte]struct{})
-	if bc.Config().AstriaBridgeAddressConfigs == nil {
+	astriaBridgeAddressConfig := bc.Config().AstriaBridgeAddressConfigs()
+	if astriaBridgeAddressConfig == nil {
 		log.Warn("bridge addresses not set")
 	} else {
 		nativeBridgeSeen := false
-		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
+		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs() {
 			err := cfg.Validate()
 			if err != nil {
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
@@ -120,12 +121,13 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	// To decrease compute cost, we identify the next fee recipient at the start
 	// and update it as we execute blocks.
 	nextFeeRecipient := common.Address{}
-	if bc.Config().AstriaFeeCollectors == nil {
+	astriaFeeCollectors := bc.Config().AstriaFeeCollectors()
+	if astriaFeeCollectors == nil {
 		log.Warn("fee asset collectors not set, assets will be burned")
 	} else {
 		maxHeightCollectorMatch := uint32(0)
 		nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
-		for height, collector := range bc.Config().AstriaFeeCollectors {
+		for height, collector := range astriaFeeCollectors {
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
 				nextFeeRecipient = collector
@@ -146,12 +148,12 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 	log.Debug("GetGenesisInfo called")
 	getGenesisInfoRequestCount.Inc(1)
 
-	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName()))
 
 	res := &astriaPb.GenesisInfo{
 		RollupId:                    rollupId[:],
-		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
+		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight(),
+		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance(),
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)
@@ -285,10 +287,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		},
 	}
 
-	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
-		s.nextFeeRecipient = next
+	astriaFeeCollectors := s.bc.Config().AstriaFeeCollectors()
+	if astriaFeeCollectors != nil {
+		if next, ok := astriaFeeCollectors[res.Number+1]; ok {
+			s.nextFeeRecipient = next
+		}
 	}
-
 	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
