@@ -15,7 +15,7 @@
         "terminalTotalDifficulty": 0,
         "terminalTotalDifficultyPassed": true,
         "ethash": {},
-        "astriaRollupName": "astriachain",
+        "astriaRollupName": "astria-test-chain-1",
         "astriaOverrideGenesisExtraData": true,
         "astriaSequencerInitialHeight": 2,
         "astriaCelestiaInitialHeight": 2,

@@ -17,7 +17,6 @@ init:
 # start a local geth node
 run:
     ./build/bin/geth \
-    --networkid=1337 \
     --http \
     --http.addr=0.0.0.0 \
     --http.port=8545 \
