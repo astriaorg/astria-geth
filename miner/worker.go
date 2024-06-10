@@ -307,6 +307,7 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 			miner.txpool.AddToAstriaExcludedFromBlock(tx)
 		}
 	}
+
 	return nil
 }
 

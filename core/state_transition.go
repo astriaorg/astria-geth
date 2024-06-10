@@ -394,7 +394,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a deposit tx, we only need to mint funds and no gas is used.
 	if st.msg.IsDepositTx {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
-		st.state.AddBalance(st.msg.From, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaDepositTx)
+		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaDepositTx)
 		return &ExecutionResult{
 			UsedGas:    0,
 			Err:        nil,
