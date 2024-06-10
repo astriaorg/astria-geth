@@ -40,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/holiman/uint256"
 )
 
 // So we can deterministically seed different blockchains
@@ -3567,7 +3568,7 @@ func testInitThenFailCreateContract(t *testing.T, scheme string) {
 	defer chain.Stop()
 
 	statedb, _ := chain.State()
-	if got, exp := statedb.GetBalance(aa), big.NewInt(100000); got.Cmp(exp) != 0 {
+	if got, exp := statedb.GetBalance(aa), uint256.NewInt(100000); got.Cmp(exp) != 0 {
 		t.Fatalf("Genesis err, got %v exp %v", got, exp)
 	}
 	// First block tries to create, but fails
@@ -3577,7 +3578,7 @@ func testInitThenFailCreateContract(t *testing.T, scheme string) {
 			t.Fatalf("block %d: failed to insert into chain: %v", block.NumberU64(), err)
 		}
 		statedb, _ = chain.State()
-		if got, exp := statedb.GetBalance(aa), big.NewInt(100000); got.Cmp(exp) != 0 {
+		if got, exp := statedb.GetBalance(aa), uint256.NewInt(100000); got.Cmp(exp) != 0 {
 			t.Fatalf("block %d: got %v exp %v", block.NumberU64(), got, exp)
 		}
 	}
@@ -3765,19 +3766,21 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 	// 3: Ensure that miner received only the tx's tip.
 	actual := state.GetBalance(block.Coinbase())
 	totalBaseFee := new(big.Int).SetUint64(block.BaseFee().Uint64() * block.GasUsed())
+
 	expected := new(big.Int).Add(
 		new(big.Int).SetUint64(block.GasUsed()*block.Transactions()[0].GasTipCap().Uint64()),
-		ethash.ConstantinopleBlockReward,
+		ethash.ConstantinopleBlockReward.ToBig(),
 	)
 	expected = expected.Add(expected, totalBaseFee)
-	if actual.Cmp(expected) != 0 {
+
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
 
 	// 4: Ensure the tx sender paid for the gasUsed * (tip + block baseFee).
-	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
+	actual = new(uint256.Int).Sub(uint256.MustFromBig(funds), state.GetBalance(addr1))
 	expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
-	if actual.Cmp(expected) != 0 {
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
 
@@ -3808,19 +3811,20 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 	// astria-evm doesn't burn the base fee, but it is given to the miner.
 	actual = state.GetBalance(block.Coinbase())
 	totalBaseFee = new(big.Int).SetUint64(block.BaseFee().Uint64() * block.GasUsed())
+
 	expected = new(big.Int).Add(
 		new(big.Int).SetUint64(block.GasUsed()*effectiveTip),
-		ethash.ConstantinopleBlockReward,
+		ethash.ConstantinopleBlockReward.ToBig(),
 	)
 	expected = expected.Add(expected, totalBaseFee)
-	if actual.Cmp(expected) != 0 {
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
 
 	// 4: Ensure the tx sender paid for the gasUsed * (effectiveTip + block baseFee).
-	actual = new(big.Int).Sub(funds, state.GetBalance(addr2))
+	actual = new(uint256.Int).Sub(uint256.MustFromBig(funds), state.GetBalance(addr2))
 	expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
-	if actual.Cmp(expected) != 0 {
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
 }
@@ -4639,14 +4643,14 @@ func TestEIP3651(t *testing.T) {
 	totalBaseFee := new(big.Int).SetUint64(block.GasUsed() * block.BaseFee().Uint64())
 	expected := new(big.Int).SetUint64(block.GasUsed() * block.Transactions()[0].GasTipCap().Uint64())
 	expected = expected.Add(expected, totalBaseFee)
-	if actual.Cmp(expected) != 0 {
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
 
 	// 4: Ensure the tx sender paid for the gasUsed * (tip + block baseFee).
-	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
+	actual = new(uint256.Int).Sub(uint256.MustFromBig(funds), state.GetBalance(addr1))
 	expected = new(big.Int).SetUint64(block.GasUsed() * (block.Transactions()[0].GasTipCap().Uint64() + block.BaseFee().Uint64()))
-	if actual.Cmp(expected) != 0 {
+	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
 }
