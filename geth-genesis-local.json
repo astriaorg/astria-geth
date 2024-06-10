@@ -20,24 +20,7 @@
         "astriaSequencerInitialHeight": 2,
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
-        "astriaBridgeAddresses": [
-            {
-                "bridgeAddress": "684ae50c49a434199199c9c698115391152d7b3f",
-                "startHeight": 1,
-                "assetDenom": "nria",
-                "assetPrecision": 9
-            },
-            {
-                "bridgeAddress": "34fec43c7fcab9aef3b3cf8aba855e41ee69ca3a",
-                "startHeight": 1,
-                "assetDenom": "transfer/channel-1/usdc",
-                "assetPrecision": 6,
-                "erc20asset": {
-                    "contractAddress":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-                    "contractPrecision": 6
-                }
-            }
-        ],
+        "astriaBridgeAddresses": [],
         "astriaBridgeSenderAddress": "0x0000000000000000000000000000000000000000",
         "astriaFeeCollectors": {
             "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
