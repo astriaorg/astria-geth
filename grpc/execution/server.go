@@ -238,9 +238,6 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
 	}
 
-	s.blockExecutionLock.Lock()
-	defer s.blockExecutionLock.Unlock()
-
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
 	softHash := s.bc.CurrentSafeBlock().Hash()
