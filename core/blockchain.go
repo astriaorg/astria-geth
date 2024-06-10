@@ -325,7 +325,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
 	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
-	bc.currentBaseCelestiaHeight.Store(bc.Config().AstriaCelestiaInitialHeight)
+	bc.currentBaseCelestiaHeight.Store(bc.Config().AstriaCelestiaInitialHeight())
 
 	// Update chain info data metrics
 	chainInfoGauge.Update(metrics.GaugeInfoValue{"chain_id": bc.chainConfig.ChainID.String()})

@@ -49,11 +49,11 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 	}
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
 
-	config.AstriaRollupName = "astria"
-	config.AstriaSequencerInitialHeight = 10
-	config.AstriaCelestiaInitialHeight = 10
-	config.AstriaCelestiaHeightVariance = 10
-	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
+	config.AstriaChainConfig.RollupName = "astria"
+	config.AstriaChainConfig.SequencerInitialHeight = 10
+	config.AstriaChainConfig.CelestiaInitialHeight = 10
+	config.AstriaChainConfig.CelestiaHeightVariance = 10
+	config.AstriaChainConfig.BridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
 		{
 			BridgeAddress:  bridgeAddress.Bytes(),
 			StartHeight:    2,
@@ -71,7 +71,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 
 	astriaFeeCollectors := make(map[uint32]common.Address)
 	astriaFeeCollectors[1] = feeCollector
-	config.AstriaFeeCollectors = astriaFeeCollectors
+	config.AstriaChainConfig.FeeCollectors = astriaFeeCollectors
 
 	genesis := &core.Genesis{
 		Config: &config,
@@ -129,7 +129,7 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
 	require.Equal(t, feeCollector, serviceV1Alpha1.nextFeeRecipient, "nextFeeRecipient not set correctly")
 
-	bridgeAsset := sha256.Sum256([]byte(genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom))
+	bridgeAsset := sha256.Sum256([]byte(genesis.Config.AstriaBridgeAddressConfigs()[0].AssetDenom))
 	_, ok := serviceV1Alpha1.bridgeAllowedAssetIDs[bridgeAsset]
 	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
 

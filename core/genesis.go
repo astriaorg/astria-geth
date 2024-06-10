@@ -428,7 +428,7 @@ func (g *Genesis) ToBlock() *types.Block {
 	}
 
 	extraData := g.ExtraData
-	if g.Config.AstriaOverrideGenesisExtraData {
+	if g.Config.AstriaOverrideGenesisExtraData() {
 		extraData = g.Config.AstriaExtraData()
 	}
 
