@@ -176,10 +176,7 @@ func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 
 // buildPayload builds the payload according to the provided parameters.
 func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
-	// Build the initial version with no transaction included. It should be fast
-	// enough to run. The empty payload can at least make sure there is something
-	// to deliver for not missing slot.
-	emptyParams := &generateParams{
+	fullParams := &generateParams{
 		timestamp:   args.Timestamp,
 		forceTime:   true,
 		parentHash:  args.Parent,
@@ -190,7 +187,7 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		noTxs:       false,
 	}
 	start := time.Now()
-	full := w.getSealingBlock(emptyParams)
+	full := w.getSealingBlock(fullParams)
 	if full.err != nil {
 		return nil, full.err
 	}

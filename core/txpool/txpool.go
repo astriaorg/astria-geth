@@ -273,6 +273,23 @@ func (p *TxPool) ClearAstriaOrdered() {
 	}
 }
 
+func (p *TxPool) AddToAstriaExcludedFromBlock(tx *types.Transaction) {
+	for _, subpool := range p.subpools {
+		subpool.AddToAstriaExcludedFromBlock(tx)
+	}
+}
+
+func (p *TxPool) AstriaExcludedFromBlock() *types.Transactions {
+	txs := types.Transactions{}
+
+	for _, subpool := range p.subpools {
+		subpoolTxs := subpool.AstriaExcludedFromBlock()
+		txs = append(txs, *subpoolTxs...)
+	}
+
+	return &txs
+}
+
 func (p *TxPool) AstriaOrdered() *types.Transactions {
 	txs := types.Transactions{}
 
