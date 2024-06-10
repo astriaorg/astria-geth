@@ -346,6 +346,7 @@ type ChainConfig struct {
 	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
+	AstriaBridgeSenderAddress      common.Address              `json:"astriaBridgeSenderAddress,omitempty"`
 	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
 	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
 }
@@ -994,7 +995,7 @@ type AstriaBridgeAddressConfig struct {
 }
 
 type AstriaErc20AssetConfig struct {
-	Erc20Address      common.Address `json:"erc20Address"`
+	ContractAddress   common.Address `json:"contractAddress"`
 	ContractPrecision uint16         `json:"contractPrecision"`
 }
 
@@ -1013,10 +1014,6 @@ func (abc *AstriaBridgeAddressConfig) Validate() error {
 	}
 	if abc.Erc20Asset != nil && abc.AssetPrecision > abc.Erc20Asset.ContractPrecision {
 		return fmt.Errorf("asset precision must be less than or equal to contract precision")
-	}
-	// TODO: support erc20 bridged assets
-	if abc.Erc20Asset != nil {
-		return fmt.Errorf("cannot currently process erc20 bridged assets")
 	}
 
 	return nil

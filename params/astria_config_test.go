@@ -168,25 +168,25 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 				AssetDenom:     "nria",
 				AssetPrecision: 22,
 				Erc20Asset: &AstriaErc20AssetConfig{
-					Erc20Address:      erc20Asset,
+					ContractAddress:   erc20Asset,
 					ContractPrecision: 18,
 				},
 			},
 			wantErr: fmt.Errorf("asset precision must be less than or equal to contract precision"),
 		},
 		{
-			description: "erc20 assets not supported",
+			description: "erc20 assets supported",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddress.Bytes(),
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset: &AstriaErc20AssetConfig{
-					Erc20Address:      erc20Asset,
+					ContractAddress:   erc20Asset,
 					ContractPrecision: 18,
 				},
 			},
-			wantErr: fmt.Errorf("cannot currently process erc20 bridged assets"),
+			wantErr: nil,
 		},
 		{
 			description: "valid config",

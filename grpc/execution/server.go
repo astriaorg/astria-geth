@@ -48,7 +48,9 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssetIDs map[[32]byte]struct{}                        // a set of allowed asset IDs structs are left empty
-	nextFeeRecipient      common.Address                               // Fee recipient for the next block
+	bridgeSenderAddress   common.Address                               // address from which AstriaBridgeableERC20 contracts are called
+
+	nextFeeRecipient common.Address // Fee recipient for the next block
 }
 
 var (
@@ -104,16 +106,25 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
-			if cfg.Erc20Asset != nil && nativeBridgeSeen {
-				return nil, errors.New("only one native bridge address is allowed")
-			}
-			if cfg.Erc20Asset != nil && !nativeBridgeSeen {
+			if cfg.Erc20Asset == nil {
+				if nativeBridgeSeen {
+						return nil, errors.New("only one native bridge address is allowed")
+				}
 				nativeBridgeSeen = true
+			}
+
+			if cfg.Erc20Asset != nil && bc.Config().AstriaBridgeSenderAddress == (common.Address{}) {
+				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
 			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
 			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
 			bridgeAllowedAssetIDs[assetID] = struct{}{}
+			if cfg.Erc20Asset == nil {
+				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
+			} else {
+				log.Info("bridge for ERC20 asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom, "contractAddress", cfg.Erc20Asset.ContractAddress)
+			}
 		}
 	}
 
@@ -142,6 +153,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		bc:                    bc,
 		bridgeAddresses:       bridgeAddresses,
 		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
+		bridgeSenderAddress:   bc.Config().AstriaBridgeSenderAddress,
 		nextFeeRecipient:      nextFeeRecipient,
 	}, nil
 }
@@ -237,9 +249,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
+	// the height that this block will be at
+	height := s.bc.CurrentBlock().Number.Uint64() + 1
+
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs, s.bridgeSenderAddress)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
