@@ -89,20 +89,8 @@ type Account struct {
 
 // getState fetches the StateDB object for an account.
 func (a *Account) getState(ctx context.Context) (*state.StateDB, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.state != nil {
-		return a.state, nil
-	}
 	state, _, err := a.r.backend.StateAndHeaderByNumberOrHash(ctx, a.blockNrOrHash)
-	if err != nil {
-		return nil, err
-	}
-	a.state = state
-	// Cache the state object. This is done so that concurrent resolvers
-	// don't have to fetch the object from DB individually.
-	a.state.GetOrNewStateObject(a.address)
-	return a.state, nil
+	return state, err
 }
 
 func (a *Account) Address(ctx context.Context) (common.Address, error) {
