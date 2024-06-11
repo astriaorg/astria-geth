@@ -203,12 +203,14 @@ func TestBuildPayload(t *testing.T) {
 			txsToBuildPayload: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+2, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 			},
 			expectedTxsInPayload: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 			},
 			txsExcludedFromBlock: types.Transactions{
 				types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
+				types.NewTransaction(b.txPool.Nonce(testBankAddress)+2, testUserAddress, big.NewInt(1000), b.BlockChain().GasLimit()-10000, txGasPrice, nil),
 			},
 		},
 		{
