@@ -13,6 +13,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1000  # make sure to fetch the old commit we diff against
+          
+      - name: fetch geth-1.14
+        run: |
+          git fetch origin go-ethereum/release/1.14
 
       - name: Build forkdiff
         uses: "docker://protolambda/forkdiff:latest"
