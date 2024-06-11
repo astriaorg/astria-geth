@@ -392,7 +392,7 @@ func (st *StateTransition) preCheck() error {
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a deposit tx, we only need to mint funds and no gas is used.
-	if st.msg.IsDepositTx {
+	if st.msg.IsDepositTx && len(st.msg.Data) == 0 {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
 		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaDepositTx)
 		return &ExecutionResult{
