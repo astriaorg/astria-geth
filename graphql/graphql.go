@@ -83,8 +83,6 @@ type Account struct {
 	r             *Resolver
 	address       common.Address
 	blockNrOrHash rpc.BlockNumberOrHash
-	state         *state.StateDB
-	mu            sync.Mutex
 }
 
 // getState fetches the StateDB object for an account.
