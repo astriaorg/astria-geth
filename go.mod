@@ -4,9 +4,9 @@ go 1.21
 
 require (
 	buf.build/gen/go/astria/execution-apis/grpc/go v1.3.0-20240601032207-1bcb86793146.3
-	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-20240601032207-1bcb86793146.1
-	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.1-20240529204957-2697e2110d78.1
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.1-20240529204957-1b3cb2034833.1
+	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.2-20240607202648-1575a82b8092.2
+	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.2-20240607202648-0eefaac9f5b8.2
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.2-20240607202648-a25091c45180.2
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -15,6 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.43
 	github.com/aws/aws-sdk-go-v2/service/route53 v1.30.2
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0
+	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/cespare/cp v0.1.0
 	github.com/cloudflare/cloudflare-go v0.79.0
 	github.com/cockroachdb/pebble v1.1.0
@@ -78,7 +79,7 @@ require (
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.20.0
 	google.golang.org/grpc v1.61.2
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )

@@ -27,6 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params/forks"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/btcsuite/btcd/btcutil/bech32"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -380,6 +382,7 @@ type ChainConfig struct {
 	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
 	AstriaRollupName               string                      `json:"astriaRollupName"`
 	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
+	AstriaSequencerHrpPrefix       string                      `json:"astriaSequencerHrpPrefix"`
 	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
@@ -1051,7 +1054,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 }
 
 type AstriaBridgeAddressConfig struct {
-	BridgeAddress  hexutil.Bytes           `json:"bridgeAddress"`
+	BridgeAddress  string                  `json:"bridgeAddress"`
 	StartHeight    uint32                  `json:"startHeight"`
 	AssetDenom     string                  `json:"assetDenom"`
 	AssetPrecision uint16                  `json:"assetPrecision"`
@@ -1063,9 +1066,18 @@ type AstriaErc20AssetConfig struct {
 	ContractPrecision uint16         `json:"contractPrecision"`
 }
 
-func (abc *AstriaBridgeAddressConfig) Validate() error {
-	if len(abc.BridgeAddress) != 20 {
-		return fmt.Errorf("bridge address must be 20 bytes")
+func (abc *AstriaBridgeAddressConfig) Validate(hrpPrefix string) error {
+	prefix, byteAddress, err := bech32.Decode(abc.BridgeAddress)
+	byteAddress, _ = bech32.ConvertBits(byteAddress, 5, 8, false)
+
+	if err != nil {
+		return fmt.Errorf("bridge address must be a bech32 encoded string")
+	}
+	if prefix != hrpPrefix {
+		return fmt.Errorf("bridge address must have prefix %s", hrpPrefix)
+	}
+	if len(byteAddress) != 20 {
+		return fmt.Errorf("bridge address must have resolve to 20 byte address, got %d", len(byteAddress))
 	}
 	if abc.StartHeight == 0 {
 		return fmt.Errorf("start height must be greater than 0")

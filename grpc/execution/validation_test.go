@@ -115,7 +115,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with an invalid asset id",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 []byte("invalid-asset-id"),
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -128,7 +128,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with a disallowed asset id",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 invalidBridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -154,7 +154,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "valid deposit tx",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 bridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),

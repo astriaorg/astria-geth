@@ -24,7 +24,7 @@ func validateAndUnmarshalSequencerTx(
 	bridgeSenderAddress common.Address,
 ) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
-		bridgeAddress := string(deposit.BridgeAddress.GetInner())
+		bridgeAddress := deposit.BridgeAddress.GetBech32M()
 		bac, ok := bridgeAddresses[bridgeAddress]
 		if !ok {
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
