@@ -101,14 +101,14 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	} else {
 		nativeBridgeSeen := false
 		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
-			err := cfg.Validate()
+			err := cfg.Validate(bc.Config().AstriaSequencerHrpPrefix)
 			if err != nil {
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
 			if cfg.Erc20Asset == nil {
 				if nativeBridgeSeen {
-						return nil, errors.New("only one native bridge address is allowed")
+					return nil, errors.New("only one native bridge address is allowed")
 				}
 				nativeBridgeSeen = true
 			}
@@ -117,7 +117,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
-			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
+			bridgeAddresses[cfg.BridgeAddress] = &cfg
 			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
 			bridgeAllowedAssetIDs[assetID] = struct{}{}
 			if cfg.Erc20Asset == nil {
