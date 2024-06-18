@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "main"
+      - "release/geth-1.13.x"
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-geth-1.13.x"
   # trigger on pull request updates when target is `astria` branch
   pull_request:
     branches:
-      - "main"
+      - "release/geth-1.13.x"
 
 jobs:
   build-and-publish-latest:
@@ -59,7 +59,7 @@ jobs:
             type=match,pattern=v(.*),group=1
             type=sha
             # set latest tag for `astria` branch
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            type=raw,value=latest-geth-1.13.x,enable=${{ github.ref == format('refs/heads/{0}', 'release/geth-1.13.x') }}
       - name: Build and push
         uses: depot/build-push-action@v1
         with:
@@ -68,7 +68,7 @@ jobs:
           provenance: false
           context: .
           # It takes a long time to build the arm image right now, so we only build it on tags which is what we use for releases, or on merges to the default branch.
-          platforms: ${{ (contains(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ (contains(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/release/geth-1.13.x') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
