@@ -3,7 +3,6 @@
 # don't need to bother with make.
 
 .PHONY: geth all test lint clean devtools help
-
 GOBIN = ./build/bin
 GO ?= latest
 GORUN = go run

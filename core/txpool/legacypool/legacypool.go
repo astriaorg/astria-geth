@@ -19,6 +19,7 @@ package legacypool
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -308,6 +309,7 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 	for idx, tx := range txs {
 		err := pool.validateTxBasics(tx, false)
 		if err != nil {
+			fmt.Printf("astria tx failed validation: %d, %s, %s\n", idx, tx.Hash().Hex(), err)
 			log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
 			continue
 		}
