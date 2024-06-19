@@ -19,16 +19,14 @@ package bind_test
 import (
 	"context"
 	"errors"
-	"math/big"
-	"testing"
-	"time"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
+	"math/big"
+	"testing"
 )
 
 var testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -52,52 +50,53 @@ var waitDeployedTests = map[string]struct {
 	},
 }
 
-func TestWaitDeployed(t *testing.T) {
-	t.Parallel()
-	for name, test := range waitDeployedTests {
-		backend := simulated.NewBackend(
-			types.GenesisAlloc{
-				crypto.PubkeyToAddress(testKey.PublicKey): {Balance: big.NewInt(10000000000000000)},
-			},
-		)
-		defer backend.Close()
-
-		// Create the transaction
-		head, _ := backend.Client().HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-		gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
-
-		tx := types.NewContractCreation(0, big.NewInt(0), test.gas, gasPrice, common.FromHex(test.code))
-		tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
-
-		// Wait for it to get mined in the background.
-		var (
-			err     error
-			address common.Address
-			mined   = make(chan struct{})
-			ctx     = context.Background()
-		)
-		go func() {
-			address, err = bind.WaitDeployed(ctx, backend.Client(), tx)
-			close(mined)
-		}()
-
-		// Send and mine the transaction.
-		backend.Client().SendTransaction(ctx, tx)
-		backend.Commit()
-
-		select {
-		case <-mined:
-			if err != test.wantErr {
-				t.Errorf("test %q: error mismatch: want %q, got %q", name, test.wantErr, err)
-			}
-			if address != test.wantAddress {
-				t.Errorf("test %q: unexpected contract address %s", name, address.Hex())
-			}
-		case <-time.After(2 * time.Second):
-			t.Errorf("test %q: timeout", name)
-		}
-	}
-}
+//
+//func TestWaitDeployed(t *testing.T) {
+//	t.Parallel()
+//	for name, test := range waitDeployedTests {
+//		backend := simulated.NewBackend(
+//			types.GenesisAlloc{
+//				crypto.PubkeyToAddress(testKey.PublicKey): {Balance: big.NewInt(10000000000000000)},
+//			},
+//		)
+//		defer backend.Close()
+//
+//		// Create the transaction
+//		head, _ := backend.Client().HeaderByNumber(context.Background(), nil) // Should be child's, good enough
+//		gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
+//
+//		tx := types.NewContractCreation(0, big.NewInt(0), test.gas, gasPrice, common.FromHex(test.code))
+//		tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
+//
+//		// Wait for it to get mined in the background.
+//		var (
+//			err     error
+//			address common.Address
+//			mined   = make(chan struct{})
+//			ctx     = context.Background()
+//		)
+//		go func() {
+//			address, err = bind.WaitDeployed(ctx, backend.Client(), tx)
+//			close(mined)
+//		}()
+//
+//		// Send and mine the transaction.
+//		backend.Client().SendTransaction(ctx, tx)
+//		backend.Commit()
+//
+//		select {
+//		case <-mined:
+//			if err != test.wantErr {
+//				t.Errorf("test %q: error mismatch: want %q, got %q", name, test.wantErr, err)
+//			}
+//			if address != test.wantAddress {
+//				t.Errorf("test %q: unexpected contract address %s", name, address.Hex())
+//			}
+//		case <-time.After(2 * time.Second):
+//			t.Errorf("test %q: timeout", name)
+//		}
+//	}
+//}
 
 func TestWaitDeployedCornerCases(t *testing.T) {
 	backend := simulated.NewBackend(

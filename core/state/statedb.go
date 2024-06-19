@@ -782,6 +782,7 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 				s.stateObjectsDestruct[obj.address] = obj.origin
 			}
 		} else {
+			obj.finalise()
 			s.markUpdate(addr)
 		}
 		// At this point, also ship the address off to the precacher. The precacher
