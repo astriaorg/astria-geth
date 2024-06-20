@@ -4,7 +4,7 @@ footer: |
 base:
   name: go-ethereum
   url: https://github.com/ethereum/go-ethereum
-  hash: 916d6a441a866cb618ae826c220866de118899f7
+  ref: refs/heads/go-ethereum/release/1.14.3
 fork:
   name: astria-geth
   url: https://github.com/astriaorg/astria-geth
