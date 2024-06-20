@@ -246,10 +246,14 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 		env.gasPool = new(core.GasPool).AddGas(gasLimit)
 	}
 
-	for _, tx := range *txs {
+	for i, tx := range *txs {
 		// Check interruption signal and abort building if it's fired.
 		if interrupt != nil {
 			if signal := interrupt.Load(); signal != commitInterruptNone {
+				// remove the subsequent txs from the mempool if block building has been interrupted
+				for _, txToRemove := range (*txs)[i:] {
+					miner.txpool.AddToAstriaExcludedFromBlock(txToRemove)
+				}
 				return signalToErr(signal)
 			}
 		}
@@ -257,7 +261,9 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 		if env.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
 			// remove txs from the mempool if they are too big for this block
-			miner.txpool.AddToAstriaExcludedFromBlock(tx)
+			for _, txToRemove := range (*txs)[i:] {
+				miner.txpool.AddToAstriaExcludedFromBlock(txToRemove)
+			}
 			break
 		}
 
