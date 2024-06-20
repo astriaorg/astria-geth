@@ -46,7 +46,7 @@ type nodeIterator struct {
 	Error error // Failure set in case of an internal error in the iterator
 }
 
-// newNodeIterator creates an post-order state node iterator.
+// newNodeIterator creates a post-order state node iterator.
 func newNodeIterator(state *StateDB) *nodeIterator {
 	return &nodeIterator{
 		state: state,
@@ -123,7 +123,7 @@ func (it *nodeIterator) step() error {
 	address := common.BytesToAddress(preimage)
 
 	// Traverse the storage slots belong to the account
-	dataTrie, err := it.state.db.OpenStorageTrie(it.state.originalRoot, address, account.Root)
+	dataTrie, err := it.state.db.OpenStorageTrie(it.state.originalRoot, address, account.Root, it.state.trie)
 	if err != nil {
 		return err
 	}

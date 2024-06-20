@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -437,24 +438,15 @@ func (t *UDPv5) verifyResponseNode(c *callV5, r *enr.Record, distances []uint, s
 	}
 	if distances != nil {
 		nd := enode.LogDist(c.id, node.ID())
-		if !containsUint(uint(nd), distances) {
+		if !slices.Contains(distances, uint(nd)) {
 			return nil, errors.New("does not match any requested distance")
 		}
 	}
 	if _, ok := seen[node.ID()]; ok {
-		return nil, fmt.Errorf("duplicate record")
+		return nil, errors.New("duplicate record")
 	}
 	seen[node.ID()] = struct{}{}
 	return node, nil
-}
-
-func containsUint(x uint, xs []uint) bool {
-	for _, v := range xs {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }
 
 // callToNode sends the given call and sets up a handler for response packets (of message
@@ -851,6 +843,7 @@ func (t *UDPv5) handleFindnode(p *v5wire.Findnode, fromID enode.ID, fromAddr *ne
 
 // collectTableNodes creates a FINDNODE result set for the given distances.
 func (t *UDPv5) collectTableNodes(rip net.IP, distances []uint, limit int) []*enode.Node {
+	var bn []*enode.Node
 	var nodes []*enode.Node
 	var processed = make(map[uint]struct{})
 	for _, dist := range distances {
@@ -859,21 +852,11 @@ func (t *UDPv5) collectTableNodes(rip net.IP, distances []uint, limit int) []*en
 		if seen || dist > 256 {
 			continue
 		}
-
-		// Get the nodes.
-		var bn []*enode.Node
-		if dist == 0 {
-			bn = []*enode.Node{t.Self()}
-		} else if dist <= 256 {
-			t.tab.mutex.Lock()
-			bn = unwrapNodes(t.tab.bucketAtDistance(int(dist)).entries)
-			t.tab.mutex.Unlock()
-		}
 		processed[dist] = struct{}{}
 
-		// Apply some pre-checks to avoid sending invalid nodes.
-		for _, n := range bn {
-			// TODO livenessChecks > 1
+		for _, n := range t.tab.appendLiveNodes(dist, bn[:0]) {
+			// Apply some pre-checks to avoid sending invalid nodes.
+			// Note liveness is checked by appendLiveNodes.
 			if netutil.CheckRelayIP(rip, n.IP()) != nil {
 				continue
 			}

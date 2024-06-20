@@ -144,10 +144,6 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		}
 	}
 
-	if merger := eth.Merger(); !merger.PoSFinalized() {
-		merger.FinalizePoS()
-	}
-
 	return &ExecutionServiceServerV1Alpha2{
 		eth:                   eth,
 		bc:                    bc,
@@ -408,6 +404,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	if currentSafe != softEthHash {
 		s.bc.SetSafe(softBlock.Header())
 	}
+
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
 		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)

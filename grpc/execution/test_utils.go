@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
@@ -107,14 +108,13 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	n, err := node.New(&node.Config{})
 	require.Nil(t, err, "can't create node")
-
-	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256}
+	mcfg := miner.DefaultConfig
+	mcfg.PendingFeeRecipient = testAddr
+	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256, Miner: mcfg}
 	ethservice, err := eth.New(n, ethcfg)
 	require.Nil(t, err, "can't create eth service")
 
-	ethservice.SetEtherbase(testAddr)
 	ethservice.SetSynced()
-
 	return ethservice
 }
 

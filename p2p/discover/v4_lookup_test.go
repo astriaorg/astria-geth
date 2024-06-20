@@ -20,13 +20,13 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"net"
+	"slices"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover/v4wire"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	"golang.org/x/exp/slices"
 )
 
 func TestUDPv4_Lookup(t *testing.T) {
@@ -40,7 +40,7 @@ func TestUDPv4_Lookup(t *testing.T) {
 	}
 
 	// Seed table with initial node.
-	fillTable(test.table, []*node{wrapNode(lookupTestnet.node(256, 0))})
+	fillTable(test.table, []*node{wrapNode(lookupTestnet.node(256, 0))}, true)
 
 	// Start the lookup.
 	resultC := make(chan []*enode.Node, 1)
@@ -74,7 +74,7 @@ func TestUDPv4_LookupIterator(t *testing.T) {
 	for i := range lookupTestnet.dists[256] {
 		bootnodes[i] = wrapNode(lookupTestnet.node(256, i))
 	}
-	fillTable(test.table, bootnodes)
+	fillTable(test.table, bootnodes, true)
 	go serveTestnet(test, lookupTestnet)
 
 	// Create the iterator and collect the nodes it yields.
@@ -109,7 +109,7 @@ func TestUDPv4_LookupIteratorClose(t *testing.T) {
 	for i := range lookupTestnet.dists[256] {
 		bootnodes[i] = wrapNode(lookupTestnet.node(256, i))
 	}
-	fillTable(test.table, bootnodes)
+	fillTable(test.table, bootnodes, true)
 	go serveTestnet(test, lookupTestnet)
 
 	it := test.udp.RandomNodes()
@@ -285,7 +285,7 @@ func (tn *preminedTestnet) neighborsAtDistances(base *enode.Node, distances []ui
 		for i := range lookupTestnet.dists[d] {
 			n := lookupTestnet.node(d, i)
 			d := enode.LogDist(base.ID(), n.ID())
-			if containsUint(uint(d), distances) {
+			if slices.Contains(distances, uint(d)) {
 				result = append(result, n)
 				if len(result) >= elems {
 					return result

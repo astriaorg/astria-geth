@@ -83,26 +83,12 @@ type Account struct {
 	r             *Resolver
 	address       common.Address
 	blockNrOrHash rpc.BlockNumberOrHash
-	state         *state.StateDB
-	mu            sync.Mutex
 }
 
 // getState fetches the StateDB object for an account.
 func (a *Account) getState(ctx context.Context) (*state.StateDB, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.state != nil {
-		return a.state, nil
-	}
 	state, _, err := a.r.backend.StateAndHeaderByNumberOrHash(ctx, a.blockNrOrHash)
-	if err != nil {
-		return nil, err
-	}
-	a.state = state
-	// Cache the state object. This is done so that concurrent resolvers
-	// don't have to fetch the object from DB individually.
-	a.state.GetOrNewStateObject(a.address)
-	return a.state, nil
+	return state, err
 }
 
 func (a *Account) Address(ctx context.Context) (common.Address, error) {
@@ -114,7 +100,7 @@ func (a *Account) Balance(ctx context.Context) (hexutil.Big, error) {
 	if err != nil {
 		return hexutil.Big{}, err
 	}
-	balance := state.GetBalance(a.address)
+	balance := state.GetBalance(a.address).ToBig()
 	if balance == nil {
 		return hexutil.Big{}, fmt.Errorf("failed to load balance %x", a.address)
 	}
@@ -244,8 +230,8 @@ func (t *Transaction) resolve(ctx context.Context) (*types.Transaction, *Block) 
 		return t.tx, t.block
 	}
 	// Try to return an already finalized transaction
-	tx, blockHash, _, index, err := t.r.backend.GetTransaction(ctx, t.hash)
-	if err == nil && tx != nil {
+	found, tx, blockHash, _, index, _ := t.r.backend.GetTransaction(ctx, t.hash)
+	if found {
 		t.tx = tx
 		blockNrOrHash := rpc.BlockNumberOrHashWithHash(blockHash, false)
 		t.block = &Block{
@@ -1523,9 +1509,15 @@ func (s *SyncState) HealingTrienodes() hexutil.Uint64 {
 func (s *SyncState) HealingBytecode() hexutil.Uint64 {
 	return hexutil.Uint64(s.progress.HealingBytecode)
 }
+func (s *SyncState) TxIndexFinishedBlocks() hexutil.Uint64 {
+	return hexutil.Uint64(s.progress.TxIndexFinishedBlocks)
+}
+func (s *SyncState) TxIndexRemainingBlocks() hexutil.Uint64 {
+	return hexutil.Uint64(s.progress.TxIndexRemainingBlocks)
+}
 
 // Syncing returns false in case the node is currently not syncing with the network. It can be up-to-date or has not
-// yet received the latest block headers from its pears. In case it is synchronizing:
+// yet received the latest block headers from its peers. In case it is synchronizing:
 // - startingBlock:       block number this node started to synchronize from
 // - currentBlock:        block number this node is currently importing
 // - highestBlock:        block number of the highest block header this node has received from peers
@@ -1541,11 +1533,13 @@ func (s *SyncState) HealingBytecode() hexutil.Uint64 {
 // - healedBytecodeBytes: number of bytecodes persisted to disk
 // - healingTrienodes:    number of state trie nodes pending
 // - healingBytecode:     number of bytecodes pending
+// - txIndexFinishedBlocks:  number of blocks whose transactions are indexed
+// - txIndexRemainingBlocks: number of blocks whose transactions are not indexed yet
 func (r *Resolver) Syncing() (*SyncState, error) {
 	progress := r.backend.SyncProgress()
 
 	// Return not syncing if the synchronisation already completed
-	if progress.CurrentBlock >= progress.HighestBlock {
+	if progress.Done() {
 		return nil, nil
 	}
 	// Otherwise gather the block sync stats

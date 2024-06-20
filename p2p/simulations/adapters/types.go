@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"strconv"
@@ -129,7 +130,7 @@ type NodeConfig struct {
 	// LogVerbosity is the log verbosity of the p2p node at runtime.
 	//
 	// The default verbosity is INFO.
-	LogVerbosity log.Lvl
+	LogVerbosity slog.Level
 }
 
 // nodeConfigJSON is used to encode and decode NodeConfig as JSON by encoding
@@ -197,7 +198,7 @@ func (n *NodeConfig) UnmarshalJSON(data []byte) error {
 	n.Port = confJSON.Port
 	n.EnableMsgEvents = confJSON.EnableMsgEvents
 	n.LogFile = confJSON.LogFile
-	n.LogVerbosity = log.Lvl(confJSON.LogVerbosity)
+	n.LogVerbosity = slog.Level(confJSON.LogVerbosity)
 
 	return nil
 }
@@ -298,7 +299,7 @@ func RegisterLifecycles(lifecycles LifecycleConstructors) {
 }
 
 // adds the host part to the configuration's ENR, signs it
-// creates and  the corresponding enode object to the configuration
+// creates and adds the corresponding enode object to the configuration
 func (n *NodeConfig) initEnode(ip net.IP, tcpport int, udpport int) error {
 	enrIp := enr.IP(ip)
 	n.Record.Set(&enrIp)

@@ -269,7 +269,7 @@ func TestUDPv4_findnode(t *testing.T) {
 		}
 		nodes.push(n, numCandidates)
 	}
-	fillTable(test.table, nodes.entries)
+	fillTable(test.table, nodes.entries, false)
 
 	// ensure there's a bond with the test node,
 	// findnode won't be accepted otherwise.
@@ -282,12 +282,12 @@ func TestUDPv4_findnode(t *testing.T) {
 	waitNeighbors := func(want []*node) {
 		test.waitPacketOut(func(p *v4wire.Neighbors, to *net.UDPAddr, hash []byte) {
 			if len(p.Nodes) != len(want) {
-				t.Errorf("wrong number of results: got %d, want %d", len(p.Nodes), bucketSize)
+				t.Errorf("wrong number of results: got %d, want %d", len(p.Nodes), len(want))
 				return
 			}
 			for i, n := range p.Nodes {
 				if n.ID.ID() != want[i].ID() {
-					t.Errorf("result mismatch at %d:\n  got:  %v\n  want: %v", i, n, expected.entries[i])
+					t.Errorf("result mismatch at %d:\n  got: %v\n  want: %v", i, n, expected.entries[i])
 				}
 				if !live[n.ID.ID()] {
 					t.Errorf("result includes dead node %v", n.ID.ID())
@@ -557,12 +557,7 @@ func startLocalhostV4(t *testing.T, cfg Config) *UDPv4 {
 
 	// Prefix logs with node ID.
 	lprefix := fmt.Sprintf("(%s)", ln.ID().TerminalString())
-	lfmt := log.TerminalFormat(false)
-	cfg.Log = testlog.Logger(t, log.LvlTrace)
-	cfg.Log.SetHandler(log.FuncHandler(func(r *log.Record) error {
-		t.Logf("%s %s", lprefix, lfmt.Format(r))
-		return nil
-	}))
+	cfg.Log = testlog.Logger(t, log.LevelTrace).With("node-id", lprefix)
 
 	// Listen.
 	socket, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IP{127, 0, 0, 1}})

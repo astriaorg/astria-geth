@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http/httptest"
 	"os"
@@ -43,8 +44,7 @@ func TestMain(m *testing.M) {
 	loglevel := flag.Int("loglevel", 2, "verbosity of logs")
 
 	flag.Parse()
-	log.PrintOrigins(true)
-	log.Root().SetHandler(log.LvlFilterHandler(log.Lvl(*loglevel), log.StreamHandler(colorable.NewColorableStderr(), log.TerminalFormat(true))))
+	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(colorable.NewColorableStderr(), slog.Level(*loglevel), true)))
 	os.Exit(m.Run())
 }
 
@@ -281,8 +281,6 @@ func (t *TestAPI) Events(ctx context.Context) (*rpc.Subscription, error) {
 			case <-sub.Err():
 				return
 			case <-rpcSub.Err():
-				return
-			case <-notifier.Closed():
 				return
 			}
 		}
@@ -840,7 +838,7 @@ func TestMsgFilterPassSingle(t *testing.T) {
 	})
 }
 
-// TestMsgFilterPassSingle tests streaming message events using an invalid
+// TestMsgFilterFailBadParams tests streaming message events using an invalid
 // filter
 func TestMsgFilterFailBadParams(t *testing.T) {
 	// start the server

@@ -35,17 +35,17 @@ import (
 // Check engine-api specification for more details.
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3
 type BuildPayloadArgs struct {
-	Parent       common.Hash       // The parent block to build payload on top
-	Timestamp    uint64            // The provided timestamp of generated payload
-	FeeRecipient common.Address    // The provided recipient address for collecting transaction fee
-	Random       common.Hash       // The provided randomness value
-	Withdrawals  types.Withdrawals // The provided withdrawals
-	BeaconRoot   *common.Hash      // The provided beaconRoot (Cancun)
+	Parent       common.Hash           // The parent block to build payload on top
+	Timestamp    uint64                // The provided timestamp of generated payload
+	FeeRecipient common.Address        // The provided recipient address for collecting transaction fee
+	Random       common.Hash           // The provided randomness value
+	Withdrawals  types.Withdrawals     // The provided withdrawals
+	BeaconRoot   *common.Hash          // The provided beaconRoot (Cancun)
+	Version      engine.PayloadVersion // Versioning byte for payload id calculation.
 }
 
 // Id computes an 8-byte identifier by hashing the components of the payload arguments.
 func (args *BuildPayloadArgs) Id() engine.PayloadID {
-	// Hash
 	hasher := sha256.New()
 	hasher.Write(args.Parent[:])
 	binary.Write(hasher, binary.BigEndian, args.Timestamp)
@@ -57,6 +57,7 @@ func (args *BuildPayloadArgs) Id() engine.PayloadID {
 	}
 	var out engine.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
+	out[0] = byte(args.Version)
 	return out
 }
 
@@ -175,7 +176,10 @@ func (payload *Payload) ResolveFull() *engine.ExecutionPayloadEnvelope {
 }
 
 // buildPayload builds the payload according to the provided parameters.
-func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
+func (miner *Miner) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
+	// Build the initial version with no transaction included. It should be fast
+	// enough to run. The empty payload can at least make sure there is something
+	// to deliver for not missing slot.
 	fullParams := &generateParams{
 		timestamp:   args.Timestamp,
 		forceTime:   true,
@@ -186,8 +190,9 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 		beaconRoot:  args.BeaconRoot,
 		noTxs:       false,
 	}
+
 	start := time.Now()
-	full := w.getSealingBlock(fullParams)
+	full := miner.generateWork(fullParams)
 	if full.err != nil {
 		return nil, full.err
 	}
@@ -198,5 +203,6 @@ func (w *worker) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 	// Add the updated block to the payload
 	payload.update(full, time.Since(start))
 	log.Info("Stopping work on payload", "id", payload.id, "reason", "delivery")
+
 	return payload, nil
 }

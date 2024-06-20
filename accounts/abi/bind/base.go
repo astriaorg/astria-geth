@@ -238,7 +238,7 @@ func (c *BoundContract) Transact(opts *TransactOpts, method string, params ...in
 	if err != nil {
 		return nil, err
 	}
-	// todo(rjl493456442) check the method is payable or not,
+	// todo(rjl493456442) check whether the method is payable or not,
 	// reject invalid transaction at the first place
 	return c.transact(opts, &c.address, input)
 }
@@ -246,7 +246,7 @@ func (c *BoundContract) Transact(opts *TransactOpts, method string, params ...in
 // RawTransact initiates a transaction with the given raw calldata as the input.
 // It's usually used to initiate transactions for invoking **Fallback** function.
 func (c *BoundContract) RawTransact(opts *TransactOpts, calldata []byte) (*types.Transaction, error) {
-	// todo(rjl493456442) check the method is payable or not,
+	// todo(rjl493456442) check whether the method is payable or not,
 	// reject invalid transaction at the first place
 	return c.transact(opts, &c.address, calldata)
 }
@@ -461,7 +461,7 @@ func (c *BoundContract) FilterLogs(opts *FilterOpts, name string, query ...[]int
 	if err != nil {
 		return nil, nil, err
 	}
-	sub, err := event.NewSubscription(func(quit <-chan struct{}) error {
+	sub := event.NewSubscription(func(quit <-chan struct{}) error {
 		for _, log := range buff {
 			select {
 			case logs <- log:
@@ -470,11 +470,8 @@ func (c *BoundContract) FilterLogs(opts *FilterOpts, name string, query ...[]int
 			}
 		}
 		return nil
-	}), nil
+	})
 
-	if err != nil {
-		return nil, nil, err
-	}
 	return logs, sub, nil
 }
 
