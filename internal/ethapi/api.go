@@ -57,7 +57,8 @@ import (
 // allowed to produce in order to speed up calculations.
 const estimateGasErrorRatio = 0.015
 
-var errBlobTxNotSupported = errors.New("signing blob transactions not supported")
+var errBlobTxNotSupported = errors.New("blob transactions not supported")
+var errDepositTxNotSupported = errors.New("deposit transactions not supported")
 
 // EthereumAPI provides an API to access Ethereum related information.
 type EthereumAPI struct {
@@ -1757,6 +1758,13 @@ func (s *TransactionAPI) sign(addr common.Address, tx *types.Transaction) (*type
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
+	if tx.Type() == types.BlobTxType {
+		return common.Hash{}, errBlobTxNotSupported
+	}
+	if tx.Type() == types.DepositTxType {
+		return common.Hash{}, errDepositTxNotSupported
+	}
+
 	// If the transaction fee cap is already specified, ensure the
 	// fee of the given transaction is _reasonable_.
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), b.RPCTxFeeCap()); err != nil {
