@@ -3,6 +3,11 @@ package execution
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"math/big"
+	"testing"
+	"time"
+
+	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	beaconConsensus "github.com/ethereum/go-ethereum/consensus/beacon"
@@ -16,9 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"testing"
-	"time"
 )
 
 var (
@@ -49,12 +51,14 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
 
 	config.AstriaRollupName = "astria"
+	config.AstriaSequencerHrpPrefix = "astria"
 	config.AstriaSequencerInitialHeight = 10
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
+	bech32mBridgeAddress, _ := bech32.EncodeM(config.AstriaSequencerHrpPrefix, bridgeAddress.Bytes())
 	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
 		{
-			BridgeAddress:  bridgeAddress.Bytes(),
+			BridgeAddress:  bech32mBridgeAddress,
 			StartHeight:    2,
 			AssetDenom:     "nria",
 			AssetPrecision: 18,

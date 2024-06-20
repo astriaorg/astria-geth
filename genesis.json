@@ -18,17 +18,18 @@
         "astriaRollupName": "astria",
         "astriaOverrideGenesisExtraData": true,
         "astriaSequencerInitialHeight": 2,
+        "astriaSequencerHrpPrefix": "astria",
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
         "astriaBridgeAddresses": [
             {
-                "bridgeAddress": "684ae50c49a434199199c9c698115391152d7b3f",
+                "bridgeAddress": "astria1dp9w2rzf5s6pnyvee8rfsy2njy2j67eln842y0",
                 "startHeight": 1,
                 "assetDenom": "nria",
                 "assetPrecision": 9
             },
             {
-                "bridgeAddress": "34fec43c7fcab9aef3b3cf8aba855e41ee69ca3a",
+                "bridgeAddress": "astria1xnlvg0rle2u6auane79t4p27g8hxnj36ja960z",
                 "startHeight": 1,
                 "assetDenom": "transfer/channel-1/usdc",
                 "assetPrecision": 6,
