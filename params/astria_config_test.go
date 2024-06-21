@@ -107,7 +107,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 	}
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
 	toEncode, _ := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
-	bridgeAddressBech32, err := bech32.EncodeM("astria", toEncode)
+	bridgeAddressBech32, _ := bech32.EncodeM("astria", toEncode)
 
 	erc20AssetKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -121,7 +121,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		wantErr     error
 	}{
 		{
-			description: "invalid bridge address",
+			description: "invalid bridge address, non bech32m",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  "rand address",
 				StartHeight:    2,
@@ -129,7 +129,29 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
 			},
-			wantErr: fmt.Errorf("bridge address must be 20 bytes"),
+			wantErr: fmt.Errorf("bridge address must be a bech32 encoded string"),
+		},
+		{
+			description: "invalid bridge address, invalid prefix",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  "badprefix1u54zke43yc2tpaecvjqj4uy7d3mdmkrj4vch35",
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("bridge address must have prefix astria"),
+		},
+		{
+			description: "invalid bridge address",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  "astria1u54zke43yc2tpaecvjqj4uy7d3mdmkqjjq96x",
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("bridge address must have resolve to 20 byte address, got 19"),
 		},
 		{
 			description: "invalid start height",
