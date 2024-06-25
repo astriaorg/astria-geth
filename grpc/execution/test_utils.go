@@ -36,7 +36,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecdsa.PrivateKey, *ecdsa.PrivateKey) {
+func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -50,13 +50,18 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 		panic(err)
 	}
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
+	bridgeAddressBytes, err := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
 
 	config.AstriaRollupName = "astria"
 	config.AstriaSequencerHrpPrefix = "astria"
 	config.AstriaSequencerInitialHeight = 10
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
-	bech32mBridgeAddress, _ := bech32.EncodeM(config.AstriaSequencerHrpPrefix, bridgeAddress.Bytes())
+
+	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerHrpPrefix, bridgeAddressBytes)
+	if err != nil {
+		panic(err)
+	}
 	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
 		{
 			BridgeAddress:  bech32mBridgeAddress,
@@ -105,7 +110,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, *ecd
 		config.TerminalTotalDifficulty = totalDifficulty
 	}
 
-	return genesis, blocks, bridgeAddressKey, feeCollectorKey
+	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey
 }
 
 // startEthService creates a full node instance for testing.
@@ -124,7 +129,7 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 
 func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1Alpha2) {
 	t.Helper()
-	genesis, blocks, bridgeAddressKey, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
+	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
 	ethservice := startEthService(t, genesis)
 
 	serviceV1Alpha1, err := NewExecutionServiceServerV1Alpha2(ethservice)
@@ -137,8 +142,7 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	_, ok := serviceV1Alpha1.bridgeAllowedAssetIDs[bridgeAsset]
 	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
 
-	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
-	_, ok = serviceV1Alpha1.bridgeAddresses[string(bridgeAddress.Bytes())]
+	_, ok = serviceV1Alpha1.bridgeAddresses[bridgeAddress]
 	require.True(t, ok, "bridgeAddress not set correctly")
 
 	_, err = ethservice.BlockChain().InsertChain(blocks)
