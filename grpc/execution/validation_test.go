@@ -34,6 +34,25 @@ func testDepositTx() *types.Transaction {
 	})
 }
 
+func generateBech32MAddress() string {
+	addressKey, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	bridgeAddress := crypto.PubkeyToAddress(addressKey.PublicKey)
+	bridgeAddressBytes, err := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
+	if err != nil {
+		panic(err)
+	}
+
+	bech32m, err := bech32.EncodeM("astria", bridgeAddressBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return bech32m
+}
+
 func TestSequenceTxValidation(t *testing.T) {
 	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
@@ -59,15 +78,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAssetDenomID := sha256.Sum256([]byte(invalidHeightBridgeAssetDenom))
-
-	invalidHeightBridgeAddressKey, err := crypto.GenerateKey()
-	if err != nil {
-		panic(err)
-	}
-	invalidHeightBridgeAddress := crypto.PubkeyToAddress(invalidHeightBridgeAddressKey.PublicKey)
-	invalidHeightBridgeAddressBytes, _ := bech32.ConvertBits(invalidHeightBridgeAddress.Bytes(), 8, 5, false)
-	invalidHeightBridgeAddressBech32m, _ := bech32.EncodeM("astria", invalidHeightBridgeAddressBytes)
-
+	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
 	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
 		AssetDenom:  invalidHeightBridgeAssetDenom,
 		StartHeight: 100,
@@ -112,7 +123,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with an unknown bridge address",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: []byte("unknown-bridge-address"),
+					Bech32M: generateBech32MAddress(),
 				},
 				AssetId:                 bridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
