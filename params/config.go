@@ -1068,10 +1068,12 @@ type AstriaErc20AssetConfig struct {
 
 func (abc *AstriaBridgeAddressConfig) Validate(hrpPrefix string) error {
 	prefix, byteAddress, err := bech32.Decode(abc.BridgeAddress)
-	byteAddress, _ = bech32.ConvertBits(byteAddress, 5, 8, false)
-
 	if err != nil {
 		return fmt.Errorf("bridge address must be a bech32 encoded string")
+	}
+	byteAddress, err = bech32.ConvertBits(byteAddress, 5, 8, false)
+	if err != nil {
+		return fmt.Errorf("failed to convert address to 8 bit")
 	}
 	if prefix != hrpPrefix {
 		return fmt.Errorf("bridge address must have prefix %s", hrpPrefix)

@@ -51,6 +51,9 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	}
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
 	bridgeAddressBytes, err := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
+	if err != nil {
+		panic(err)
+	}
 
 	config.AstriaRollupName = "astria"
 	config.AstriaSequencerHrpPrefix = "astria"
