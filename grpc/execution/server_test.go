@@ -296,7 +296,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 					BridgeAddress: &primitivev1.Address{
-						Inner: bridgeAddress,
+						Bech32M: bridgeAddress,
 					},
 					AssetId:                 bridgeAssetDenom[:],
 					Amount:                  depositAmount,
@@ -389,7 +389,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 	depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 		BridgeAddress: &primitivev1.Address{
-			Inner: bridgeAddress,
+			Bech32M: bridgeAddress,
 		},
 		AssetId:                 bridgeAssetDenom[:],
 		Amount:                  depositAmount,

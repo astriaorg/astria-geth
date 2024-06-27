@@ -1,17 +1,19 @@
 package execution
 
 import (
+	"crypto/sha256"
+	"math/big"
+	"testing"
+
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
-	"crypto/sha256"
+	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"testing"
 )
 
 func testBlobTx() *types.Transaction {
@@ -30,6 +32,25 @@ func testDepositTx() *types.Transaction {
 		Value: big.NewInt(1000),
 		Gas:   1000,
 	})
+}
+
+func generateBech32MAddress() string {
+	addressKey, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	bridgeAddress := crypto.PubkeyToAddress(addressKey.PublicKey)
+	bridgeAddressBytes, err := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
+	if err != nil {
+		panic(err)
+	}
+
+	bech32m, err := bech32.EncodeM("astria", bridgeAddressBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return bech32m
 }
 
 func TestSequenceTxValidation(t *testing.T) {
@@ -57,8 +78,8 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAssetDenomID := sha256.Sum256([]byte(invalidHeightBridgeAssetDenom))
-	invalidHeightBridgeAddress := "invalid-height-bridge-address"
-	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddress] = &params.AstriaBridgeAddressConfig{
+	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
+	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
 		AssetDenom:  invalidHeightBridgeAssetDenom,
 		StartHeight: 100,
 	}
@@ -102,7 +123,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with an unknown bridge address",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: []byte("unknown-bridge-address"),
+					Bech32M: generateBech32MAddress(),
 				},
 				AssetId:                 bridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -115,7 +136,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with an invalid asset id",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 []byte("invalid-asset-id"),
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -128,7 +149,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with a disallowed asset id",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 invalidBridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -141,7 +162,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "deposit tx with a height and asset below the bridge start height",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: []byte(invalidHeightBridgeAddress),
+					Bech32M: invalidHeightBridgeAddressBech32m,
 				},
 				AssetId:                 invalidHeightBridgeAssetDenomID[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
@@ -154,7 +175,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "valid deposit tx",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
-					Inner: bridgeAddress,
+					Bech32M: bridgeAddress,
 				},
 				AssetId:                 bridgeAssetDenom[:],
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
