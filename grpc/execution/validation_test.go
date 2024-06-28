@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"crypto/sha256"
 	"math/big"
 	"testing"
 
@@ -73,11 +72,10 @@ func TestSequenceTxValidation(t *testing.T) {
 	require.Nil(t, err, "failed to generate chain destination key: %v", err)
 	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
 
-	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
-	invalidBridgeAssetDenom := sha256.Sum256([]byte("invalid-asset-denom"))
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	invalidBridgeAssetDenom := "invalid-asset-denom"
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
-	invalidHeightBridgeAssetDenomID := sha256.Sum256([]byte(invalidHeightBridgeAssetDenom))
 	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
 	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
 		AssetDenom:  invalidHeightBridgeAssetDenom,
@@ -125,7 +123,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: generateBech32MAddress(),
 				},
-				AssetId:                 bridgeAssetDenom[:],
+				Asset:                   bridgeAssetDenom,
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
@@ -133,30 +131,17 @@ func TestSequenceTxValidation(t *testing.T) {
 			wantErr: "unknown bridge address",
 		},
 		{
-			description: "deposit tx with an invalid asset id",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: bridgeAddress,
-				},
-				AssetId:                 []byte("invalid-asset-id"),
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-			}}},
-			wantErr: "invalid asset ID",
-		},
-		{
 			description: "deposit tx with a disallowed asset id",
 			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: bridgeAddress,
 				},
-				AssetId:                 invalidBridgeAssetDenom[:],
+				Asset:                   invalidBridgeAssetDenom,
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 			}}},
-			wantErr: "disallowed asset ID",
+			wantErr: "disallowed asset",
 		},
 		{
 			description: "deposit tx with a height and asset below the bridge start height",
@@ -164,7 +149,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: invalidHeightBridgeAddressBech32m,
 				},
-				AssetId:                 invalidHeightBridgeAssetDenomID[:],
+				Asset:                   invalidHeightBridgeAssetDenom,
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
@@ -177,7 +162,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: bridgeAddress,
 				},
-				AssetId:                 bridgeAssetDenom[:],
+				Asset:                   bridgeAssetDenom,
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
@@ -195,7 +180,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssetIDs, common.Address{})
+			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
 			if test.wantErr == "" && err == nil {
 				return
 			}
