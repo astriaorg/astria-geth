@@ -101,7 +101,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	} else {
 		nativeBridgeSeen := false
 		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
-			err := cfg.Validate(bc.Config().AstriaSequencerHrpPrefix)
+			err := cfg.Validate(bc.Config().AstriaSequencerAddressPrefix)
 			if err != nil {
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}

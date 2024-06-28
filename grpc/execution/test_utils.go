@@ -55,12 +55,12 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	}
 
 	config.AstriaRollupName = "astria"
-	config.AstriaSequencerHrpPrefix = "astria"
+	config.AstriaSequencerAddressPrefix = "astria"
 	config.AstriaSequencerInitialHeight = 10
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
 
-	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerHrpPrefix, bridgeAddressBytes)
+	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
 	if err != nil {
 		panic(err)
 	}

@@ -382,7 +382,7 @@ type ChainConfig struct {
 	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
 	AstriaRollupName               string                      `json:"astriaRollupName"`
 	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
-	AstriaSequencerHrpPrefix       string                      `json:"astriaSequencerHrpPrefix"`
+	AstriaSequencerAddressPrefix   string                      `json:"astriaSequencerAddressPrefix,omitempty"`
 	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
@@ -1066,7 +1066,7 @@ type AstriaErc20AssetConfig struct {
 	ContractPrecision uint16         `json:"contractPrecision"`
 }
 
-func (abc *AstriaBridgeAddressConfig) Validate(hrpPrefix string) error {
+func (abc *AstriaBridgeAddressConfig) Validate(genesisPrefix string) error {
 	prefix, byteAddress, err := bech32.Decode(abc.BridgeAddress)
 	if err != nil {
 		return fmt.Errorf("bridge address must be a bech32 encoded string")
@@ -1075,8 +1075,8 @@ func (abc *AstriaBridgeAddressConfig) Validate(hrpPrefix string) error {
 	if err != nil {
 		return fmt.Errorf("failed to convert address to 8 bit")
 	}
-	if prefix != hrpPrefix {
-		return fmt.Errorf("bridge address must have prefix %s", hrpPrefix)
+	if prefix != genesisPrefix {
+		return fmt.Errorf("bridge address must have prefix %s", genesisPrefix)
 	}
 	if len(byteAddress) != 20 {
 		return fmt.Errorf("bridge address must have resolve to 20 byte address, got %d", len(byteAddress))
