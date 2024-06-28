@@ -141,7 +141,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 			}}},
-			wantErr: "disallowed asset ID",
+			wantErr: "disallowed asset",
 		},
 		{
 			description: "deposit tx with a height and asset below the bridge start height",

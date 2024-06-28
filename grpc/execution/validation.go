@@ -35,11 +35,11 @@ func validateAndUnmarshalSequencerTx(
 		}
 
 		if _, ok := bridgeAllowedAssets[deposit.Asset]; !ok {
-			return nil, fmt.Errorf("disallowed asset ID %s in deposit tx", deposit.Asset)
+			return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
 		}
 
 		if deposit.Asset != bac.AssetDenom {
-			return nil, fmt.Errorf("asset ID %x does not match bridge address %s asset", deposit.Asset, bridgeAddress)
+			return nil, fmt.Errorf("asset %s does not match bridge address %s asset", deposit.Asset, bridgeAddress)
 		}
 
 		recipient := common.HexToAddress(deposit.DestinationChainAddress)
