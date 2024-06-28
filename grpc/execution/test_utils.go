@@ -2,7 +2,6 @@ package execution
 
 import (
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"math/big"
 	"testing"
 	"time"
@@ -141,8 +140,8 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
 	require.Equal(t, feeCollector, serviceV1Alpha1.nextFeeRecipient, "nextFeeRecipient not set correctly")
 
-	bridgeAsset := sha256.Sum256([]byte(genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom))
-	_, ok := serviceV1Alpha1.bridgeAllowedAssetIDs[bridgeAsset]
+	bridgeAsset := genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom
+	_, ok := serviceV1Alpha1.bridgeAllowedAssets[bridgeAsset]
 	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
 
 	_, ok = serviceV1Alpha1.bridgeAddresses[bridgeAddress]
@@ -152,5 +151,4 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	require.Nil(t, err, "can't insert blocks")
 
 	return ethservice, serviceV1Alpha1
-
 }

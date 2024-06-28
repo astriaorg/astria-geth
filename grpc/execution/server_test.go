@@ -286,7 +286,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
 				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
 				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
 				// create new chain destination address for better testing
 				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -298,7 +298,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					BridgeAddress: &primitivev1.Address{
 						Bech32M: bridgeAddress,
 					},
-					AssetId:                 bridgeAssetDenom[:],
+					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
 					RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
 					DestinationChainAddress: chainDestinationAddress.String(),
@@ -373,7 +373,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	amountToDeposit := big.NewInt(1000000000000000000)
 	depositAmount := bigIntToProtoU128(amountToDeposit)
 	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
 	// create new chain destination address for better testing
 	chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -391,7 +391,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		BridgeAddress: &primitivev1.Address{
 			Bech32M: bridgeAddress,
 		},
-		AssetId:                 bridgeAssetDenom[:],
+		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
 		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
 		DestinationChainAddress: chainDestinationAddress.String(),
