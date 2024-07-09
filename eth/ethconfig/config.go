@@ -46,16 +46,6 @@ var FullNodeGPO = gasprice.Config{
 	IgnorePrice:      gasprice.DefaultIgnorePrice,
 }
 
-// LightClientGPO contains default gasprice oracle settings for light client.
-var LightClientGPO = gasprice.Config{
-	Blocks:           2,
-	Percentile:       60,
-	MaxHeaderHistory: 300,
-	MaxBlockHistory:  5,
-	MaxPrice:         gasprice.DefaultMaxPrice,
-	IgnorePrice:      gasprice.DefaultIgnorePrice,
-}
-
 // Defaults contains default settings for use on the Ethereum main net.
 var Defaults = Config{
 	SyncMode:           downloader.SnapSync,
@@ -93,7 +83,7 @@ type Config struct {
 	SyncMode  downloader.SyncMode
 
 	// This can be set to list of enrtree:// URLs which will be queried for
-	// for nodes to connect to.
+	// nodes to connect to.
 	EthDiscoveryURLs  []string
 	SnapDiscoveryURLs []string
 
@@ -151,6 +141,10 @@ type Config struct {
 	// Enables tracking of SHA3 preimages in the VM
 	EnablePreimageRecording bool
 
+	// Enables VM tracing
+	VMTrace           string
+	VMTraceJsonConfig string
+
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
 
@@ -175,15 +169,14 @@ type Config struct {
 // Clique is allowed for now to live standalone, but ethash is forbidden and can
 // only exist on already merged networks.
 func CreateConsensusEngine(config *params.ChainConfig, db ethdb.Database) (consensus.Engine, error) {
-	// If proof-of-authority is requested, set it up
+	// Geth v1.14.0 dropped support for non-merged networks in any consensus
+	// mode. If such a network is requested, reject startup.
+	if !config.TerminalTotalDifficultyPassed {
+		return nil, errors.New("only PoS networks are supported, please transition old ones with Geth v1.13.x")
+	}
+	// Wrap previously supported consensus engines into their post-merge counterpart
 	if config.Clique != nil {
 		return beacon.New(clique.New(config.Clique, db)), nil
-	}
-	// If defaulting to proof-of-work, enforce an already merged network since
-	// we cannot run PoW algorithms anymore, so we cannot even follow a chain
-	// not coordinated by a beacon node.
-	if !config.TerminalTotalDifficultyPassed {
-		return nil, errors.New("ethash is only supported as a historical component of already merged networks")
 	}
 	return beacon.New(ethash.NewFaker()), nil
 }

@@ -18,35 +18,24 @@ package miner
 
 import (
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/clique"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
-)
-
-const (
-	// testCode is the testing contract binary code which will initialises some
-	// variables in constructor
-	testCode = "0x60806040527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0060005534801561003457600080fd5b5060fc806100436000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80630c4dae8814603757806398a213cf146053575b600080fd5b603d607e565b6040518082815260200191505060405180910390f35b607c60048036036020811015606757600080fd5b81019080803590602001909291905050506084565b005b60005481565b806000819055507fe9e44f9f7da8c559de847a3232b57364adc0354f15a2cd8dc636d54396f9587a6000546040518082815260200191505060405180910390a15056fea265627a7a723058208ae31d9424f2d0bc2a3da1a5dd659db2d71ec322a17db8f87e19e209e3a1ff4a64736f6c634300050a0032"
-
-	// testGas is the gas required for contract deployment.
-	testGas = 144109
 )
 
 var (
@@ -67,9 +56,10 @@ var (
 	pendingTxs []*types.Transaction
 	newTxs     []*types.Transaction
 
-	testConfig = &Config{
-		Recommit: time.Second,
-		GasCeil:  params.GenesisGasLimit,
+	testConfig = Config{
+		PendingFeeRecipient: testBankAddress,
+		Recommit:            time.Second,
+		GasCeil:             params.GenesisGasLimit,
 	}
 )
 
@@ -135,7 +125,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 		t.Fatalf("core.NewBlockChain failed: %v", err)
 	}
 	pool := legacypool.New(testTxPoolConfig, chain)
-	txpool, _ := txpool.New(new(big.Int).SetUint64(testTxPoolConfig.PriceLimit), chain, []txpool.SubPool{pool})
+	txpool, _ := txpool.New(testTxPoolConfig.PriceLimit, chain, []txpool.SubPool{pool})
 
 	return &testWorkerBackend{
 		db:      db,
@@ -148,22 +138,196 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
 func (b *testWorkerBackend) TxPool() *txpool.TxPool       { return b.txPool }
 
-func (b *testWorkerBackend) newRandomTx(creation bool) *types.Transaction {
-	var tx *types.Transaction
-	gasPrice := big.NewInt(10 * params.InitialBaseFee)
-	if creation {
-		tx, _ = types.SignTx(types.NewContractCreation(b.txPool.Nonce(testBankAddress), big.NewInt(0), testGas, gasPrice, common.FromHex(testCode)), types.HomesteadSigner{}, testBankKey)
-	} else {
-		tx, _ = types.SignTx(types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, gasPrice, nil), types.HomesteadSigner{}, testBankKey)
-	}
-	return tx
+func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*Miner, *testWorkerBackend) {
+	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
+	w := New(backend, testConfig, engine)
+	return w, backend
 }
 
-func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, blocks int) (*worker, *testWorkerBackend) {
-	backend := newTestWorkerBackend(t, chainConfig, engine, db, blocks)
-	w := newWorker(testConfig, chainConfig, engine, backend, new(event.TypeMux), nil, false)
-	w.setEtherbase(testBankAddress)
-	return w, backend
+func TestBuildPayloadNotEnoughGas(t *testing.T) {
+	var (
+		db        = rawdb.NewMemoryDatabase()
+		recipient = common.HexToAddress("0xdeadbeef")
+	)
+	w, b := newTestWorker(t, params.TestChainConfig, ethash.NewFaker(), db, 0)
+
+	timestamp := uint64(time.Now().Unix())
+
+	txGasPrice := big.NewInt(10 * params.InitialBaseFee)
+
+	gasLimit := b.chain.GasLimit()
+
+	contains := func(transactions types.Transactions, tx *types.Transaction) bool {
+		for _, t := range transactions {
+			if t.Hash() == tx.Hash() {
+				return true
+			}
+		}
+		return false
+	}
+
+	txsToAdd := types.Transactions{}
+	nonceCounter := uint64(0)
+	// keep adding txs until the gas pool goes below 21000 and then add 5 more txs. these 5 txs have to be
+	// excluded from the block
+	for {
+		tx := types.NewTransaction(b.txPool.Nonce(testBankAddress)+nonceCounter, testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil)
+		txsToAdd = append(txsToAdd, tx)
+		gasLimit -= params.TxGas
+		nonceCounter += 1
+
+		if gasLimit < 21000 {
+			// add 5 more such txs which have to be excluded from the block
+			for i := 0; i < 5; i++ {
+				tx := types.NewTransaction(b.txPool.Nonce(testBankAddress)+nonceCounter, testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil)
+				txsToAdd = append(txsToAdd, tx)
+				nonceCounter += 1
+			}
+			break
+		}
+	}
+
+	signedTxs := types.Transactions{}
+	for _, tx := range txsToAdd {
+		signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testBankKey)
+		if err != nil {
+			t.Fatalf("Failed to sign tx %v", err)
+		}
+		signedTxs = append(signedTxs, signedTx)
+	}
+
+	// set the astria ordered txsToBuildPayload
+	b.TxPool().SetAstriaOrdered(signedTxs)
+	astriaTxs := b.TxPool().AstriaOrdered()
+
+	if astriaTxs.Len() != len(txsToAdd) {
+		t.Fatalf("Unexpected number of astria ordered transactions: %d", astriaTxs.Len())
+	}
+
+	txs := types.TxDifference(*astriaTxs, signedTxs)
+	if txs.Len() != 0 {
+		t.Fatalf("Unexpected transactions in astria ordered transactions: %v", txs)
+	}
+
+	args := &BuildPayloadArgs{
+		Parent:       b.chain.CurrentBlock().Hash(),
+		Timestamp:    timestamp,
+		Random:       common.Hash{},
+		FeeRecipient: recipient,
+	}
+
+	payload, err := w.buildPayload(args)
+	if err != nil {
+		t.Fatalf("Failed to build payload %v", err)
+	}
+	full := payload.ResolveFull()
+	astriaExcludedFromBlock := b.TxPool().AstriaExcludedFromBlock()
+
+	// ensure that the transactions not included in the block are included in astriaExcludedFromBlock
+	excludedTxsCount := len(txsToAdd) - len(full.ExecutionPayload.Transactions)
+	if astriaExcludedFromBlock.Len() != excludedTxsCount {
+		t.Fatalf("Unexpected number of transactions in astria excluded from block: %d", astriaExcludedFromBlock.Len())
+	}
+
+	// ensure that only the excluded txs are in the list
+	if astriaExcludedFromBlock.Len() > 0 {
+		for _, binaryTx := range full.ExecutionPayload.Transactions {
+			tx := new(types.Transaction)
+			err = tx.UnmarshalBinary(binaryTx)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal binary transaction %v", err)
+			}
+			if contains(*astriaExcludedFromBlock, tx) {
+				t.Fatalf("Transaction %v should not be in the astria excluded from block list", tx)
+			}
+		}
+	}
+}
+
+func TestBuildPayloadTimeout(t *testing.T) {
+	var (
+		db        = rawdb.NewMemoryDatabase()
+		recipient = common.HexToAddress("0xdeadbeef")
+	)
+	w, b := newTestWorker(t, params.TestChainConfig, ethash.NewFaker(), db, 0)
+
+	timestamp := uint64(time.Now().Unix())
+
+	contains := func(transactions types.Transactions, tx *types.Transaction) bool {
+		for _, t := range transactions {
+			if t.Hash() == tx.Hash() {
+				return true
+			}
+		}
+		return false
+	}
+
+	txGasPrice := big.NewInt(10 * params.InitialBaseFee)
+
+	txsToAdd := types.Transactions{
+		types.NewTransaction(b.txPool.Nonce(testBankAddress), testUserAddress, big.NewInt(1000), params.TxGas, txGasPrice, nil),
+		types.NewTransaction(b.txPool.Nonce(testBankAddress)+1, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+		types.NewTransaction(b.txPool.Nonce(testBankAddress)+2, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+		types.NewTransaction(b.txPool.Nonce(testBankAddress)+3, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+		types.NewTransaction(b.txPool.Nonce(testBankAddress)+4, testUserAddress, big.NewInt(2000), params.TxGas, txGasPrice, nil),
+	}
+	signedTxs := types.Transactions{}
+	for _, tx := range txsToAdd {
+		signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, testBankKey)
+		if err != nil {
+			t.Fatalf("Failed to sign tx %v", err)
+		}
+		signedTxs = append(signedTxs, signedTx)
+	}
+
+	// set the astria ordered txsToBuildPayload
+	b.TxPool().SetAstriaOrdered(signedTxs)
+	astriaTxs := b.TxPool().AstriaOrdered()
+
+	if astriaTxs.Len() != len(txsToAdd) {
+		t.Fatalf("Unexpected number of astria ordered transactions: %d", astriaTxs.Len())
+	}
+
+	txs := types.TxDifference(*astriaTxs, signedTxs)
+	if txs.Len() != 0 {
+		t.Fatalf("Unexpected transactions in astria ordered transactions: %v", txs)
+	}
+
+	// a very small recommit to reliably timeout the payload building
+	w.config.Recommit = time.Nanosecond
+	args := &BuildPayloadArgs{
+		Parent:       b.chain.CurrentBlock().Hash(),
+		Timestamp:    timestamp,
+		Random:       common.Hash{},
+		FeeRecipient: recipient,
+	}
+
+	payload, err := w.buildPayload(args)
+	if err != nil {
+		t.Fatalf("Failed to build payload %v", err)
+	}
+	full := payload.ResolveFull()
+	astriaExcludedFromBlock := b.TxPool().AstriaExcludedFromBlock()
+
+	// ensure that the transactions not included in the block are included in astriaExcludedFromBlock
+	excludedTxsCount := len(txsToAdd) - len(full.ExecutionPayload.Transactions)
+	if astriaExcludedFromBlock.Len() != excludedTxsCount {
+		t.Fatalf("Unexpected number of transactions in astria excluded from block: %d", astriaExcludedFromBlock.Len())
+	}
+
+	// ensure that only the excluded txs are in the list
+	if astriaExcludedFromBlock.Len() > 0 {
+		for _, binaryTx := range full.ExecutionPayload.Transactions {
+			tx := new(types.Transaction)
+			err = tx.UnmarshalBinary(binaryTx)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal binary transaction %v", err)
+			}
+			if contains(*astriaExcludedFromBlock, tx) {
+				t.Fatalf("Transaction %v should not be in the astria excluded from block list", tx)
+			}
+		}
+	}
 }
 
 func TestBuildPayload(t *testing.T) {
@@ -172,26 +336,25 @@ func TestBuildPayload(t *testing.T) {
 		recipient = common.HexToAddress("0xdeadbeef")
 	)
 	w, b := newTestWorker(t, params.TestChainConfig, ethash.NewFaker(), db, 0)
-	defer w.close()
 
 	timestamp := uint64(time.Now().Unix())
 
 	verify := func(outer *engine.ExecutionPayloadEnvelope, txs int) {
 		payload := outer.ExecutionPayload
 		if payload.ParentHash != b.chain.CurrentBlock().Hash() {
-			t.Fatal("Unexpect parent hash")
+			t.Fatal("Unexpected parent hash")
 		}
 		if payload.Random != (common.Hash{}) {
-			t.Fatal("Unexpect random value")
+			t.Fatal("Unexpected random value")
 		}
 		if payload.Timestamp != timestamp {
-			t.Fatal("Unexpect timestamp")
+			t.Fatal("Unexpected timestamp")
 		}
 		if payload.FeeRecipient != recipient {
-			t.Fatal("Unexpect fee recipient")
+			t.Fatal("Unexpected fee recipient")
 		}
 		if len(payload.Transactions) != txs {
-			t.Fatal("Unexpect transaction set")
+			t.Fatal("Unexpected transaction set")
 		}
 	}
 
@@ -331,6 +494,7 @@ func TestBuildPayload(t *testing.T) {
 }
 
 func TestPayloadId(t *testing.T) {
+	t.Parallel()
 	ids := make(map[string]int)
 	for i, tt := range []*BuildPayloadArgs{
 		{

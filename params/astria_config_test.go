@@ -3,10 +3,12 @@ package params
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"reflect"
 	"testing"
+
+	"github.com/btcsuite/btcd/btcutil/bech32"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -104,6 +106,8 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		panic(err)
 	}
 	bridgeAddress := crypto.PubkeyToAddress(bridgeAddressKey.PublicKey)
+	toEncode, _ := bech32.ConvertBits(bridgeAddress.Bytes(), 8, 5, false)
+	bridgeAddressBech32, _ := bech32.EncodeM("astria", toEncode)
 
 	erc20AssetKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -117,20 +121,42 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		wantErr     error
 	}{
 		{
-			description: "invalid bridge address",
+			description: "invalid bridge address, non bech32m",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  []byte("rand address"),
+				BridgeAddress:  "rand address",
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
 			},
-			wantErr: fmt.Errorf("bridge address must be 20 bytes"),
+			wantErr: fmt.Errorf("bridge address must be a bech32 encoded string"),
+		},
+		{
+			description: "invalid bridge address, invalid prefix",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  "badprefix1u54zke43yc2tpaecvjqj4uy7d3mdmkrj4vch35",
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("bridge address must have prefix astria"),
+		},
+		{
+			description: "invalid bridge address",
+			config: AstriaBridgeAddressConfig{
+				BridgeAddress:  "astria1u54zke43yc2tpaecvjqj4uy7d3mdmkqjjq96x",
+				StartHeight:    2,
+				AssetDenom:     "nria",
+				AssetPrecision: 18,
+				Erc20Asset:     nil,
+			},
+			wantErr: fmt.Errorf("bridge address must have resolve to 20 byte address, got 19"),
 		},
 		{
 			description: "invalid start height",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    0,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
@@ -141,7 +167,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		{
 			description: "invalid asset denom",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    2,
 				AssetDenom:     "",
 				AssetPrecision: 18,
@@ -152,7 +178,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		{
 			description: "invalid asset precision",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 22,
@@ -163,7 +189,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		{
 			description: "invalid contract precision",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 22,
@@ -177,7 +203,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		{
 			description: "erc20 assets supported",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
@@ -191,7 +217,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		{
 			description: "valid config",
 			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddress.Bytes(),
+				BridgeAddress:  bridgeAddressBech32,
 				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
@@ -203,7 +229,7 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			err := test.config.Validate()
+			err := test.config.Validate("astria")
 			if test.wantErr != nil && err == nil {
 				t.Errorf("expected error, got nil")
 			}

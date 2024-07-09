@@ -46,9 +46,9 @@ type ExecutionServiceServerV1Alpha2 struct {
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
 
-	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
-	bridgeAllowedAssetIDs map[[32]byte]struct{}                        // a set of allowed asset IDs structs are left empty
-	bridgeSenderAddress   common.Address                               // address from which AstriaBridgeableERC20 contracts are called
+	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
+	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
+	bridgeSenderAddress common.Address                               // address from which AstriaBridgeableERC20 contracts are called
 
 	nextFeeRecipient common.Address // Fee recipient for the next block
 }
@@ -95,20 +95,20 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	}
 
 	bridgeAddresses := make(map[string]*params.AstriaBridgeAddressConfig)
-	bridgeAllowedAssetIDs := make(map[[32]byte]struct{})
+	bridgeAllowedAssets := make(map[string]struct{})
 	if bc.Config().AstriaBridgeAddressConfigs == nil {
 		log.Warn("bridge addresses not set")
 	} else {
 		nativeBridgeSeen := false
 		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
-			err := cfg.Validate()
+			err := cfg.Validate(bc.Config().AstriaSequencerAddressPrefix)
 			if err != nil {
 				return nil, fmt.Errorf("invalid bridge address config: %w", err)
 			}
 
 			if cfg.Erc20Asset == nil {
 				if nativeBridgeSeen {
-						return nil, errors.New("only one native bridge address is allowed")
+					return nil, errors.New("only one native bridge address is allowed")
 				}
 				nativeBridgeSeen = true
 			}
@@ -117,9 +117,8 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
-			bridgeAddresses[string(cfg.BridgeAddress)] = &cfg
-			assetID := sha256.Sum256([]byte(cfg.AssetDenom))
-			bridgeAllowedAssetIDs[assetID] = struct{}{}
+			bridgeAddresses[cfg.BridgeAddress] = &cfg
+			bridgeAllowedAssets[cfg.AssetDenom] = struct{}{}
 			if cfg.Erc20Asset == nil {
 				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
 			} else {
@@ -144,17 +143,13 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		}
 	}
 
-	if merger := eth.Merger(); !merger.PoSFinalized() {
-		merger.FinalizePoS()
-	}
-
 	return &ExecutionServiceServerV1Alpha2{
-		eth:                   eth,
-		bc:                    bc,
-		bridgeAddresses:       bridgeAddresses,
-		bridgeAllowedAssetIDs: bridgeAllowedAssetIDs,
-		bridgeSenderAddress:   bc.Config().AstriaBridgeSenderAddress,
-		nextFeeRecipient:      nextFeeRecipient,
+		eth:                 eth,
+		bc:                  bc,
+		bridgeAddresses:     bridgeAddresses,
+		bridgeAllowedAssets: bridgeAllowedAssets,
+		bridgeSenderAddress: bc.Config().AstriaBridgeSenderAddress,
+		nextFeeRecipient:    nextFeeRecipient,
 	}, nil
 }
 
@@ -254,7 +249,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssetIDs, s.bridgeSenderAddress)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
@@ -408,6 +403,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	if currentSafe != softEthHash {
 		s.bc.SetSafe(softBlock.Header())
 	}
+
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
 		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)

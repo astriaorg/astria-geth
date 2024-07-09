@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
@@ -46,7 +47,7 @@ func startSimulatedBeaconEthService(t *testing.T, genesis *core.Genesis) (*node.
 		t.Fatal("can't create node:", err)
 	}
 
-	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256}
+	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256, Miner: miner.DefaultConfig}
 	ethservice, err := eth.New(n, ethcfg)
 	if err != nil {
 		t.Fatal("can't create eth service:", err)
@@ -71,7 +72,7 @@ func startSimulatedBeaconEthService(t *testing.T, genesis *core.Genesis) (*node.
 // send enough transactions to fill multiple blocks
 func TestSimulatedBeaconSendWithdrawals(t *testing.T) {
 	var withdrawals []types.Withdrawal
-	txs := make(map[common.Hash]types.Transaction)
+	txs := make(map[common.Hash]*types.Transaction)
 
 	var (
 		// testKey is a private key to use for funding a tester account.
@@ -83,7 +84,7 @@ func TestSimulatedBeaconSendWithdrawals(t *testing.T) {
 
 	// short period (1 second) for testing purposes
 	var gasLimit uint64 = 10_000_000
-	genesis := core.DeveloperGenesisBlock(gasLimit, testAddr)
+	genesis := core.DeveloperGenesisBlock(gasLimit, &testAddr)
 	node, ethService, mock := startSimulatedBeaconEthService(t, genesis)
 	_ = mock
 	defer node.Close()
@@ -108,7 +109,7 @@ func TestSimulatedBeaconSendWithdrawals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error signing transaction, err=%v", err)
 		}
-		txs[tx.Hash()] = *tx
+		txs[tx.Hash()] = tx
 
 		allTxs = append(allTxs, tx)
 	}

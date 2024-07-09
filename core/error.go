@@ -26,9 +26,6 @@ var (
 	// ErrKnownBlock is returned when a block to import is already known locally.
 	ErrKnownBlock = errors.New("block already known")
 
-	// ErrBannedHash is returned if a block to import is on the banned list.
-	ErrBannedHash = errors.New("banned hash")
-
 	// ErrNoGenesis is returned when there is no Genesis Block.
 	ErrNoGenesis = errors.New("genesis not found in chain")
 
@@ -104,4 +101,10 @@ var (
 	// ErrBlobFeeCapTooLow is returned if the transaction fee cap is less than the
 	// blob gas fee of the block.
 	ErrBlobFeeCapTooLow = errors.New("max fee per blob gas less than block blob gas fee")
+
+	// ErrMissingBlobHashes is returned if a blob transaction has no blob hashes.
+	ErrMissingBlobHashes = errors.New("blob transaction missing blob hashes")
+
+	// ErrBlobTxCreate is returned if a blob transaction has no explicit to field.
+	ErrBlobTxCreate = errors.New("blob transaction of type create")
 )

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -285,7 +286,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
 				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
 				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
 				// create new chain destination address for better testing
 				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -295,9 +296,9 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 					BridgeAddress: &primitivev1.Address{
-						Inner: bridgeAddress,
+						Bech32M: bridgeAddress,
 					},
-					AssetId:                 bridgeAssetDenom[:],
+					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
 					RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
 					DestinationChainAddress: chainDestinationAddress.String(),
@@ -372,7 +373,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	amountToDeposit := big.NewInt(1000000000000000000)
 	depositAmount := bigIntToProtoU128(amountToDeposit)
 	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-	bridgeAssetDenom := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom))
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
 	// create new chain destination address for better testing
 	chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -388,9 +389,9 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 	depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
 		BridgeAddress: &primitivev1.Address{
-			Inner: bridgeAddress,
+			Bech32M: bridgeAddress,
 		},
-		AssetId:                 bridgeAssetDenom[:],
+		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
 		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
 		DestinationChainAddress: chainDestinationAddress.String(),
@@ -463,6 +464,6 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.NotNil(t, stateDb, "State db is nil")
 	chainDestinationAddressBalanceAfter := stateDb.GetBalance(chainDestinationAddress)
 
-	balanceDiff := new(big.Int).Sub(chainDestinationAddressBalanceAfter, chainDestinationAddressBalanceBefore)
-	require.True(t, balanceDiff.Cmp(big.NewInt(1000000000000000000)) == 0, "Chain destination address balance is not correct")
+	balanceDiff := new(uint256.Int).Sub(chainDestinationAddressBalanceAfter, chainDestinationAddressBalanceBefore)
+	require.True(t, balanceDiff.Cmp(uint256.NewInt(1000000000000000000)) == 0, "Chain destination address balance is not correct")
 }
