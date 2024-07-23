@@ -28,7 +28,7 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
 
-	require.True(t, bytes.Equal(genesisInfo.RollupId, hashedRollupId[:]), "RollupId is not correct")
+	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
 	require.Equal(t, genesisInfo.GetSequencerGenesisBlockHeight(), ethservice.BlockChain().Config().AstriaSequencerInitialHeight, "SequencerInitialHeight is not correct")
 	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaCelestiaHeightVariance, "CelestiaHeightVariance is not correct")
 	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
@@ -267,13 +267,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 			// create the txs to send
 			// create 5 txs
-			txs := []*types.Transaction{}
 			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
 			for i := 0; i < 5; i++ {
 				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 				require.Nil(t, err, "Failed to sign tx")
-				txs = append(txs, tx)
 
 				marshalledTx, err := tx.MarshalBinary()
 				require.Nil(t, err, "Failed to marshal tx")
@@ -300,7 +298,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					},
 					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
-					RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
+					RollupId:                genesisInfo.RollupId,
 					DestinationChainAddress: chainDestinationAddress.String(),
 				}}}
 
@@ -355,13 +353,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.NotNil(t, previousBlock, "Previous block not found")
 
 	// create 5 txs
-	txs := []*types.Transaction{}
 	marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
 	for i := 0; i < 5; i++ {
 		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 		require.Nil(t, err, "Failed to sign tx")
-		txs = append(txs, tx)
 
 		marshalledTx, err := tx.MarshalBinary()
 		require.Nil(t, err, "Failed to marshal tx")
@@ -393,7 +389,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
-		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
+		RollupId:                genesisInfo.RollupId,
 		DestinationChainAddress: chainDestinationAddress.String(),
 	}}}
 
