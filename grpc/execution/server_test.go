@@ -267,11 +267,13 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 			// create the txs to send
 			// create 5 txs
+			txs := []*types.Transaction{}
 			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
 			for i := 0; i < 5; i++ {
 				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 				require.Nil(t, err, "Failed to sign tx")
+				txs = append(txs, tx)
 
 				marshalledTx, err := tx.MarshalBinary()
 				require.Nil(t, err, "Failed to marshal tx")
@@ -353,11 +355,13 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.NotNil(t, previousBlock, "Previous block not found")
 
 	// create 5 txs
+	txs := []*types.Transaction{}
 	marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
 	for i := 0; i < 5; i++ {
 		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 		require.Nil(t, err, "Failed to sign tx")
+		txs = append(txs, tx)
 
 		marshalledTx, err := tx.MarshalBinary()
 		require.Nil(t, err, "Failed to marshal tx")
