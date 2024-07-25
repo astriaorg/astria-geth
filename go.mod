@@ -85,6 +85,8 @@ require (
 )
 
 require (
+	buf.build/gen/go/astria/protocol-apis/grpc/go v1.4.0-00000000000000-71710707f61c.2 // indirect
+	buf.build/gen/go/astria/protocol-apis/protocolbuffers/go v1.34.2-20240723183210-71710707f61c.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
