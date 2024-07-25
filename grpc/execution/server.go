@@ -157,10 +157,11 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 	log.Debug("GetGenesisInfo called")
 	getGenesisInfoRequestCount.Inc(1)
 
-	rollupId := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
 
 	res := &astriaPb.GenesisInfo{
-		RollupId:                    rollupId[:],
+		RollupId:                    &rollupId,
 		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
 		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
 	}
