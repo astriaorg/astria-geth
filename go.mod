@@ -3,7 +3,7 @@ module github.com/ethereum/go-ethereum
 go 1.21
 
 require (
-	buf.build/gen/go/astria/execution-apis/grpc/go v1.4.0-00000000000000-193b02425a52.2
+	buf.build/gen/go/astria/execution-apis/grpc/go v1.4.0-20240627184145-202c666b5a8a.2
 	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.2-20240723183210-193b02425a52.2
 	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.2-20240723183210-d00b2a17ea5b.2
 	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.2-20240723183210-414756da3320.2
