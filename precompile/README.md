@@ -8,7 +8,7 @@
 
 4. Implement the precompile in Go at `./contracts/<precompile>/<precompile.go>`.
   - The struct should implement the `StatefulPrecompiledContract` interface
-  - You must methods defined in the Solidity interface
+  - You must implement methods defined in the Solidity interface
   - Implement custom gas handlers as needed
   - You can use the `StatefulContext` to access and modify the evm state db
 

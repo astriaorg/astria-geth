@@ -1,3 +1,11 @@
+#!/bin/bash
+
+rm -fr ./bindings
+mkdir ./bindings
+
+rm -fr ./out
+mkdir ./out
+
 forge build --extra-output-files bin --extra-output-files abi --root .
 
 for dir in ./out/*/
