@@ -28,7 +28,7 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
 
-	require.True(t, bytes.Equal(genesisInfo.RollupId, hashedRollupId[:]), "RollupId is not correct")
+	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
 	require.Equal(t, genesisInfo.GetSequencerGenesisBlockHeight(), ethservice.BlockChain().Config().AstriaSequencerInitialHeight, "SequencerInitialHeight is not correct")
 	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaCelestiaHeightVariance, "CelestiaHeightVariance is not correct")
 	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
@@ -300,7 +300,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					},
 					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
-					RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
+					RollupId:                genesisInfo.RollupId,
 					DestinationChainAddress: chainDestinationAddress.String(),
 				}}}
 
@@ -393,7 +393,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
-		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId},
+		RollupId:                genesisInfo.RollupId,
 		DestinationChainAddress: chainDestinationAddress.String(),
 	}}}
 
