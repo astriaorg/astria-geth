@@ -206,6 +206,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 		prevBlockHash                        []byte
 		timestamp                            uint64
 		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
+		simulateOnly                         bool
 		expectedReturnCode                   codes.Code
 	}{
 		{
@@ -215,6 +216,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
 			depositTxAmount:                      big.NewInt(0),
+			simulateOnly:                         false,
 			expectedReturnCode:                   codes.PermissionDenied,
 		},
 		{
@@ -224,6 +226,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
 			depositTxAmount:                      big.NewInt(0),
+			simulateOnly:                         false,
 			expectedReturnCode:                   0,
 		},
 		{
@@ -233,6 +236,17 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
 			depositTxAmount:                      big.NewInt(1000000000000000000),
+			simulateOnly:                         false,
+			expectedReturnCode:                   0,
+		},
+		{
+			description:                          "ExecuteBlock with 5 txs and no deposit tx in simulate only mode",
+			callGenesisInfoAndGetCommitmentState: true,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:                      big.NewInt(0),
+			simulateOnly:                         true,
 			expectedReturnCode:                   0,
 		},
 		{
@@ -242,6 +256,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
 			depositTxAmount:                      big.NewInt(0),
+			simulateOnly:                         false,
 			expectedReturnCode:                   codes.FailedPrecondition,
 		},
 	}
@@ -300,7 +315,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					},
 					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
-					RollupId:                genesisInfo.RollupId,
+					RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId.Inner},
 					DestinationChainAddress: chainDestinationAddress.String(),
 				}}}
 
@@ -313,6 +328,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					Seconds: int64(tt.timestamp),
 				},
 				Transactions: marshalledTxs,
+				SimulateOnly: tt.simulateOnly,
 			}
 
 			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
@@ -321,6 +337,13 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
 			}
 			if err == nil {
+				block := ethservice.BlockChain().GetBlockByHash(common.BytesToHash(executeBlockRes.Block.Hash))
+				if tt.simulateOnly {
+					require.Nil(t, block, "Block should not be found in blockchain")
+				} else {
+					require.NotNil(t, block, "Block not found in blockchain")
+				}
+
 				require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
 
 				astriaOrdered := ethservice.TxPool().AstriaOrdered()
@@ -393,7 +416,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
-		RollupId:                genesisInfo.RollupId,
+		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId.Inner},
 		DestinationChainAddress: chainDestinationAddress.String(),
 	}}}
 
@@ -420,16 +443,16 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	updateCommitmentStateReq := &astriaPb.UpdateCommitmentStateRequest{
 		CommitmentState: &astriaPb.CommitmentState{
 			Soft: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
+				Hash:            executeBlockRes.GetBlock().Hash,
+				ParentBlockHash: executeBlockRes.GetBlock().ParentBlockHash,
+				Number:          executeBlockRes.GetBlock().Number,
+				Timestamp:       executeBlockRes.GetBlock().Timestamp,
 			},
 			Firm: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
+				Hash:            executeBlockRes.GetBlock().Hash,
+				ParentBlockHash: executeBlockRes.GetBlock().ParentBlockHash,
+				Number:          executeBlockRes.GetBlock().Number,
+				Timestamp:       executeBlockRes.GetBlock().Timestamp,
 			},
 			BaseCelestiaHeight: commitmentState.BaseCelestiaHeight + 1,
 		},

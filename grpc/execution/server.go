@@ -5,6 +5,8 @@
 package execution
 
 import (
+	composerv1alpha1 "buf.build/gen/go/astria/composer-apis/protocolbuffers/go/astria/composer/v1alpha1"
+	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -222,9 +224,34 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func unbundleBuilderBundlePacket(
+	builderBundlePacket *composerv1alpha1.BuilderBundlePacket,
+	height uint64,
+	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
+	bridgeAllowedAssets map[string]struct{},
+	bridgeSenderAddress common.Address,
+) (types.Transactions, error) {
+	// TODO - add builder packet validation
+	if builderBundlePacket == nil {
+		return types.Transactions{}, nil
+	}
+
+	ethTxs := types.Transactions{}
+	for _, tx := range builderBundlePacket.GetBundle().GetTransactions() {
+		ethTx, err := validateAndUnmarshalTx(height, tx, bridgeAddresses, bridgeAllowedAssets, bridgeSenderAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		ethTxs = append(ethTxs, ethTx)
+	}
+
+	return ethTxs, nil
+}
+
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
-func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.ExecuteBlockResponse, error) {
 	log.Debug("ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
 
@@ -248,18 +275,26 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess := types.Transactions{}
-	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
-		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
-			continue
-		}
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+	builderBundlePacket, ethTxs, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+	if err != nil {
+		log.Error("failed to extract builder bundle and txs", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not extract builder bundle and txs")
+	}
+	if req.GetSimulateOnly() && builderBundlePacket != nil {
+		return nil, status.Error(codes.InvalidArgument, "bundle simulation is not supported for builder bundle packets")
 	}
 
-	// This set of ordered TXs on the TxPool is has been configured to be used by
-	// the Miner when building a payload.
+	tobTxs := types.Transactions{}
+	if builderBundlePacket != nil {
+		tobTxs, err = unbundleBuilderBundlePacket(builderBundlePacket, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+		if err != nil {
+			log.Error("failed to unbundle builder bundle packet", "err", err)
+			return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
+		}
+	}
+
+	txsToProcess := append(tobTxs, ethTxs...)
+
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
 	// Build a payload to add to the chain
@@ -282,16 +317,32 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
-	err = s.bc.InsertBlockWithoutSetHead(block)
-	if err != nil {
-		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
-		return nil, status.Error(codes.Internal, "failed to insert block to chain")
+
+	includedTransactions := make([]*sequencerblockv1alpha1.RollupData, 0, len(block.Transactions()))
+	for _, tx := range block.Transactions() {
+		marshalledTx, err := tx.MarshalBinary()
+		if err != nil {
+			log.Error("failed to marshal transaction", "err", err)
+			return nil, status.Error(codes.Internal, "failed to marshal transaction")
+		}
+		includedTransactions = append(includedTransactions, &sequencerblockv1alpha1.RollupData{
+			Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+		})
+	}
+
+	// we do not insert the block to the chain if we just want to simulate the transactions
+	if !req.GetSimulateOnly() {
+		err = s.bc.InsertBlockWithoutSetHead(block)
+		if err != nil {
+			log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
+			return nil, status.Error(codes.Internal, "failed to insert block to chain")
+		}
 	}
 
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &astriaPb.Block{
+	finalBlock := &astriaPb.Block{
 		Number:          uint32(block.NumberU64()),
 		Hash:            block.Hash().Bytes(),
 		ParentBlockHash: block.ParentHash().Bytes(),
@@ -300,11 +351,16 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		},
 	}
 
-	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
+	if next, ok := s.bc.Config().AstriaFeeCollectors[finalBlock.Number+1]; ok {
 		s.nextFeeRecipient = next
 	}
 
-	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
+	res := &astriaPb.ExecuteBlockResponse{
+		Block:                finalBlock,
+		IncludedTransactions: includedTransactions,
+	}
+
+	log.Info("ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
