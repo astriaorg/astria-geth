@@ -55,20 +55,7 @@ func generateBech32MAddress() string {
 }
 
 func TestExtractBuilderBundleAndTxs(t *testing.T) {
-	// we need to consider the following cases
-	// 1: empty list of transactions
-	// 2. list of transactions without builderBundlePacket
-	// 3. list of transactions with builderBundlePacket
-	// 4. one transaction with builderBundlePacket
-
 	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
-
-	//chainDestinationKey, err := crypto.GenerateKey()
-	//require.Nil(t, err, "failed to generate chain destination key: %v", err)
-	//chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
-	//
-	//bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
-	//invalidBridgeAssetDenom := "invalid-asset-denom"
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
@@ -122,14 +109,15 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 				})
 			}
 
-			// create the BuilderBundlePacket
-			builderBundle := &composerv1alpha1.BuilderBundlePacket{
-				Bundle: &composerv1alpha1.BuilderBundle{
-					Transactions: []*sequencerblockv1alpha1.RollupData{},
-					ParentHash:   nil,
-				},
-			}
 			if test.noOfTxsInBuilderBundle > 0 {
+				// create the BuilderBundlePacket
+				builderBundle := &composerv1alpha1.BuilderBundlePacket{
+					Bundle: &composerv1alpha1.BuilderBundle{
+						Transactions: []*sequencerblockv1alpha1.RollupData{},
+						ParentHash:   nil,
+					},
+				}
+
 				// create noOfTxsInBuilderBundle txs
 				for i := nonce; i < nonce+test.noOfTxsInBuilderBundle; i++ {
 					unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
