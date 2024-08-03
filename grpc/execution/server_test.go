@@ -342,6 +342,9 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					require.Nil(t, block, "Block should not be found in blockchain")
 				} else {
 					require.NotNil(t, block, "Block not found in blockchain")
+					require.Equal(t, block.Hash(), common.BytesToHash(executeBlockRes.Block.Hash), "Block hash is not correct")
+					require.Equal(t, block.ParentHash(), common.BytesToHash(executeBlockRes.Block.ParentBlockHash), "Parent Block Hash is not correct")
+					require.Equal(t, block.NumberU64(), uint64(executeBlockRes.Block.Number), "Block number is not correct")
 				}
 
 				require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
