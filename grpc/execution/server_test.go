@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -428,6 +429,29 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				includedTransactions := executeBlockRes.GetIncludedTransactions()
 				require.NotNil(t, includedTransactions, "IncludedTransactions is nil")
 				require.Equal(t, tt.noOfBuilderBundleTxs+tt.noOfTxs+tt.noOfDepositTxs, len(includedTransactions), "IncludedTransactions length is not correct")
+
+				// check if includedTransactions is the same as marshalled transactions without considering order
+				for _, includedTx := range includedTransactions {
+					found := false
+					for _, tx := range marshalledTxs {
+						if includedDeposit := includedTx.GetDeposit(); includedDeposit != nil {
+							fmt.Printf("Found included deposit!")
+							// check if included deposit tx is the same as the one we sent
+							depositTx := tx.GetDeposit()
+							if depositTx != nil && depositTx.GetAmount().Lo == includedDeposit.GetAmount().Lo && depositTx.GetAmount().Hi == includedDeposit.GetAmount().Hi {
+								fmt.Printf("Found corresponding deposit!")
+								found = true
+								break
+							}
+						} else {
+							if bytes.Equal(includedTx.GetSequencedData(), tx.GetSequencedData()) {
+								found = true
+								break
+							}
+						}
+					}
+					require.True(t, found, "Included transaction not found in marshalled transactions")
+				}
 			}
 
 		})

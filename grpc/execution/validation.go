@@ -124,16 +124,19 @@ func validateAndUnmarshallSequenceTx(
 func extractBuilderBundleAndTxs(txs []*sequencerblockv1alpha1.RollupData, height uint64,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{},
-	bridgeSenderAddress common.Address) (*composerv1alpha1.BuilderBundlePacket, types.Transactions, error) {
+	bridgeSenderAddress common.Address) (*composerv1alpha1.BuilderBundlePacket, types.Transactions, map[string]*sequencerblockv1alpha1.Deposit, error) {
 	// Extract the builder bundle from the sequencer txs
 	var builderBundle *composerv1alpha1.BuilderBundlePacket
 	ethTxs := types.Transactions{}
+	// this is a mapping from tx hash to depositTx, we use this when we need to simulate the txs to map the tx hash to the depositTx
+	depositTxMapping := map[string]*sequencerblockv1alpha1.Deposit{}
 	for _, tx := range txs {
 		if deposit := tx.GetDeposit(); deposit != nil {
 			tx, err := validateAndUnmarshallDepositTx(height, tx, bridgeAddresses, bridgeAllowedAssets, bridgeSenderAddress)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
+			depositTxMapping[tx.Hash().Hex()] = deposit
 			ethTxs = append(ethTxs, tx)
 		} else {
 			// check if we can unmarshall the sequence data to a BuilderBundlePacket
@@ -143,7 +146,7 @@ func extractBuilderBundleAndTxs(txs []*sequencerblockv1alpha1.RollupData, height
 				// we found a builder bundle, we first check if we got a duplicate builder bundle. if we did
 				// we throw an error
 				if builderBundle != nil {
-					return nil, nil, fmt.Errorf("duplicate builder bundle found in sequencer txs")
+					return nil, nil, nil, fmt.Errorf("duplicate builder bundle found in sequencer txs")
 				}
 
 				// duplicate builder bundle not found, we set the builder bundle to the temp builder bundle
@@ -153,7 +156,7 @@ func extractBuilderBundleAndTxs(txs []*sequencerblockv1alpha1.RollupData, height
 				// if its not a builder bundle, then it should be a regular eth tx
 				ethTx, err := validateAndUnmarshallSequenceTx(tx)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				ethTxs = append(ethTxs, ethTx)
@@ -163,13 +166,5 @@ func extractBuilderBundleAndTxs(txs []*sequencerblockv1alpha1.RollupData, height
 
 	}
 
-	if builderBundle == nil {
-		builderBundle = &composerv1alpha1.BuilderBundlePacket{
-			Bundle: &composerv1alpha1.BuilderBundle{
-				Transactions: []*sequencerblockv1alpha1.RollupData{},
-			},
-		}
-	}
-
-	return builderBundle, ethTxs, nil
+	return builderBundle, ethTxs, depositTxMapping, nil
 }

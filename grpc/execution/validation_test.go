@@ -97,8 +97,8 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 
 			// create the other txs
 			nonce := 0
-			for i := nonce; i < test.noOfOtherTxs; i++ {
-				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+			for i := 0; i < test.noOfOtherTxs; i++ {
+				unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 				require.Nil(t, err, "Failed to sign tx")
 
@@ -107,6 +107,8 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
 					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
 				})
+
+				nonce += 1
 			}
 
 			if test.noOfTxsInBuilderBundle > 0 {
@@ -119,8 +121,8 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 				}
 
 				// create noOfTxsInBuilderBundle txs
-				for i := nonce; i < nonce+test.noOfTxsInBuilderBundle; i++ {
-					unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				for i := 0; i < test.noOfTxsInBuilderBundle; i++ {
+					unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 					tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 					require.Nil(t, err, "Failed to sign tx")
 
@@ -129,6 +131,7 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 					builderBundle.Bundle.Transactions = append(builderBundle.Bundle.Transactions, &sequencerblockv1alpha1.RollupData{
 						Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
 					})
+					nonce += 1
 				}
 
 				// add the builderBundle to the list of transactions
@@ -139,7 +142,7 @@ func TestExtractBuilderBundleAndTxs(t *testing.T) {
 				})
 			}
 
-			builderBundlePacket, otherTxs, err := extractBuilderBundleAndTxs(marshalledTxs, 2, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
+			builderBundlePacket, otherTxs, _, err := extractBuilderBundleAndTxs(marshalledTxs, 2, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
 			require.Nil(t, err, "Failed to extract builder bundle and txs")
 			require.Equal(t, test.noOfTxsInBuilderBundle, len(builderBundlePacket.GetBundle().GetTransactions()), "Incorrect number of txs in builder bundle")
 			require.Equal(t, test.noOfOtherTxs, len(otherTxs), "Incorrect number of other txs")

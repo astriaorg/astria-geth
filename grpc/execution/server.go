@@ -7,6 +7,7 @@ package execution
 import (
 	composerv1alpha1 "buf.build/gen/go/astria/composer-apis/protocolbuffers/go/astria/composer/v1alpha1"
 	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -226,14 +227,17 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 
 func unbundleBuilderBundlePacket(
 	builderBundlePacket *composerv1alpha1.BuilderBundlePacket,
+	parentHash []byte,
 	height uint64,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{},
 	bridgeSenderAddress common.Address,
 ) (types.Transactions, error) {
-	// TODO - add builder packet validation
 	if builderBundlePacket == nil {
 		return types.Transactions{}, nil
+	}
+	if bytes.Compare(builderBundlePacket.GetBundle().GetParentHash(), parentHash) != 0 {
+		return nil, fmt.Errorf("parent hash does not match parent hash of the block")
 	}
 
 	ethTxs := types.Transactions{}
@@ -275,7 +279,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
-	builderBundlePacket, ethTxs, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+	builderBundlePacket, ethTxs, depositTxMapping, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to extract builder bundle and txs", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not extract builder bundle and txs")
@@ -284,13 +288,10 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		return nil, status.Error(codes.InvalidArgument, "bundle simulation is not supported for builder bundle packets")
 	}
 
-	tobTxs := types.Transactions{}
-	if builderBundlePacket != nil {
-		tobTxs, err = unbundleBuilderBundlePacket(builderBundlePacket, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
-		if err != nil {
-			log.Error("failed to unbundle builder bundle packet", "err", err)
-			return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
-		}
+	tobTxs, err := unbundleBuilderBundlePacket(builderBundlePacket, req.PrevBlockHash, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+	if err != nil {
+		log.Error("failed to unbundle builder bundle packet", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
 	}
 
 	txsToProcess := append(tobTxs, ethTxs...)
@@ -320,14 +321,25 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	includedTransactions := make([]*sequencerblockv1alpha1.RollupData, 0, len(block.Transactions()))
 	for _, tx := range block.Transactions() {
-		marshalledTx, err := tx.MarshalBinary()
-		if err != nil {
-			log.Error("failed to marshal transaction", "err", err)
-			return nil, status.Error(codes.Internal, "failed to marshal transaction")
+		if tx.Type() == types.DepositTxType {
+			depositTx, ok := depositTxMapping[tx.Hash().Hex()]
+			if !ok {
+				log.Error("deposit tx not found in depositTxMapping", "tx hash", tx.Hash().Hex())
+				return nil, status.Error(codes.Internal, "deposit tx not found in depositTxMapping")
+			}
+
+			includedTransactions = append(includedTransactions, &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: depositTx}})
+
+		} else {
+			marshalledTx, err := tx.MarshalBinary()
+			if err != nil {
+				log.Error("failed to marshal transaction", "err", err)
+				return nil, status.Error(codes.Internal, "failed to marshal transaction")
+			}
+			includedTransactions = append(includedTransactions, &sequencerblockv1alpha1.RollupData{
+				Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+			})
 		}
-		includedTransactions = append(includedTransactions, &sequencerblockv1alpha1.RollupData{
-			Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
-		})
 	}
 
 	// we do not insert the block to the chain if we just want to simulate the transactions
