@@ -1,16 +1,19 @@
 package execution
 
 import (
+	composerv1alpha1 "buf.build/gen/go/astria/composer-apis/protocolbuffers/go/astria/composer/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/golang/protobuf/proto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -202,46 +205,89 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	tests := []struct {
 		description                          string
 		callGenesisInfoAndGetCommitmentState bool
-		numberOfTxs                          int
+		noOfTxs                              int
+		noOfBuilderBundleTxs                 int
 		prevBlockHash                        []byte
 		timestamp                            uint64
-		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
+		noOfDepositTxs                       int
+		simulateOnly                         bool
 		expectedReturnCode                   codes.Code
 	}{
 		{
 			description:                          "ExecuteBlock without calling GetGenesisInfo and GetCommitmentState",
 			callGenesisInfoAndGetCommitmentState: false,
-			numberOfTxs:                          5,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 0,
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
+			noOfDepositTxs:                       0,
+			simulateOnly:                         false,
 			expectedReturnCode:                   codes.PermissionDenied,
 		},
 		{
 			description:                          "ExecuteBlock with 5 txs and no deposit tx",
 			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 0,
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   0,
+			noOfDepositTxs:                       0,
+			simulateOnly:                         false,
+			expectedReturnCode:                   codes.OK,
 		},
 		{
 			description:                          "ExecuteBlock with 5 txs and a deposit tx",
 			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 0,
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(1000000000000000000),
-			expectedReturnCode:                   0,
+			noOfDepositTxs:                       1,
+			simulateOnly:                         false,
+			expectedReturnCode:                   codes.OK,
+		},
+		{
+			description:                          "ExecuteBlock with 5 txs and no deposit tx in simulate only mode",
+			callGenesisInfoAndGetCommitmentState: true,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 0,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			noOfDepositTxs:                       0,
+			simulateOnly:                         true,
+			expectedReturnCode:                   codes.OK,
+		},
+		{
+			description:                          "ExecuteBlock with 5 txs, no deposit tx and with 5 builder bundle txs in simulate only mode",
+			callGenesisInfoAndGetCommitmentState: true,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			noOfDepositTxs:                       0,
+			simulateOnly:                         true,
+			expectedReturnCode:                   codes.InvalidArgument,
+		},
+		{
+			description:                          "ExecuteBlock with 5 txs, no deposit tx and with 5 builder bundle txs",
+			callGenesisInfoAndGetCommitmentState: true,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			noOfDepositTxs:                       0,
+			simulateOnly:                         false,
+			expectedReturnCode:                   codes.OK,
 		},
 		{
 			description:                          "ExecuteBlock with incorrect previous block hash",
 			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
+			noOfTxs:                              5,
+			noOfBuilderBundleTxs:                 0,
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
+			noOfDepositTxs:                       0,
+			simulateOnly:                         false,
 			expectedReturnCode:                   codes.FailedPrecondition,
 		},
 	}
@@ -266,11 +312,44 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			}
 
 			// create the txs to send
-			// create 5 txs
 			txs := []*types.Transaction{}
 			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
-			for i := 0; i < 5; i++ {
-				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+
+			nonce := 0
+
+			if tt.noOfBuilderBundleTxs > 0 {
+				// create the BuilderBundlePacket
+				builderBundle := &composerv1alpha1.BuilderBundlePacket{
+					Bundle: &composerv1alpha1.BuilderBundle{
+						Transactions: []*sequencerblockv1alpha1.RollupData{},
+						ParentHash:   nil,
+					},
+				}
+
+				// create noOfTxsInBuilderBundle txs
+				for i := 0; i < tt.noOfBuilderBundleTxs; i++ {
+					unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+					tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+					require.Nil(t, err, "Failed to sign tx")
+
+					marshalledTx, err := tx.MarshalBinary()
+					require.Nil(t, err, "Failed to marshal tx")
+					builderBundle.Bundle.Transactions = append(builderBundle.Bundle.Transactions, &sequencerblockv1alpha1.RollupData{
+						Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+					})
+					nonce += 1
+				}
+
+				// add the builderBundle to the list of transactions
+				marshalledProto, err := proto.Marshal(builderBundle)
+				require.Nil(t, err, "Failed to marshal builder bundle")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledProto},
+				})
+			}
+
+			for i := 0; i < tt.noOfTxs; i++ {
+				unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 				require.Nil(t, err, "Failed to sign tx")
 				txs = append(txs, tx)
@@ -280,31 +359,35 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
 					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
 				})
+
+				nonce += 1
 			}
 
-			// create deposit tx if depositTxAmount is non zero
-			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
-				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
-				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+			// create deposit tx if noOfDepositTxs is non zero
+			if tt.noOfDepositTxs > 0 {
+				for i := 0; i < tt.noOfDepositTxs; i++ {
+					depositAmount := bigIntToProtoU128(big.NewInt(1000000000000000000))
+					bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+					bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
-				// create new chain destination address for better testing
-				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
-				require.Nil(t, err, "Failed to generate chain destination address")
+					// create new chain destination address for better testing
+					chainDestinationAddressPrivKey, err := crypto.GenerateKey()
+					require.Nil(t, err, "Failed to generate chain destination address")
 
-				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
+					chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
 
-				depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
-					BridgeAddress: &primitivev1.Address{
-						Bech32M: bridgeAddress,
-					},
-					Asset:                   bridgeAssetDenom,
-					Amount:                  depositAmount,
-					RollupId:                genesisInfo.RollupId,
-					DestinationChainAddress: chainDestinationAddress.String(),
-				}}}
+					depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+						BridgeAddress: &primitivev1.Address{
+							Bech32M: bridgeAddress,
+						},
+						Asset:                   bridgeAssetDenom,
+						Amount:                  depositAmount,
+						RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId.Inner},
+						DestinationChainAddress: chainDestinationAddress.String(),
+					}}}
 
-				marshalledTxs = append(marshalledTxs, depositTx)
+					marshalledTxs = append(marshalledTxs, depositTx)
+				}
 			}
 
 			executeBlockReq := &astriaPb.ExecuteBlockRequest{
@@ -313,6 +396,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					Seconds: int64(tt.timestamp),
 				},
 				Transactions: marshalledTxs,
+				SimulateOnly: tt.simulateOnly,
 			}
 
 			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
@@ -321,6 +405,16 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
 			}
 			if err == nil {
+				block := ethservice.BlockChain().GetBlockByHash(common.BytesToHash(executeBlockRes.Block.Hash))
+				if tt.simulateOnly {
+					require.Nil(t, block, "Block should not be found in blockchain")
+				} else {
+					require.NotNil(t, block, "Block not found in blockchain")
+					require.Equal(t, block.Hash(), common.BytesToHash(executeBlockRes.Block.Hash), "Block hash is not correct")
+					require.Equal(t, block.ParentHash(), common.BytesToHash(executeBlockRes.Block.ParentBlockHash), "Parent Block Hash is not correct")
+					require.Equal(t, block.NumberU64(), uint64(executeBlockRes.Block.Number), "Block number is not correct")
+				}
+
 				require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
 
 				astriaOrdered := ethservice.TxPool().AstriaOrdered()
@@ -331,6 +425,33 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				require.Nil(t, err, "GetCommitmentState failed")
 
 				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
+
+				includedTransactions := executeBlockRes.GetIncludedTransactions()
+				require.NotNil(t, includedTransactions, "IncludedTransactions is nil")
+				require.Equal(t, tt.noOfBuilderBundleTxs+tt.noOfTxs+tt.noOfDepositTxs, len(includedTransactions), "IncludedTransactions length is not correct")
+
+				// check if includedTransactions is the same as marshalled transactions without considering order
+				for _, includedTx := range includedTransactions {
+					found := false
+					for _, tx := range marshalledTxs {
+						if includedDeposit := includedTx.GetDeposit(); includedDeposit != nil {
+							fmt.Printf("Found included deposit!")
+							// check if included deposit tx is the same as the one we sent
+							depositTx := tx.GetDeposit()
+							if depositTx != nil && depositTx.GetAmount().Lo == includedDeposit.GetAmount().Lo && depositTx.GetAmount().Hi == includedDeposit.GetAmount().Hi {
+								fmt.Printf("Found corresponding deposit!")
+								found = true
+								break
+							}
+						} else {
+							if bytes.Equal(includedTx.GetSequencedData(), tx.GetSequencedData()) {
+								found = true
+								break
+							}
+						}
+					}
+					require.True(t, found, "Included transaction not found in marshalled transactions")
+				}
 			}
 
 		})
@@ -393,7 +514,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 		Asset:                   bridgeAssetDenom,
 		Amount:                  depositAmount,
-		RollupId:                genesisInfo.RollupId,
+		RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId.Inner},
 		DestinationChainAddress: chainDestinationAddress.String(),
 	}}}
 
@@ -420,16 +541,16 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	updateCommitmentStateReq := &astriaPb.UpdateCommitmentStateRequest{
 		CommitmentState: &astriaPb.CommitmentState{
 			Soft: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
+				Hash:            executeBlockRes.GetBlock().Hash,
+				ParentBlockHash: executeBlockRes.GetBlock().ParentBlockHash,
+				Number:          executeBlockRes.GetBlock().Number,
+				Timestamp:       executeBlockRes.GetBlock().Timestamp,
 			},
 			Firm: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
+				Hash:            executeBlockRes.GetBlock().Hash,
+				ParentBlockHash: executeBlockRes.GetBlock().ParentBlockHash,
+				Number:          executeBlockRes.GetBlock().Number,
+				Timestamp:       executeBlockRes.GetBlock().Timestamp,
 			},
 			BaseCelestiaHeight: commitmentState.BaseCelestiaHeight + 1,
 		},
