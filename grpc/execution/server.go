@@ -237,7 +237,8 @@ func unbundleBuilderBundlePacket(
 		return types.Transactions{}, nil
 	}
 	if bytes.Compare(builderBundlePacket.GetBundle().GetParentHash(), parentHash) != 0 {
-		return nil, fmt.Errorf("parent hash does not match parent hash of the block")
+		log.Error("parent hash does not match parent hash of the block", "parentHash", common.BytesToHash(parentHash).Hex(), "bundleParentHash", common.BytesToHash(builderBundlePacket.GetBundle().GetParentHash()).Hex())
+		return types.Transactions{}, nil
 	}
 
 	ethTxs := types.Transactions{}
@@ -256,8 +257,9 @@ func unbundleBuilderBundlePacket(
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.ExecuteBlockResponse, error) {
-	log.Debug("ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+	log.Info("Trusted Buildoooor ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
+	log.Info("Mode is set to", "simulateOnly", req.GetSimulateOnly())
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
@@ -279,6 +281,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
+	log.Info("Calling extractBuilderBundleAndTxs")
 	builderBundlePacket, ethTxs, depositTxMapping, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to extract builder bundle and txs", "err", err)
@@ -287,12 +290,19 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	if req.GetSimulateOnly() && builderBundlePacket != nil {
 		return nil, status.Error(codes.InvalidArgument, "bundle simulation is not supported for builder bundle packets")
 	}
+	if builderBundlePacket == nil {
+		log.Info("No builder bundle packet found")
+	} else {
+		log.Info("Builder bundle packet found")
+	}
 
+	log.Info("Calling unbundleBuilderBundlePacket")
 	tobTxs, err := unbundleBuilderBundlePacket(builderBundlePacket, req.PrevBlockHash, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to unbundle builder bundle packet", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
 	}
+	log.Info("Unbundle builder bundle packet completed", "tx_count", len(tobTxs))
 
 	txsToProcess := append(tobTxs, ethTxs...)
 
@@ -341,6 +351,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			})
 		}
 	}
+	log.Info("included transactions", "count", len(includedTransactions))
 
 	// we do not insert the block to the chain if we just want to simulate the transactions
 	if !req.GetSimulateOnly() {
@@ -372,7 +383,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		IncludedTransactions: includedTransactions,
 	}
 
-	log.Info("ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
+	log.Info("Trusted Buildoooor ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
@@ -402,7 +413,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 		BaseCelestiaHeight: celestiaBlock,
 	}
 
-	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
+	log.Debug("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
 	getCommitmentStateSuccessCount.Inc(1)
 	s.getCommitmentStateCalled = true
 	return res, nil
@@ -478,7 +489,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
 	}
 
-	log.Info("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
+	log.Debug("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
 	softCommitmentHeight.Update(int64(softBlock.NumberU64()))
 	firmCommitmentHeight.Update(int64(firmBlock.NumberU64()))
 	updateCommitmentStateSuccessCount.Inc(1)

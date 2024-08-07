@@ -145,6 +145,7 @@ func extractBuilderBundleAndTxs(txs []*sequencerblockv1alpha1.RollupData, height
 			if err == nil {
 				// we found a builder bundle, we first check if we got a duplicate builder bundle. if we did
 				// we throw an error
+				// TODO - we could just ignore the duplicate builder bundle??
 				if builderBundle != nil {
 					return nil, nil, nil, fmt.Errorf("duplicate builder bundle found in sequencer txs")
 				}
