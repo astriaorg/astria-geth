@@ -194,6 +194,10 @@ func (miner *Miner) commitTransaction(env *environment, tx *types.Transaction) e
 	if err != nil {
 		return err
 	}
+	if receipt.Status == types.ReceiptStatusFailed {
+		//log.Error("Transaction failed", "hash", tx.Hash())
+		return core.ErrTxReverted
+	}
 	env.txs = append(env.txs, tx)
 	env.receipts = append(env.receipts, receipt)
 	env.tcount++
@@ -286,12 +290,16 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+		case errors.Is(err, core.ErrTxReverted):
+			// Transaction failed, discard the transaction and get the next in line
+			log.Trace("Transaction reverted", "hash", tx.Hash(), "err", err)
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 		}
 		if err != nil {
+			log.Error("Removing invalid transaction", "hash", tx.Hash(), "from", from, "err", err)
 			log.Trace("Marking transaction as invalid", "hash", tx.Hash(), "err", err)
 			miner.txpool.AddToAstriaExcludedFromBlock(tx)
 		}

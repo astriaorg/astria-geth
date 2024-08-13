@@ -236,10 +236,14 @@ func unbundleBuilderBundlePacket(
 	if builderBundlePacket == nil {
 		return types.Transactions{}, nil
 	}
-	if bytes.Compare(builderBundlePacket.GetBundle().GetParentHash(), parentHash) != 0 {
+
+	builderBundle := builderBundlePacket.GetBundle()
+	if bytes.Compare(builderBundle.GetParentHash(), parentHash) != 0 {
 		log.Error("parent hash does not match parent hash of the block", "parentHash", common.BytesToHash(parentHash).Hex(), "bundleParentHash", common.BytesToHash(builderBundlePacket.GetBundle().GetParentHash()).Hex())
 		return types.Transactions{}, nil
 	}
+
+	// TODO - bundle signature verification
 
 	ethTxs := types.Transactions{}
 	for _, tx := range builderBundlePacket.GetBundle().GetTransactions() {
@@ -257,7 +261,7 @@ func unbundleBuilderBundlePacket(
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.ExecuteBlockResponse, error) {
-	log.Info("Trusted Buildoooor ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+	log.Info("Trusted Builder ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
 	log.Info("Mode is set to", "simulateOnly", req.GetSimulateOnly())
 
@@ -281,7 +285,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
-	log.Info("Calling extractBuilderBundleAndTxs")
+	log.Info("Extracting builder bundle and other txs")
 	builderBundlePacket, ethTxs, depositTxMapping, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to extract builder bundle and txs", "err", err)
@@ -294,17 +298,20 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		log.Info("No builder bundle packet found")
 	} else {
 		log.Info("Builder bundle packet found")
+		log.Info("Unbundling the builder bundle packet", "simulateOnly", req.GetSimulateOnly())
 	}
 
-	log.Info("Calling unbundleBuilderBundlePacket")
 	tobTxs, err := unbundleBuilderBundlePacket(builderBundlePacket, req.PrevBlockHash, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to unbundle builder bundle packet", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
 	}
-	log.Info("Unbundle builder bundle packet completed", "tx_count", len(tobTxs))
+	if builderBundlePacket != nil {
+		log.Info("Unbundled the builder bundle packet", "tx_count", len(tobTxs))
+	}
 
 	txsToProcess := append(tobTxs, ethTxs...)
+	log.Info("Total txs to process", "tx_count", len(txsToProcess))
 
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
@@ -315,33 +322,54 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
 	}
+	log.Info("Building payload")
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
 	}
+	log.Info("Built payload!")
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
+	log.Info("Extracting block out of payload!")
 	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
+	log.Info("Extracted block out of payload!")
 
+	log.Info("Building included_transactions list by removing txs which are in the list of AstriaExcludedTxs")
+	excludedTransactions := s.eth.TxPool().AstriaExcludedFromBlock()
 	includedTransactions := make([]*sequencerblockv1alpha1.RollupData, 0, len(block.Transactions()))
-	for _, tx := range block.Transactions() {
-		if tx.Type() == types.DepositTxType {
-			depositTx, ok := depositTxMapping[tx.Hash().Hex()]
+	log.Info("excluded txs", "count", len(*excludedTransactions))
+	for _, blockTx := range block.Transactions() {
+		// ensure blockTx is not in excludedTxs
+		found := false
+		for _, tx := range *excludedTransactions {
+			if tx.Hash() == tx.Hash() {
+				found = true
+				log.Error("tx found in excluded txs", "blockTx hash", tx.Hash().Hex())
+				break
+			}
+		}
+		if found {
+			// ignore tx which has been excluded
+			continue
+		}
+
+		if blockTx.Type() == types.DepositTxType {
+			depositTx, ok := depositTxMapping[blockTx.Hash().Hex()]
 			if !ok {
-				log.Error("deposit tx not found in depositTxMapping", "tx hash", tx.Hash().Hex())
-				return nil, status.Error(codes.Internal, "deposit tx not found in depositTxMapping")
+				log.Error("deposit blockTx not found in depositTxMapping", "blockTx hash", blockTx.Hash().Hex())
+				return nil, status.Error(codes.Internal, "deposit blockTx not found in depositTxMapping")
 			}
 
 			includedTransactions = append(includedTransactions, &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: depositTx}})
 
 		} else {
-			marshalledTx, err := tx.MarshalBinary()
+			marshalledTx, err := blockTx.MarshalBinary()
 			if err != nil {
 				log.Error("failed to marshal transaction", "err", err)
 				return nil, status.Error(codes.Internal, "failed to marshal transaction")
@@ -351,15 +379,18 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			})
 		}
 	}
-	log.Info("included transactions", "count", len(includedTransactions))
+	log.Info("Built included tx list", "count", len(includedTransactions))
 
 	// we do not insert the block to the chain if we just want to simulate the transactions
 	if !req.GetSimulateOnly() {
+		log.Info("Inserting block to chain")
 		err = s.bc.InsertBlockWithoutSetHead(block)
 		if err != nil {
 			log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 			return nil, status.Error(codes.Internal, "failed to insert block to chain")
 		}
+	} else {
+		log.Info("Skipping inserting block to chain as simulateOnly is set")
 	}
 
 	// remove txs from original mempool
@@ -383,7 +414,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		IncludedTransactions: includedTransactions,
 	}
 
-	log.Info("Trusted Buildoooor ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
+	log.Info("Trusted Builder ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
