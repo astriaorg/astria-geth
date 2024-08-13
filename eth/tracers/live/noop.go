@@ -59,16 +59,13 @@ func (t *noop) OnExit(depth int, output []byte, gasUsed uint64, err error, rever
 func (t *noop) OnTxStart(vm *tracing.VMContext, tx *types.Transaction, from common.Address) {
 }
 
-func (t *noop) OnTxEnd(receipt *types.Receipt, err error) {}
+func (t *noop) OnTxEnd(receipt *types.Receipt, err error) {
 
-func (t *noop) OnBlockStart(ev tracing.BlockEvent) {
-	// Compute the increase and decrease in bridged asset here
-	// These values are staged over here
 }
 
-func (t *noop) OnBlockEnd(err error) {
-	// if err == nil, then we need to commit the values we have staged.
-}
+func (t *noop) OnBlockStart(ev tracing.BlockEvent) {}
+
+func (t *noop) OnBlockEnd(err error) {}
 
 func (t *noop) OnSkippedBlock(ev tracing.BlockEvent) {}
 

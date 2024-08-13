@@ -195,7 +195,6 @@ func (miner *Miner) commitTransaction(env *environment, tx *types.Transaction) e
 		return err
 	}
 	if receipt.Status == types.ReceiptStatusFailed {
-		//log.Error("Transaction failed", "hash", tx.Hash())
 		return core.ErrTxReverted
 	}
 	env.txs = append(env.txs, tx)
