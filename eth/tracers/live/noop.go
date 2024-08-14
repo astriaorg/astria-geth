@@ -60,13 +60,12 @@ func (t *noop) OnTxStart(vm *tracing.VMContext, tx *types.Transaction, from comm
 }
 
 func (t *noop) OnTxEnd(receipt *types.Receipt, err error) {
+
 }
 
-func (t *noop) OnBlockStart(ev tracing.BlockEvent) {
-}
+func (t *noop) OnBlockStart(ev tracing.BlockEvent) {}
 
-func (t *noop) OnBlockEnd(err error) {
-}
+func (t *noop) OnBlockEnd(err error) {}
 
 func (t *noop) OnSkippedBlock(ev tracing.BlockEvent) {}
 
