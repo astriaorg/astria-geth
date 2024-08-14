@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -314,15 +313,18 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			// create the txs to send
 			txs := []*types.Transaction{}
 			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
+			txsToCheck := []*sequencerblockv1alpha1.RollupData{}
 
 			nonce := 0
 
 			if tt.noOfBuilderBundleTxs > 0 {
+				parentBlock := ethservice.BlockChain().CurrentSafeBlock()
+
 				// create the BuilderBundlePacket
 				builderBundle := &composerv1alpha1.BuilderBundlePacket{
 					Bundle: &composerv1alpha1.BuilderBundle{
 						Transactions: []*sequencerblockv1alpha1.RollupData{},
-						ParentHash:   nil,
+						ParentHash:   parentBlock.Hash().Bytes(),
 					},
 				}
 
@@ -334,9 +336,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 					marshalledTx, err := tx.MarshalBinary()
 					require.Nil(t, err, "Failed to marshal tx")
-					builderBundle.Bundle.Transactions = append(builderBundle.Bundle.Transactions, &sequencerblockv1alpha1.RollupData{
+					rollupData := &sequencerblockv1alpha1.RollupData{
 						Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
-					})
+					}
+					txsToCheck = append(txsToCheck, rollupData)
+					builderBundle.Bundle.Transactions = append(builderBundle.Bundle.Transactions, rollupData)
 					nonce += 1
 				}
 
@@ -356,9 +360,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				marshalledTx, err := tx.MarshalBinary()
 				require.Nil(t, err, "Failed to marshal tx")
-				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+				rollupData := &sequencerblockv1alpha1.RollupData{
 					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
-				})
+				}
+				txsToCheck = append(txsToCheck, rollupData)
+				marshalledTxs = append(marshalledTxs, rollupData)
 
 				nonce += 1
 			}
@@ -385,7 +391,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 						RollupId:                &primitivev1.RollupId{Inner: genesisInfo.RollupId.Inner},
 						DestinationChainAddress: chainDestinationAddress.String(),
 					}}}
-
+					txsToCheck = append(txsToCheck, depositTx)
 					marshalledTxs = append(marshalledTxs, depositTx)
 				}
 			}
@@ -433,13 +439,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				// check if includedTransactions is the same as marshalled transactions without considering order
 				for _, includedTx := range includedTransactions {
 					found := false
-					for _, tx := range marshalledTxs {
+					for _, tx := range txsToCheck {
 						if includedDeposit := includedTx.GetDeposit(); includedDeposit != nil {
-							fmt.Printf("Found included deposit!")
 							// check if included deposit tx is the same as the one we sent
 							depositTx := tx.GetDeposit()
 							if depositTx != nil && depositTx.GetAmount().Lo == includedDeposit.GetAmount().Lo && depositTx.GetAmount().Hi == includedDeposit.GetAmount().Hi {
-								fmt.Printf("Found corresponding deposit!")
 								found = true
 								break
 							}
