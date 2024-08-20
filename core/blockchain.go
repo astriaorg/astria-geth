@@ -237,6 +237,7 @@ type BlockChain struct {
 	currentSnapBlock  atomic.Pointer[types.Header] // Current head of snap-sync
 	currentFinalBlock atomic.Pointer[types.Header] // Latest (consensus) finalized block
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
+	currentTempBlock  atomic.Pointer[types.Header] // Latest block executed via ExecuteBlock
 
 	currentBaseCelestiaHeight atomic.Uint64 // Latest finalized block height on Celestia
 
@@ -637,6 +638,10 @@ func (bc *BlockChain) SetSafe(header *types.Header) {
 	} else {
 		headSafeBlockGauge.Update(0)
 	}
+}
+
+func (bc *BlockChain) SetTemp(header *types.Header) {
+	bc.currentTempBlock.Store(header)
 }
 
 // rewindHashHead implements the logic of rewindHead in the context of hash scheme.

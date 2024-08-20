@@ -278,7 +278,8 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
 	softHash := s.bc.CurrentSafeBlock().Hash()
-	if prevHeadHash != softHash {
+	tempHash := s.bc.CurrentTempBlock().Hash()
+	if prevHeadHash != softHash && prevHeadHash != tempHash {
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
@@ -389,6 +390,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 			return nil, status.Error(codes.Internal, "failed to insert block to chain")
 		}
+		s.bc.SetTemp(block.Header())
 	} else {
 		log.Info("Skipping inserting block to chain as simulateOnly is set")
 	}
