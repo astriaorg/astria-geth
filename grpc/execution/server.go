@@ -278,15 +278,31 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	// Validate block being created has valid previous hash
 	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
 	softHash := s.bc.CurrentSafeBlock().Hash()
-	tempHash := s.bc.CurrentTempBlock().Hash()
+	tempHash := common.Hash{}
+	if s.bc.CurrentTempBlock() != nil {
+		tempHash = s.bc.CurrentTempBlock().Hash()
+	}
+	//if prevHeadHash.Hex() != "" {
+	//	log.Crit("prevHeadHash", prevHeadHash.Hex())
+	//}
+	//if softHash.Hex() != "" {
+	//	log.Crit("softHash", softHash.Hex())
+	//}
+	//if tempHash.Hex() != "" {
+	//	log.Crit("tempHash", tempHash.Hex())
+	//}
 	if prevHeadHash != softHash && prevHeadHash != tempHash {
+		log.Error("prevHeadHash", prevHeadHash.Hex())
+		log.Error("softHash", softHash.Hex())
+		log.Error("tempHash", tempHash.Hex())
+
+		log.Error("Block can only be created on top of soft block.")
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
-	log.Info("Extracting builder bundle and other txs")
 	builderBundlePacket, ethTxs, depositTxMapping, err := extractBuilderBundleAndTxs(req.Transactions, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to extract builder bundle and txs", "err", err)
@@ -295,12 +311,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	if req.GetSimulateOnly() && builderBundlePacket != nil {
 		return nil, status.Error(codes.InvalidArgument, "bundle simulation is not supported for builder bundle packets")
 	}
-	if builderBundlePacket == nil {
-		log.Info("No builder bundle packet found")
-	} else {
-		log.Info("Builder bundle packet found")
-		log.Info("Unbundling the builder bundle packet", "simulateOnly", req.GetSimulateOnly())
-	}
+	//if builderBundlePacket == nil {
+	//	log.Info("No builder bundle packet found")
+	//} else {
+	//	log.Info("Builder bundle packet found")
+	//	log.Info("Unbundling the builder bundle packet", "simulateOnly", req.GetSimulateOnly())
+	//}
 
 	tobTxs, err := unbundleBuilderBundlePacket(builderBundlePacket, req.PrevBlockHash, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
@@ -323,28 +339,22 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
 	}
-	log.Info("Building payload")
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
 	}
-	log.Info("Built payload!")
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	log.Info("Extracting block out of payload!")
 	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
-	log.Info("Extracted block out of payload!")
 
-	log.Info("Building included_transactions list by removing txs which are in the list of AstriaExcludedTxs")
 	excludedTransactions := s.eth.TxPool().AstriaExcludedFromBlock()
 	includedTransactions := make([]*sequencerblockv1alpha1.RollupData, 0, len(block.Transactions()))
-	log.Info("excluded txs", "count", len(*excludedTransactions))
 	for _, blockTx := range block.Transactions() {
 		// ensure blockTx is not in excludedTxs
 		found := false
@@ -380,7 +390,6 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			})
 		}
 	}
-	log.Info("Built included tx list", "count", len(includedTransactions))
 
 	// we do not insert the block to the chain if we just want to simulate the transactions
 	if !req.GetSimulateOnly() {
@@ -390,6 +399,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 			log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 			return nil, status.Error(codes.Internal, "failed to insert block to chain")
 		}
+		log.Error("Inserting to temp block!!")
 		s.bc.SetTemp(block.Header())
 	} else {
 		log.Info("Skipping inserting block to chain as simulateOnly is set")

@@ -324,6 +324,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 
 	bc.currentSnapBlock.Store(nil)
 	bc.currentBlock.Store(bc.genesisBlock.Header())
+	bc.currentTempBlock.Store(bc.genesisBlock.Header())
 	bc.currentFinalBlock.Store(bc.genesisBlock.Header())
 	bc.currentSafeBlock.Store(bc.genesisBlock.Header())
 	bc.currentBaseCelestiaHeight.Store(bc.Config().AstriaCelestiaInitialHeight)
