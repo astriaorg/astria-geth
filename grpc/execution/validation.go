@@ -153,9 +153,6 @@ func validateStaticBlock(block *astriaPb.Block) error {
 	if block.Timestamp == nil {
 		return fmt.Errorf("timestamp is 0")
 	}
-	if block.Number == 0 {
-		return fmt.Errorf("block number is 0")
-	}
 
 	return nil
 }
