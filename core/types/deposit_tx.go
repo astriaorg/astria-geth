@@ -24,6 +24,10 @@ type DepositTx struct {
 	// if this is an ERC20 mint, the following field is set
 	// to the `mint` function calldata.
 	Data []byte
+	// the hash of the transaction which initiated the deposit
+	SourceTransactionHash string
+	// the index of the deposit within the source transaction
+	SourceTransactionIndex uint32
 }
 
 func (tx *DepositTx) copy() TxData {
@@ -38,6 +42,8 @@ func (tx *DepositTx) copy() TxData {
 		Gas:   tx.Gas,
 		To:    to,
 		Data:  make([]byte, len(tx.Data)),
+		SourceTransactionHash: tx.SourceTransactionHash,
+		SourceTransactionIndex: tx.SourceTransactionIndex,
 	}
 
 	if tx.Value != nil {
