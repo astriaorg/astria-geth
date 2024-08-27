@@ -107,4 +107,7 @@ var (
 
 	// ErrBlobTxCreate is returned if a blob transaction has no explicit to field.
 	ErrBlobTxCreate = errors.New("blob transaction of type create")
+
+	// ErrTxReverted is returned if a transaction is reverted.
+	ErrTxReverted = errors.New("transaction reverted")
 )

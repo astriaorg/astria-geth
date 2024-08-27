@@ -1,6 +1,8 @@
 package execution
 
 import (
+	composerv1alpha1 "buf.build/gen/go/astria/composer-apis/protocolbuffers/go/astria/composer/v1alpha1"
+	"github.com/golang/protobuf/proto"
 	"math/big"
 	"testing"
 
@@ -50,6 +52,103 @@ func generateBech32MAddress() string {
 	}
 
 	return bech32m
+}
+
+func TestExtractBuilderBundleAndTxs(t *testing.T) {
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+
+	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
+	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
+	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
+		AssetDenom:  invalidHeightBridgeAssetDenom,
+		StartHeight: 100,
+	}
+
+	tests := []struct {
+		description            string
+		noOfTxsInBuilderBundle int
+		noOfOtherTxs           int
+	}{
+		{
+			description:            "empty list of transactions",
+			noOfTxsInBuilderBundle: 0,
+			noOfOtherTxs:           0,
+		},
+		{
+			description:            "list of transactions without builderBundlePacket",
+			noOfTxsInBuilderBundle: 0,
+			noOfOtherTxs:           5,
+		},
+		{
+			description:            "list of transactions with builderBundlePacket",
+			noOfTxsInBuilderBundle: 5,
+			noOfOtherTxs:           5,
+		},
+		{
+			description:            "one transaction with builderBundlePacket",
+			noOfTxsInBuilderBundle: 5,
+			noOfOtherTxs:           0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
+
+			// create the other txs
+			nonce := 0
+			for i := 0; i < test.noOfOtherTxs; i++ {
+				unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+				require.Nil(t, err, "Failed to sign tx")
+
+				marshalledTx, err := tx.MarshalBinary()
+				require.Nil(t, err, "Failed to marshal tx")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+				})
+
+				nonce += 1
+			}
+
+			if test.noOfTxsInBuilderBundle > 0 {
+				// create the BuilderBundlePacket
+				builderBundle := &composerv1alpha1.BuilderBundlePacket{
+					Bundle: &composerv1alpha1.BuilderBundle{
+						Transactions: []*sequencerblockv1alpha1.RollupData{},
+						ParentHash:   nil,
+					},
+				}
+
+				// create noOfTxsInBuilderBundle txs
+				for i := 0; i < test.noOfTxsInBuilderBundle; i++ {
+					unsignedTx := types.NewTransaction(uint64(nonce), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+					tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+					require.Nil(t, err, "Failed to sign tx")
+
+					marshalledTx, err := tx.MarshalBinary()
+					require.Nil(t, err, "Failed to marshal tx")
+					builderBundle.Bundle.Transactions = append(builderBundle.Bundle.Transactions, &sequencerblockv1alpha1.RollupData{
+						Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+					})
+					nonce += 1
+				}
+
+				// add the builderBundle to the list of transactions
+				marshalledProto, err := proto.Marshal(builderBundle)
+				require.Nil(t, err, "Failed to marshal builder bundle")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledProto},
+				})
+			}
+
+			builderBundlePacket, otherTxs, _, err := extractBuilderBundleAndTxs(marshalledTxs, 2, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
+			require.Nil(t, err, "Failed to extract builder bundle and txs")
+			require.Equal(t, test.noOfTxsInBuilderBundle, len(builderBundlePacket.GetBundle().GetTransactions()), "Incorrect number of txs in builder bundle")
+			require.Equal(t, test.noOfOtherTxs, len(otherTxs), "Incorrect number of other txs")
+		})
+	}
+
 }
 
 func TestSequenceTxValidation(t *testing.T) {
@@ -180,7 +279,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
+			_, err := validateAndUnmarshalTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
 			if test.wantErr == "" && err == nil {
 				return
 			}

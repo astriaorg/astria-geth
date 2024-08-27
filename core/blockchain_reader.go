@@ -63,6 +63,10 @@ func (bc *BlockChain) CurrentSafeBlock() *types.Header {
 	return bc.currentSafeBlock.Load()
 }
 
+func (bc *BlockChain) CurrentTempBlock() *types.Header {
+	return bc.currentTempBlock.Load()
+}
+
 // CurrentBaseCelestiaHeight retrieves the current base celestia height of the
 // canonical chain. The height is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentBaseCelestiaHeight() uint64 {
