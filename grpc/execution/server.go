@@ -261,9 +261,13 @@ func unbundleBuilderBundlePacket(
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.ExecuteBlockResponse, error) {
-	log.Info("Trusted Builder ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+
+	if req.GetSimulateOnly() {
+		log.Info("Trusted Builder ExecuteBlock called for Simulation", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+	} else {
+		log.Info("Trusted Builder ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+	}
 	executeBlockRequestCount.Inc(1)
-	log.Info("Mode is set to", "simulateOnly", req.GetSimulateOnly())
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
@@ -282,21 +286,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	if s.bc.CurrentTempBlock() != nil {
 		tempHash = s.bc.CurrentTempBlock().Hash()
 	}
-	//if prevHeadHash.Hex() != "" {
-	//	log.Crit("prevHeadHash", prevHeadHash.Hex())
-	//}
-	//if softHash.Hex() != "" {
-	//	log.Crit("softHash", softHash.Hex())
-	//}
-	//if tempHash.Hex() != "" {
-	//	log.Crit("tempHash", tempHash.Hex())
-	//}
 	if prevHeadHash != softHash && prevHeadHash != tempHash {
-		log.Error("prevHeadHash", prevHeadHash.Hex())
-		log.Error("softHash", softHash.Hex())
-		log.Error("tempHash", tempHash.Hex())
-
-		log.Error("Block can only be created on top of soft block.")
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
@@ -311,24 +301,14 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 	if req.GetSimulateOnly() && builderBundlePacket != nil {
 		return nil, status.Error(codes.InvalidArgument, "bundle simulation is not supported for builder bundle packets")
 	}
-	//if builderBundlePacket == nil {
-	//	log.Info("No builder bundle packet found")
-	//} else {
-	//	log.Info("Builder bundle packet found")
-	//	log.Info("Unbundling the builder bundle packet", "simulateOnly", req.GetSimulateOnly())
-	//}
 
 	tobTxs, err := unbundleBuilderBundlePacket(builderBundlePacket, req.PrevBlockHash, height, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
 	if err != nil {
 		log.Error("failed to unbundle builder bundle packet", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not unbundle builder bundle packet")
 	}
-	if builderBundlePacket != nil {
-		log.Info("Unbundled the builder bundle packet", "tx_count", len(tobTxs))
-	}
 
 	txsToProcess := append(tobTxs, ethTxs...)
-	log.Info("Total txs to process", "tx_count", len(txsToProcess))
 
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
@@ -393,16 +373,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	// we do not insert the block to the chain if we just want to simulate the transactions
 	if !req.GetSimulateOnly() {
-		log.Info("Inserting block to chain")
 		err = s.bc.InsertBlockWithoutSetHead(block)
 		if err != nil {
 			log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 			return nil, status.Error(codes.Internal, "failed to insert block to chain")
 		}
-		log.Error("Inserting to temp block!!")
 		s.bc.SetTemp(block.Header())
-	} else {
-		log.Info("Skipping inserting block to chain as simulateOnly is set")
 	}
 
 	// remove txs from original mempool
@@ -426,7 +402,11 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 		IncludedTransactions: includedTransactions,
 	}
 
-	log.Info("Trusted Builder ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
+	if req.GetSimulateOnly() {
+		log.Info("Trusted Builder ExecuteBlock completed in Simulation", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
+	} else {
+		log.Info("Trusted Builder ExecuteBlock completed", "block_num", res.GetBlock().Number, "timestamp", res.GetBlock().Timestamp)
+	}
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
