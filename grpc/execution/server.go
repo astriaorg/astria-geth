@@ -174,6 +174,10 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 
 // GetBlock will return a block given an identifier.
 func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
+	if req.GetIdentifier() == nil {
+		return nil, status.Error(codes.InvalidArgument, "identifier cannot be empty")
+	}
+
 	log.Debug("GetBlock called", "request", req)
 	getBlockRequestCount.Inc(1)
 
@@ -191,8 +195,13 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 // BatchGetBlocks will return an array of Blocks given an array of block
 // identifiers.
 func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
-	log.Debug("BatchGetBlocks called", "first block", req.Identifiers[0], "last block", req.Identifiers[len(req.Identifiers)-1], "total blocks", len(req.Identifiers))
+	if req.Identifiers == nil || len(req.Identifiers) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "identifiers cannot be empty")
+	}
+
 	batchGetBlockRequestCount.Inc(1)
+	log.Debug("BatchGetBlocks called", "num blocks requested", len(req.Identifiers))
+
 	var blocks []*astriaPb.Block
 
 	ids := req.GetIdentifiers()
@@ -225,6 +234,10 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
+	if err := validateStaticExecuteBlockRequest(req); err != nil {
+		log.Error("ExecuteBlock called with invalid ExecuteBlockRequest", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "ExecuteBlockRequest is invalid")
+	}
 	log.Debug("ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
 
@@ -343,6 +356,11 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 // UpdateCommitmentState replaces the whole CommitmentState with a new
 // CommitmentState.
 func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
+	if err := validateStaticCommitmentState(req.CommitmentState); err != nil {
+		log.Error("UpdateCommitmentState called with invalid CommitmentState", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "CommitmentState is invalid")
+	}
+
 	log.Debug("UpdateCommitmentState called", "request_soft_height", req.CommitmentState.Soft.Number, "request_firm_height", req.CommitmentState.Firm.Number)
 	updateCommitmentStateRequestCount.Inc(1)
 	commitmentUpdateStart := time.Now()
