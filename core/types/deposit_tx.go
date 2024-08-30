@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 )
 
 var _ TxData = &DepositTx{}
@@ -24,10 +25,11 @@ type DepositTx struct {
 	// if this is an ERC20 mint, the following field is set
 	// to the `mint` function calldata.
 	Data []byte
-	// the hash of the transaction which initiated the deposit
-	SourceTransactionHash string
-	// the index of the deposit within the source transaction
-	SourceTransactionIndex uint32
+	// the transaction ID of the source action for the deposit, consisting
+  	// of the transaction hash.
+	TransactionId primitivev1.TransactionId
+	// index of the deposit's source action within its transaction
+	IndexOfAction uint32
 }
 
 func (tx *DepositTx) copy() TxData {
@@ -42,8 +44,8 @@ func (tx *DepositTx) copy() TxData {
 		Gas:   tx.Gas,
 		To:    to,
 		Data:  make([]byte, len(tx.Data)),
-		SourceTransactionHash: tx.SourceTransactionHash,
-		SourceTransactionIndex: tx.SourceTransactionIndex,
+		TransactionId: tx.TransactionId,
+		IndexOfAction: tx.IndexOfAction,
 	}
 
 	if tx.Value != nil {
