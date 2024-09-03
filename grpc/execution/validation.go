@@ -70,8 +70,8 @@ func validateAndUnmarshalSequencerTx(
 				Gas:  16000,
 				To:   &bac.Erc20Asset.ContractAddress,
 				Data: calldata,
-				TransactionId: *deposit.TransactionId,
-				IndexOfAction: deposit.IndexOfAction,
+				IdOfSourceTransaction: *deposit.IdOfSourceTransaction,
+				PositionInSourceTransaction: deposit.PositionInSourceTransaction,
 			}
 
 			tx := types.NewTx(&txdata)
@@ -83,8 +83,8 @@ func validateAndUnmarshalSequencerTx(
 			To:    &recipient,
 			Value: amount,
 			Gas:   0,
-			TransactionId: *deposit.TransactionId,
-			IndexOfAction: deposit.IndexOfAction,
+			IdOfSourceTransaction: *deposit.IdOfSourceTransaction,
+			PositionInSourceTransaction: deposit.PositionInSourceTransaction,
 		}
 		return types.NewTx(&txdata), nil
 	} else {

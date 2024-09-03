@@ -302,10 +302,10 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					Amount:                  depositAmount,
 					RollupId:                genesisInfo.RollupId,
 					DestinationChainAddress: chainDestinationAddress.String(),
-					TransactionId: &primitivev1.TransactionId{
-						Hash: "test_tx_hash",
+					IdOfSourceTransaction: &primitivev1.TransactionId{
+						Inner: make([]byte, 0),
 					},
-					IndexOfAction: 0,
+					PositionInSourceTransaction: 0,
 				}}}
 
 				marshalledTxs = append(marshalledTxs, depositTx)
@@ -399,10 +399,10 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		Amount:                  depositAmount,
 		RollupId:                genesisInfo.RollupId,
 		DestinationChainAddress: chainDestinationAddress.String(),
-		TransactionId: &primitivev1.TransactionId{
-			Hash: "test_tx_hash",
+		IdOfSourceTransaction: &primitivev1.TransactionId{
+			Inner: make([]byte, 0),
 		},
-		IndexOfAction: 0,
+		PositionInSourceTransaction: 0,
 	}}}
 
 	marshalledTxs = append(marshalledTxs, depositTx)

@@ -5,8 +5,8 @@ go 1.21
 require (
 	buf.build/gen/go/astria/execution-apis/grpc/go v1.4.0-20240725205400-4746841755df.1
 	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-20240725205400-4746841755df.1
-	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.2-00000000000000-ec254ec7b009.2
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.2-00000000000000-5ed8a932ed80.2
+	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.2-00000000000000-db0e73b29c7f.2
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.2-00000000000000-ec1676595dd2.2
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -85,9 +85,10 @@ require (
 )
 
 require (
+	buf.build/gen/go/astria/primitives/grpc/go v1.5.1-00000000000000-db0e73b29c7f.1 // indirect
 	buf.build/gen/go/astria/protocol-apis/grpc/go v1.3.0-20240829200558-cd9207200425.3 // indirect
 	buf.build/gen/go/astria/protocol-apis/protocolbuffers/go v1.34.1-20240829200558-cd9207200425.1 // indirect
-	buf.build/gen/go/astria/sequencerblock-apis/grpc/go v1.5.1-00000000000000-5ed8a932ed80.1 // indirect
+	buf.build/gen/go/astria/sequencerblock-apis/grpc/go v1.5.1-00000000000000-ec1676595dd2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
