@@ -303,7 +303,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					RollupId:                genesisInfo.RollupId,
 					DestinationChainAddress: chainDestinationAddress.String(),
 					IdOfSourceTransaction: &primitivev1.TransactionId{
-						Inner: make([]byte, 0),
+						Hash: "test_tx_hash",
 					},
 					PositionInSourceTransaction: 0,
 				}}}
@@ -400,7 +400,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		RollupId:                genesisInfo.RollupId,
 		DestinationChainAddress: chainDestinationAddress.String(),
 		IdOfSourceTransaction: &primitivev1.TransactionId{
-			Inner: make([]byte, 0),
+			Hash: "test_tx_hash",
 		},
 		PositionInSourceTransaction: 0,
 	}}}
