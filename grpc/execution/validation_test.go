@@ -128,7 +128,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 				IdOfSourceTransaction: &primitivev1.TransactionId{
-					Hash: "test_tx_hash",
+					Inner: "test_tx_hash",
 				},
 				PositionInSourceTransaction: 0,
 			}}},
@@ -145,7 +145,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 				IdOfSourceTransaction: &primitivev1.TransactionId{
-					Hash: "test_tx_hash",
+					Inner: "test_tx_hash",
 				},
 				PositionInSourceTransaction: 0,
 			}}},
@@ -162,7 +162,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 				IdOfSourceTransaction: &primitivev1.TransactionId{
-					Hash: "test_tx_hash",
+					Inner: "test_tx_hash",
 				},
 				PositionInSourceTransaction: 0,
 			}}},
@@ -179,7 +179,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
 				IdOfSourceTransaction: &primitivev1.TransactionId{
-					Hash: "test_tx_hash",
+					Inner: "test_tx_hash",
 				},
 				PositionInSourceTransaction: 0,
 			}}},
