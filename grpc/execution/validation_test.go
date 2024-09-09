@@ -127,10 +127,10 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
-				IdOfSourceTransaction: &primitivev1.TransactionId{
+				SourceTransactionId: &primitivev1.TransactionId{
 					Inner: "test_tx_hash",
 				},
-				PositionInSourceTransaction: 0,
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "unknown bridge address",
 		},
@@ -144,10 +144,10 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
-				IdOfSourceTransaction: &primitivev1.TransactionId{
+				SourceTransactionId: &primitivev1.TransactionId{
 					Inner: "test_tx_hash",
 				},
-				PositionInSourceTransaction: 0,
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "disallowed asset",
 		},
@@ -161,10 +161,10 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
-				IdOfSourceTransaction: &primitivev1.TransactionId{
+				SourceTransactionId: &primitivev1.TransactionId{
 					Inner: "test_tx_hash",
 				},
-				PositionInSourceTransaction: 0,
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "not allowed before height",
 		},
@@ -178,10 +178,10 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
-				IdOfSourceTransaction: &primitivev1.TransactionId{
+				SourceTransactionId: &primitivev1.TransactionId{
 					Inner: "test_tx_hash",
 				},
-				PositionInSourceTransaction: 0,
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "",
 		},
