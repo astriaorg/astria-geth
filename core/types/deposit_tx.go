@@ -27,9 +27,9 @@ type DepositTx struct {
 	Data []byte
 	// the transaction ID of the source action for the deposit, consisting
   	// of the transaction hash.
-	IdOfSourceTransaction primitivev1.TransactionId
+	SourceTransactionId primitivev1.TransactionId
 	// index of the deposit's source action within its transaction
-	PositionInSourceTransaction uint64
+	SourceTransactionIndex uint64
 }
 
 func (tx *DepositTx) copy() TxData {
@@ -44,8 +44,8 @@ func (tx *DepositTx) copy() TxData {
 		Gas:   tx.Gas,
 		To:    to,
 		Data:  make([]byte, len(tx.Data)),
-		IdOfSourceTransaction: tx.IdOfSourceTransaction,
-		PositionInSourceTransaction: tx.PositionInSourceTransaction,
+		SourceTransactionId: tx.SourceTransactionId,
+		SourceTransactionIndex: tx.SourceTransactionIndex,
 	}
 
 	if tx.Value != nil {
