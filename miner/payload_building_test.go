@@ -340,7 +340,6 @@ func TestBuildPayload(t *testing.T) {
 	w, b := newTestWorker(t, params.TestChainConfig, ethash.NewFaker(), db, 0)
 
 	timestamp := uint64(time.Now().Unix())
-
 	verify := func(outer *engine.ExecutionPayloadEnvelope, txs int) {
 		payload := outer.ExecutionPayload
 		if payload.ParentHash != b.chain.CurrentBlock().Hash() {
@@ -468,7 +467,7 @@ func TestBuildPayload(t *testing.T) {
 				FeeRecipient: recipient,
 			}
 
-			payload, err := w.buildPayload(args)
+			payload, err := w.buildPayload(args, false)
 			if err != nil {
 				t.Fatalf("Failed to build payload %v", err)
 			}

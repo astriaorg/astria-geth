@@ -300,7 +300,8 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		FeeRecipient: s.activeFork.FeeCollector,
 		BeaconRoot:   sequencerHashRef,
 	}
-	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
+	// TODO(janis): setting witness to false - should this be configurable?
+	payload, err := s.eth.Miner().BuildPayload(payloadAttributes, false)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
@@ -314,7 +315,8 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
 
-	err = s.bc.InsertBlockWithoutSetHead(block)
+	// TODO(janis): setting makeWitness to false - should this be configurable?
+	_, err = s.bc.InsertBlockWithoutSetHead(block, false)
 	if err != nil {
 		log.Error("failed to insert block to chain", "hash", block.Hash(), "parentHash", req.ParentHash, "err", err)
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
