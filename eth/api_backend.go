@@ -275,6 +275,10 @@ func (b *EthAPIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) e
 	return b.eth.BlockChain().SubscribeChainHeadEvent(ch)
 }
 
+func (b *EthAPIBackend) SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainOptimisticHeadEvent) event.Subscription {
+	return b.eth.BlockChain().SubscribeChainOptimisticHeadEvent(ch)
+}
+
 func (b *EthAPIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
 	return b.eth.BlockChain().SubscribeChainSideEvent(ch)
 }
