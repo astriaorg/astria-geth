@@ -61,6 +61,7 @@ func TestEthSuite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create new test suite: %v", err)
 	}
+
 	for _, test := range suite.EthTests() {
 		t.Run(test.Name, func(t *testing.T) {
 			if test.Slow && testing.Short() {
@@ -149,5 +150,6 @@ func setupGeth(stack *node.Node, dir string) error {
 		return fmt.Errorf("failed to register catalyst service: %v", err)
 	}
 	_, err = backend.BlockChain().InsertChain(chain.blocks[1:])
+	backend.BlockChain().SetOptimistic(chain.blocks[len(chain.blocks)-1])
 	return err
 }

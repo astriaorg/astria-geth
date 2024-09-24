@@ -63,14 +63,15 @@ func init() {
 }
 
 type testBlockChain struct {
-	config        *params.ChainConfig
-	gasLimit      atomic.Uint64
-	statedb       *state.StateDB
-	chainHeadFeed *event.Feed
+	config                 *params.ChainConfig
+	gasLimit               atomic.Uint64
+	statedb                *state.StateDB
+	chainHeadFeed          *event.Feed
+	chainOptimisticHeadFee *event.Feed
 }
 
 func newTestBlockChain(config *params.ChainConfig, gasLimit uint64, statedb *state.StateDB, chainHeadFeed *event.Feed) *testBlockChain {
-	bc := testBlockChain{config: config, statedb: statedb, chainHeadFeed: new(event.Feed)}
+	bc := testBlockChain{config: config, statedb: statedb, chainHeadFeed: new(event.Feed), chainOptimisticHeadFee: new(event.Feed)}
 	bc.gasLimit.Store(gasLimit)
 	return &bc
 }
@@ -96,6 +97,10 @@ func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
 
 func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return bc.chainHeadFeed.Subscribe(ch)
+}
+
+func (bc *testBlockChain) SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return bc.chainOptimisticHeadFee.Subscribe(ch)
 }
 
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
