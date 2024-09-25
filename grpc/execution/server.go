@@ -117,7 +117,8 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
-			bridgeAddresses[cfg.BridgeAddress] = &cfg
+			bridgeCfg := cfg
+			bridgeAddresses[cfg.BridgeAddress] = &bridgeCfg
 			bridgeAllowedAssets[cfg.AssetDenom] = struct{}{}
 			if cfg.Erc20Asset == nil {
 				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
