@@ -1744,6 +1744,9 @@ func (pool *LegacyPool) clearPendingAndQueued() {
 		for _, tx := range dropped {
 			pool.all.Remove(tx.Hash())
 		}
+		for _, tx := range invalids {
+			pool.all.Remove(tx.Hash())
+		}
 
 		if list.Empty() {
 			delete(pool.queue, addr)
@@ -1757,63 +1760,15 @@ func (pool *LegacyPool) clearPendingAndQueued() {
 		for _, tx := range dropped {
 			pool.all.Remove(tx.Hash())
 		}
+		for _, tx := range invalids {
+			pool.all.Remove(tx.Hash())
+		}
 
 		if list.Empty() {
 			delete(pool.pending, addr)
 			delete(pool.beats, addr)
 		}
 	}
-
-	//for addr, list := range pool.pending {
-	//	nonce := pool.currentState.GetNonce(addr)
-	//
-	//	// Drop all transactions that are deemed too old (low nonce)
-	//	olds := list.Forward(nonce)
-	//	for _, tx := range olds {
-	//		hash := tx.Hash()
-	//		pool.all.Remove(hash)
-	//		log.Trace("Removed old pending transaction", "hash", hash)
-	//	}
-	//	// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
-	//	drops, invalids := list.Filter(pool.currentState.GetBalance(addr), gasLimit)
-	//	for _, tx := range drops {
-	//		hash := tx.Hash()
-	//		log.Trace("Removed unpayable pending transaction", "hash", hash)
-	//		pool.all.Remove(hash)
-	//	}
-	//	pendingNofundsMeter.Mark(int64(len(drops)))
-	//
-	//	for _, tx := range invalids {
-	//		hash := tx.Hash()
-	//		log.Trace("Demoting pending transaction", "hash", hash)
-	//
-	//		// Internal shuffle shouldn't touch the lookup set.
-	//		pool.enqueueTx(hash, tx, false, false)
-	//	}
-	//	pendingGauge.Dec(int64(len(olds) + len(drops) + len(invalids)))
-	//	if pool.locals.contains(addr) {
-	//		localGauge.Dec(int64(len(olds) + len(drops) + len(invalids)))
-	//	}
-	//	// If there's a gap in front, alert (should never happen) and postpone all transactions
-	//	if list.Len() > 0 && list.txs.Get(nonce) == nil {
-	//		gapped := list.Cap(0)
-	//		for _, tx := range gapped {
-	//			hash := tx.Hash()
-	//			log.Error("Demoting invalidated transaction", "hash", hash)
-	//
-	//			// Internal shuffle shouldn't touch the lookup set.
-	//			pool.enqueueTx(hash, tx, false, false)
-	//		}
-	//		pendingGauge.Dec(int64(len(gapped)))
-	//	}
-	//	// Delete the entire pending entry if it became empty.
-	//	if list.Empty() {
-	//		delete(pool.pending, addr)
-	//		if _, ok := pool.queue[addr]; !ok {
-	//			pool.reserve(addr, false)
-	//		}
-	//	}
-	//}
 }
 
 // demoteUnexecutables removes invalid and processed transactions from the pools
