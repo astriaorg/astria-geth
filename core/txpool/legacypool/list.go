@@ -396,6 +396,35 @@ func (l *list) Filter(costLimit *uint256.Int, gasLimit uint64) (types.Transactio
 	return removed, invalids
 }
 
+func (l *list) ClearList() (types.Transactions, types.Transactions) {
+	// Filter out all the transactions
+	removed := l.txs.Filter(func(tx *types.Transaction) bool {
+		return true
+	})
+
+	if len(removed) == 0 {
+		return nil, nil
+	}
+
+	// TODO: we might not need the code below
+	var invalids types.Transactions
+	// If the list was strict, filter anything above the lowest nonce
+	if l.strict {
+		lowest := uint64(math.MaxUint64)
+		for _, tx := range removed {
+			if nonce := tx.Nonce(); lowest > nonce {
+				lowest = nonce
+			}
+		}
+		invalids = l.txs.filter(func(tx *types.Transaction) bool { return tx.Nonce() > lowest })
+	}
+	// Reset total cost
+	l.subTotalCost(removed)
+	l.subTotalCost(invalids)
+	l.txs.reheap()
+	return removed, invalids
+}
+
 // Cap places a hard limit on the number of items, returning all transactions
 // exceeding that limit.
 func (l *list) Cap(threshold int) types.Transactions {

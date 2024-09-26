@@ -13,7 +13,6 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
 package legacypool
 
 import (
@@ -301,7 +300,8 @@ func TestStateChangeDuringReset(t *testing.T) {
 	<-pool.requestReset(nil, nil)
 
 	nonce = pool.Nonce(address)
-	if nonce != 2 {
+	// mempool is cleared
+	if nonce != 0 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
 }
@@ -635,58 +635,17 @@ func TestDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
 	<-pool.requestReset(nil, nil)
-	if pool.pending[account].Len() != 3 {
-		t.Errorf("pending transaction mismatch: have %d, want %d", pool.pending[account].Len(), 3)
-	}
-	if pool.queue[account].Len() != 3 {
-		t.Errorf("queued transaction mismatch: have %d, want %d", pool.queue[account].Len(), 3)
-	}
-	if pool.all.Count() != 6 {
-		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
-	}
-	// Reduce the balance of the account, and check that invalidated transactions are dropped
-	testAddBalance(pool, account, big.NewInt(-650))
-	<-pool.requestReset(nil, nil)
 
-	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
-		t.Errorf("funded pending transaction missing: %v", tx0)
-	}
-	if _, ok := pool.pending[account].txs.items[tx1.Nonce()]; !ok {
-		t.Errorf("funded pending transaction missing: %v", tx0)
-	}
-	if _, ok := pool.pending[account].txs.items[tx2.Nonce()]; ok {
-		t.Errorf("out-of-fund pending transaction present: %v", tx1)
-	}
-	if _, ok := pool.queue[account].txs.items[tx10.Nonce()]; !ok {
-		t.Errorf("funded queued transaction missing: %v", tx10)
-	}
-	if _, ok := pool.queue[account].txs.items[tx11.Nonce()]; !ok {
-		t.Errorf("funded queued transaction missing: %v", tx10)
-	}
-	if _, ok := pool.queue[account].txs.items[tx12.Nonce()]; ok {
-		t.Errorf("out-of-fund queued transaction present: %v", tx11)
-	}
-	if pool.all.Count() != 4 {
-		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
-	}
-	// Reduce the block gas limit, check that invalidated transactions are dropped
-	pool.chain.(*testBlockChain).gasLimit.Store(100)
-	<-pool.requestReset(nil, nil)
+	pending, queued := pool.Stats()
 
-	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
-		t.Errorf("funded pending transaction missing: %v", tx0)
+	if pending != 0 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
 	}
-	if _, ok := pool.pending[account].txs.items[tx1.Nonce()]; ok {
-		t.Errorf("over-gased pending transaction present: %v", tx1)
+	if queued != 0 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
 	}
-	if _, ok := pool.queue[account].txs.items[tx10.Nonce()]; !ok {
-		t.Errorf("funded queued transaction missing: %v", tx10)
-	}
-	if _, ok := pool.queue[account].txs.items[tx11.Nonce()]; ok {
-		t.Errorf("over-gased queued transaction present: %v", tx11)
-	}
-	if pool.all.Count() != 2 {
-		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 2)
+	if err := validatePoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 }
 
@@ -743,64 +702,18 @@ func TestPostponing(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
 	}
 	<-pool.requestReset(nil, nil)
-	if pending := pool.pending[accs[0]].Len() + pool.pending[accs[1]].Len(); pending != len(txs) {
-		t.Errorf("pending transaction mismatch: have %d, want %d", pending, len(txs))
-	}
-	if len(pool.queue) != 0 {
-		t.Errorf("queued accounts mismatch: have %d, want %d", len(pool.queue), 0)
-	}
-	if pool.all.Count() != len(txs) {
-		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
-	}
-	// Reduce the balance of the account, and check that transactions are reorganised
-	for _, addr := range accs {
-		testAddBalance(pool, addr, big.NewInt(-1))
-	}
-	<-pool.requestReset(nil, nil)
 
-	// The first account's first transaction remains valid, check that subsequent
-	// ones are either filtered out, or queued up for later.
-	if _, ok := pool.pending[accs[0]].txs.items[txs[0].Nonce()]; !ok {
-		t.Errorf("tx %d: valid and funded transaction missing from pending pool: %v", 0, txs[0])
+	pending, queued := pool.Stats()
+
+	if pending != 0 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
 	}
-	if _, ok := pool.queue[accs[0]].txs.items[txs[0].Nonce()]; ok {
-		t.Errorf("tx %d: valid and funded transaction present in future queue: %v", 0, txs[0])
+	if queued != 0 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
 	}
-	for i, tx := range txs[1:100] {
-		if i%2 == 1 {
-			if _, ok := pool.pending[accs[0]].txs.items[tx.Nonce()]; ok {
-				t.Errorf("tx %d: valid but future transaction present in pending pool: %v", i+1, tx)
-			}
-			if _, ok := pool.queue[accs[0]].txs.items[tx.Nonce()]; !ok {
-				t.Errorf("tx %d: valid but future transaction missing from future queue: %v", i+1, tx)
-			}
-		} else {
-			if _, ok := pool.pending[accs[0]].txs.items[tx.Nonce()]; ok {
-				t.Errorf("tx %d: out-of-fund transaction present in pending pool: %v", i+1, tx)
-			}
-			if _, ok := pool.queue[accs[0]].txs.items[tx.Nonce()]; ok {
-				t.Errorf("tx %d: out-of-fund transaction present in future queue: %v", i+1, tx)
-			}
-		}
-	}
-	// The second account's first transaction got invalid, check that all transactions
-	// are either filtered out, or queued up for later.
-	if pool.pending[accs[1]] != nil {
-		t.Errorf("invalidated account still has pending transactions")
-	}
-	for i, tx := range txs[100:] {
-		if i%2 == 1 {
-			if _, ok := pool.queue[accs[1]].txs.items[tx.Nonce()]; !ok {
-				t.Errorf("tx %d: valid but future transaction missing from future queue: %v", 100+i, tx)
-			}
-		} else {
-			if _, ok := pool.queue[accs[1]].txs.items[tx.Nonce()]; ok {
-				t.Errorf("tx %d: out-of-fund transaction present in future queue: %v", 100+i, tx)
-			}
-		}
-	}
-	if pool.all.Count() != len(txs)/2 {
-		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs)/2)
+
+	if err := validatePoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 }
 
@@ -993,6 +906,7 @@ func testQueueGlobalLimiting(t *testing.T, nolocals bool) {
 func TestQueueTimeLimiting(t *testing.T) {
 	testQueueTimeLimiting(t, false)
 }
+
 func TestQueueTimeLimitingNoLocals(t *testing.T) {
 	testQueueTimeLimiting(t, true)
 }
@@ -1086,55 +1000,6 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 	}
 	if queued != 0 {
 		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
-	}
-	if err := validatePoolInternals(pool); err != nil {
-		t.Fatalf("pool internal state corrupted: %v", err)
-	}
-
-	// Queue gapped transactions
-	if err := pool.addLocal(pricedTransaction(4, 100000, big.NewInt(1), local)); err != nil {
-		t.Fatalf("failed to add remote transaction: %v", err)
-	}
-	if err := pool.addRemoteSync(pricedTransaction(4, 100000, big.NewInt(1), remote)); err != nil {
-		t.Fatalf("failed to add remote transaction: %v", err)
-	}
-	time.Sleep(5 * evictionInterval) // A half lifetime pass
-
-	// Queue executable transactions, the life cycle should be restarted.
-	if err := pool.addLocal(pricedTransaction(2, 100000, big.NewInt(1), local)); err != nil {
-		t.Fatalf("failed to add remote transaction: %v", err)
-	}
-	if err := pool.addRemoteSync(pricedTransaction(2, 100000, big.NewInt(1), remote)); err != nil {
-		t.Fatalf("failed to add remote transaction: %v", err)
-	}
-	time.Sleep(6 * evictionInterval)
-
-	// All gapped transactions shouldn't be kicked out
-	pending, queued = pool.Stats()
-	if pending != 2 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 2)
-	}
-	if queued != 2 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 2)
-	}
-	if err := validatePoolInternals(pool); err != nil {
-		t.Fatalf("pool internal state corrupted: %v", err)
-	}
-
-	// The whole life time pass after last promotion, kick out stale transactions
-	time.Sleep(2 * config.Lifetime)
-	pending, queued = pool.Stats()
-	if pending != 2 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 2)
-	}
-	if nolocals {
-		if queued != 0 {
-			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
-		}
-	} else {
-		if queued != 1 {
-			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
-		}
 	}
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
@@ -2344,6 +2209,7 @@ func TestReplacementDynamicFee(t *testing.T) {
 
 // Tests that local transactions are journaled to disk, but remote transactions
 // get discarded between restarts.
+// TODO - fix this
 func TestJournaling(t *testing.T)         { testJournaling(t, false) }
 func TestJournalingNoLocals(t *testing.T) { testJournaling(t, true) }
 
@@ -2439,18 +2305,13 @@ func testJournaling(t *testing.T, nolocals bool) {
 	pool = New(config, blockchain)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 
+	// tx mempool is cleared out completely after a reset
 	pending, queued = pool.Stats()
 	if pending != 0 {
 		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
 	}
-	if nolocals {
-		if queued != 0 {
-			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
-		}
-	} else {
-		if queued != 1 {
-			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
-		}
+	if queued != 0 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
 	}
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
