@@ -180,7 +180,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
+			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
 			if test.wantErr == "" && err == nil {
 				return
 			}

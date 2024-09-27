@@ -48,7 +48,6 @@ type ExecutionServiceServerV1Alpha2 struct {
 
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
-	bridgeSenderAddress common.Address                               // address from which AstriaBridgeableERC20 contracts are called
 
 	nextFeeRecipient common.Address // Fee recipient for the next block
 }
@@ -113,7 +112,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 				nativeBridgeSeen = true
 			}
 
-			if cfg.Erc20Asset != nil && bc.Config().AstriaBridgeSenderAddress == (common.Address{}) {
+			if cfg.Erc20Asset != nil && cfg.SenderAddress == (common.Address{}) {
 				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
@@ -149,7 +148,6 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		bc:                  bc,
 		bridgeAddresses:     bridgeAddresses,
 		bridgeAllowedAssets: bridgeAllowedAssets,
-		bridgeSenderAddress: bc.Config().AstriaBridgeSenderAddress,
 		nextFeeRecipient:    nextFeeRecipient,
 	}, nil
 }
@@ -264,7 +262,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
