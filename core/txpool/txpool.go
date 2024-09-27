@@ -58,8 +58,8 @@ type BlockChain interface {
 	// SubscribeChainHeadEvent subscribes to new blocks being added to the chain.
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 
-	// SubscribeChainOpimisticHeadEvent subscribes to new optimistic blocks being added to the chain.
-	SubscribeChainOpimisticHeadEvent(ch chan<- core.ChainOptimisticHeadEvent) event.Subscription
+	// SubscribeChainOptimisticHeadEvent subscribes to new optimistic blocks being added to the chain.
+	SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainOptimisticHeadEvent) event.Subscription
 }
 
 // TxPool is an aggregator for various transaction specific pools, collectively

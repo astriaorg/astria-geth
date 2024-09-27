@@ -93,6 +93,10 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 	return bc.chainHeadFeed.Subscribe(ch)
 }
 
+func (bc *testBlockChain) SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainOptimisticHeadEvent) event.Subscription {
+	return bc.chainHeadFeed.Subscribe(ch)
+}
+
 func TestBuildPendingBlocks(t *testing.T) {
 	miner := createMiner(t)
 	var wg sync.WaitGroup

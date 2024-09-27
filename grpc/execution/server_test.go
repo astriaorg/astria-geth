@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -303,6 +304,10 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 
 				marshalledTxs = append(marshalledTxs, depositTx)
 			}
+
+			optimisticHeadCh := make(chan core.ChainOptimisticHeadEvent, 1)
+			optimsticHeadSub := ethservice.BlockChain().SubscribeChainOptimisticHeadEvent(optimisticHeadCh)
+			defer optimsticHeadSub.Unsubscribe()
 
 			baseBlockReq := &optimsticPb.BaseBlock{
 				Timestamp: &timestamppb.Timestamp{
