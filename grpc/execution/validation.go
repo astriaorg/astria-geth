@@ -1,16 +1,17 @@
 package execution
 
 import (
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
-	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"crypto/sha256"
 	"fmt"
+	"math/big"
+
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
+	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
 )
 
 // `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction.
@@ -68,7 +69,7 @@ func validateAndUnmarshalSequencerTx(
 				//
 				// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
 				// address defined by consensus, so the gas cost is not actually deducted from any account.
-				Gas:  16000,
+				Gas:  64000,
 				To:   &bac.Erc20Asset.ContractAddress,
 				Data: calldata,
 			}
