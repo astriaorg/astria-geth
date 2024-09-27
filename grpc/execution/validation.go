@@ -23,7 +23,6 @@ func validateAndUnmarshalSequencerTx(
 	tx *sequencerblockv1alpha1.RollupData,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{},
-	bridgeSenderAddress common.Address,
 ) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := deposit.BridgeAddress.GetBech32M()
@@ -63,7 +62,7 @@ func validateAndUnmarshalSequencerTx(
 			}
 
 			txdata := types.DepositTx{
-				From:  bridgeSenderAddress,
+				From:  bac.SenderAddress,
 				Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
 				// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
 				//
@@ -79,7 +78,7 @@ func validateAndUnmarshalSequencerTx(
 		}
 
 		txdata := types.DepositTx{
-			From:  bridgeSenderAddress,
+			From:  bac.SenderAddress,
 			To:    &recipient,
 			Value: amount,
 			Gas:   0,
