@@ -310,7 +310,7 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 
 	// we store a pointer to the optimistic block in the chain so that we can use it
 	// to retrieve the state of the optimistic block
-	s.bc.SetOptimistic(block.Header())
+	s.bc.SetOptimistic(block)
 
 	res := &astriaPb.Block{
 		Number:          uint32(block.NumberU64()),
@@ -320,8 +320,6 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 			Seconds: int64(block.Time()),
 		},
 	}
-
-	// TODO - we need to send an event after inserting the optimistic block
 
 	log.Info("ExecuteOptimisticBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
 	executeOptimisticBlockSuccessCount.Inc(1)

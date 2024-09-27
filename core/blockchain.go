@@ -220,15 +220,16 @@ type BlockChain struct {
 	stateCache    state.Database                   // State database to reuse between imports (contains state cache)
 	txIndexer     *txIndexer                       // Transaction indexer, might be nil if not enabled
 
-	hc            *HeaderChain
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	blockProcFeed event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc                      *HeaderChain
+	rmLogsFeed              event.Feed
+	chainFeed               event.Feed
+	chainSideFeed           event.Feed
+	chainHeadFeed           event.Feed
+	chainOptimisticHeadFeed event.Feed
+	logsFeed                event.Feed
+	blockProcFeed           event.Feed
+	scope                   event.SubscriptionScope
+	genesisBlock            *types.Block
 
 	// This mutex synchronizes chain write operations.
 	// Readers don't need to take it, they can just read the database.
@@ -644,13 +645,16 @@ func (bc *BlockChain) SetSafe(header *types.Header) {
 }
 
 // SetOptimistic sets the optimistic block.
-func (bc *BlockChain) SetOptimistic(header *types.Header) {
+func (bc *BlockChain) SetOptimistic(block *types.Block) {
+	header := block.Header()
 	bc.currentOptimisticBlock.Store(header)
 	if header != nil {
 		headOptimisticBlockGauge.Update(int64(header.Number.Uint64()))
 	} else {
 		headOptimisticBlockGauge.Update(0)
 	}
+
+	bc.chainOptimisticHeadFeed.Send(ChainOptimisticHeadEvent{Block: block})
 }
 
 // rewindHashHead implements the logic of rewindHead in the context of hash scheme.
