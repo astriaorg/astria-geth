@@ -140,6 +140,9 @@ type SubPool interface {
 	// or also for reorged out ones.
 	SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription
 
+	// SubscribeMempoolClearance subscribes to new mempool clearing events.
+	SubscribeMempoolClearance(ch chan<- core.NewMempoolCleared) event.Subscription
+
 	// Nonce returns the next nonce of an account, with all transactions executable
 	// by the pool already applied on top.
 	Nonce(addr common.Address) uint64
