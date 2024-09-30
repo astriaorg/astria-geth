@@ -35,14 +35,15 @@ import (
 // Check engine-api specification for more details.
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3
 type BuildPayloadArgs struct {
-	Parent               common.Hash           // The parent block to build payload on top
-	Timestamp            uint64                // The provided timestamp of generated payload
-	FeeRecipient         common.Address        // The provided recipient address for collecting transaction fee
-	Random               common.Hash           // The provided randomness value
-	Withdrawals          types.Withdrawals     // The provided withdrawals
-	BeaconRoot           *common.Hash          // The provided beaconRoot (Cancun)
-	Version              engine.PayloadVersion // Versioning byte for payload id calculation.
-	OverrideTransactions types.Transactions    // Transactions to use during payload building
+	Parent                common.Hash           // The parent block to build payload on top
+	Timestamp             uint64                // The provided timestamp of generated payload
+	FeeRecipient          common.Address        // The provided recipient address for collecting transaction fee
+	Random                common.Hash           // The provided randomness value
+	Withdrawals           types.Withdrawals     // The provided withdrawals
+	BeaconRoot            *common.Hash          // The provided beaconRoot (Cancun)
+	Version               engine.PayloadVersion // Versioning byte for payload id calculation.
+	OverrideTransactions  types.Transactions    // Transactions to use during payload building
+	IsOptimisticExecution bool                  // Whether the payload is for optimistic execution
 }
 
 // Id computes an 8-byte identifier by hashing the components of the payload arguments.
@@ -182,15 +183,16 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs) (*Payload, error) {
 	// enough to run. The empty payload can at least make sure there is something
 	// to deliver for not missing slot.
 	fullParams := &generateParams{
-		timestamp:            args.Timestamp,
-		forceTime:            true,
-		parentHash:           args.Parent,
-		coinbase:             args.FeeRecipient,
-		random:               args.Random,
-		withdrawals:          args.Withdrawals,
-		beaconRoot:           args.BeaconRoot,
-		noTxs:                false,
-		overrideTransactions: args.OverrideTransactions,
+		timestamp:             args.Timestamp,
+		forceTime:             true,
+		parentHash:            args.Parent,
+		coinbase:              args.FeeRecipient,
+		random:                args.Random,
+		withdrawals:           args.Withdrawals,
+		beaconRoot:            args.BeaconRoot,
+		noTxs:                 false,
+		overrideTransactions:  args.OverrideTransactions,
+		isOptimisticExecution: args.IsOptimisticExecution,
 	}
 
 	start := time.Now()

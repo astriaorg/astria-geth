@@ -272,11 +272,12 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Cont
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
-		Parent:               softBlock.Hash(),
-		Timestamp:            uint64(req.GetTimestamp().GetSeconds()),
-		Random:               common.Hash{},
-		FeeRecipient:         s.nextFeeRecipient,
-		OverrideTransactions: txsToProcess,
+		Parent:                softBlock.Hash(),
+		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
+		Random:                common.Hash{},
+		FeeRecipient:          s.nextFeeRecipient,
+		OverrideTransactions:  txsToProcess,
+		IsOptimisticExecution: true,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -365,11 +366,12 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
-		Parent:               prevHeadHash,
-		Timestamp:            uint64(req.GetTimestamp().GetSeconds()),
-		Random:               common.Hash{},
-		FeeRecipient:         s.nextFeeRecipient,
-		OverrideTransactions: types.Transactions{},
+		Parent:                prevHeadHash,
+		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
+		Random:                common.Hash{},
+		FeeRecipient:          s.nextFeeRecipient,
+		OverrideTransactions:  types.Transactions{},
+		IsOptimisticExecution: false,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {

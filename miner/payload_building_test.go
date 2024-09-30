@@ -210,10 +210,11 @@ func TestBuildPayloadNotEnoughGas(t *testing.T) {
 	}
 
 	args := &BuildPayloadArgs{
-		Parent:       b.chain.CurrentBlock().Hash(),
-		Timestamp:    timestamp,
-		Random:       common.Hash{},
-		FeeRecipient: recipient,
+		Parent:                b.chain.CurrentBlock().Hash(),
+		Timestamp:             timestamp,
+		Random:                common.Hash{},
+		FeeRecipient:          recipient,
+		IsOptimisticExecution: false,
 	}
 
 	payload, err := w.buildPayload(args)
