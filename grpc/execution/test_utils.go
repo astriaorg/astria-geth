@@ -67,6 +67,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
 		{
 			BridgeAddress:  bech32mBridgeAddress,
+			SenderAddress:  common.Address{},
 			StartHeight:    2,
 			AssetDenom:     "nria",
 			AssetPrecision: 18,
