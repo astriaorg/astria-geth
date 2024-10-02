@@ -13,11 +13,10 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
-<<<<<<<< HEAD:core/rawdb/freezer_memory_test.go
 package rawdb
 
 import (
+	"net"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/rawdb/ancienttest"
