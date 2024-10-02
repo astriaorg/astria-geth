@@ -31,14 +31,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/metrics/exp"
-	"github.com/fjl/memsize/memsizeui"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
-
-var Memsize memsizeui.Handler
 
 var (
 	verbosityFlag = &cli.IntFlag{
@@ -69,11 +66,6 @@ var (
 	logFormatFlag = &cli.StringFlag{
 		Name:     "log.format",
 		Usage:    "Log format to use (json|logfmt|terminal)",
-		Category: flags.LoggingCategory,
-	}
-	logfmtFlag = &cli.BoolFlag{
-		Name:     "log.logfmt",
-		Usage:    "Format logs with logfmt",
 		Category: flags.LoggingCategory,
 	}
 	logFileFlag = &cli.StringFlag{
@@ -236,9 +228,9 @@ func Setup(ctx *cli.Context) error {
 	case ctx.Bool(logjsonFlag.Name):
 		// Retain backwards compatibility with `--log.json` flag if `--log.format` not set
 		defer log.Warn("The flag '--log.json' is deprecated, please use '--log.format=json' instead")
-		handler = log.JSONHandlerWithLevel(output, log.LevelInfo)
+		handler = log.JSONHandler(output)
 	case logFmtFlag == "json":
-		handler = log.JSONHandlerWithLevel(output, log.LevelInfo)
+		handler = log.JSONHandler(output)
 	case logFmtFlag == "logfmt":
 		handler = log.LogfmtHandler(output)
 	case logFmtFlag == "", logFmtFlag == "terminal":
@@ -318,7 +310,6 @@ func StartPProf(address string, withMetrics bool) {
 	if withMetrics {
 		exp.Exp(metrics.DefaultRegistry)
 	}
-	http.Handle("/memsize/", http.StripPrefix("/memsize", &Memsize))
 	log.Info("Starting pprof server", "addr", fmt.Sprintf("http://%s/debug/pprof", address))
 	go func() {
 		if err := http.ListenAndServe(address, nil); err != nil {

@@ -106,12 +106,11 @@ func TestAdjustTime(t *testing.T) {
 	block2, _ := client.BlockByNumber(context.Background(), nil)
 	prevTime := block1.Time()
 	newTime := block2.Time()
-	if newTime-prevTime != uint64(time.Minute) {
+	if newTime-prevTime != 60 {
 		t.Errorf("adjusted time not equal to 60 seconds. prev: %v, new: %v", prevTime, newTime)
 	}
 }
 
-//
 //func TestSendTransaction(t *testing.T) {
 //	sim := simTestBackend(testAddr)
 //	defer sim.Close()
@@ -214,7 +213,9 @@ func TestFork(t *testing.T) {
 //	if err != nil {
 //		t.Fatalf("could not create transaction: %v", err)
 //	}
-//	client.SendTransaction(ctx, tx)
+//	if err := client.SendTransaction(ctx, tx); err != nil {
+//		t.Fatalf("sending transaction: %v", err)
+//	}
 //	sim.Commit()
 //
 //	// 3.
@@ -257,11 +258,10 @@ func TestCommitReturnValue(t *testing.T) {
 	}
 
 	// Create a block in the original chain (containing a transaction to force different block hashes)
-	head, _ := client.HeaderByNumber(ctx, nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
-	tx, _ := types.SignTx(_tx, types.HomesteadSigner{}, testKey)
-	client.SendTransaction(ctx, tx)
+	tx, _ := newTx(sim, testKey)
+	if err := client.SendTransaction(ctx, tx); err != nil {
+		t.Errorf("sending transaction: %v", err)
+	}
 
 	h2 := sim.Commit()
 

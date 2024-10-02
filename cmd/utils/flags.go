@@ -43,6 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/txpool/blobpool"
 	"github.com/ethereum/go-ethereum/core/txpool/legacypool"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -134,18 +135,13 @@ var (
 	}
 	NetworkIdFlag = &cli.Uint64Flag{
 		Name:     "networkid",
-		Usage:    "Explicitly set network id (integer)(For testnets: use --goerli, --sepolia, --holesky instead)",
+		Usage:    "Explicitly set network id (integer)(For testnets: use --sepolia, --holesky instead)",
 		Value:    ethconfig.Defaults.NetworkId,
 		Category: flags.EthCategory,
 	}
 	MainnetFlag = &cli.BoolFlag{
 		Name:     "mainnet",
 		Usage:    "Ethereum mainnet",
-		Category: flags.EthCategory,
-	}
-	GoerliFlag = &cli.BoolFlag{
-		Name:     "goerli",
-		Usage:    "Görli network: pre-configured proof-of-authority test network",
 		Category: flags.EthCategory,
 	}
 	SepoliaFlag = &cli.BoolFlag{
@@ -292,7 +288,7 @@ var (
 	}
 	BeaconApiHeaderFlag = &cli.StringSliceFlag{
 		Name:     "beacon.api.header",
-		Usage:    "Pass custom HTTP header fields to the emote beacon node API in \"key:value\" format. This flag can be given multiple times.",
+		Usage:    "Pass custom HTTP header fields to the remote beacon node API in \"key:value\" format. This flag can be given multiple times.",
 		Category: flags.BeaconCategory,
 	}
 	BeaconThresholdFlag = &cli.IntFlag{
@@ -605,6 +601,11 @@ var (
 		Usage:    "Disables db compaction after import",
 		Category: flags.LoggingCategory,
 	}
+	CollectWitnessFlag = &cli.BoolFlag{
+		Name:     "collectwitness",
+		Usage:    "Enable state witness generation during block execution. Work in progress flag, don't use.",
+		Category: flags.MiscCategory,
+	}
 
 	// MISC settings
 	SyncTargetFlag = &cli.StringFlag{
@@ -750,6 +751,7 @@ var (
 		Usage:    "Enables the (deprecated) personal namespace",
 		Category: flags.APICategory,
 	}
+
 	// grpc
 	GRPCEnabledFlag = &cli.BoolFlag{
 		Name:     "grpc",
@@ -825,8 +827,9 @@ var (
 	DiscoveryV5Flag = &cli.BoolFlag{
 		Name:     "discovery.v5",
 		Aliases:  []string{"discv5"},
-		Usage:    "Enables the experimental RLPx V5 (Topic Discovery) mechanism",
+		Usage:    "Enables the V5 discovery mechanism",
 		Category: flags.NetworkingCategory,
+		Value:    true,
 	}
 	NetrestrictFlag = &cli.StringFlag{
 		Name:     "netrestrict",
@@ -978,7 +981,6 @@ Please note that --` + MetricsHTTPFlag.Name + ` must be set to start the server.
 var (
 	// TestnetFlags is the flag group of all built-in supported testnets.
 	TestnetFlags = []cli.Flag{
-		GoerliFlag,
 		SepoliaFlag,
 		HoleskyFlag,
 	}
@@ -1001,9 +1003,6 @@ var (
 // then a subdirectory of the specified datadir will be used.
 func MakeDataDir(ctx *cli.Context) string {
 	if path := ctx.String(DataDirFlag.Name); path != "" {
-		if ctx.Bool(GoerliFlag.Name) {
-			return filepath.Join(path, "goerli")
-		}
 		if ctx.Bool(SepoliaFlag.Name) {
 			return filepath.Join(path, "sepolia")
 		}
@@ -1055,7 +1054,7 @@ func setNodeUserIdent(ctx *cli.Context, cfg *node.Config) {
 //
 // 1. --bootnodes flag
 // 2. Config file
-// 3. Network preset flags (e.g. --goerli)
+// 3. Network preset flags (e.g. --holesky)
 // 4. default to mainnet nodes
 func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 	urls := params.MainnetBootnodes
@@ -1070,8 +1069,6 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 			urls = params.HoleskyBootnodes
 		case ctx.Bool(SepoliaFlag.Name):
 			urls = params.SepoliaBootnodes
-		case ctx.Bool(GoerliFlag.Name):
-			urls = params.GoerliBootnodes
 		}
 	}
 	cfg.BootstrapNodes = mustParseBootnodes(urls)
@@ -1511,8 +1508,6 @@ func SetDataDir(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = ctx.String(DataDirFlag.Name)
 	case ctx.Bool(DeveloperFlag.Name):
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
-	case ctx.Bool(GoerliFlag.Name) && cfg.DataDir == node.DefaultDataDir():
-		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "goerli")
 	case ctx.Bool(SepoliaFlag.Name) && cfg.DataDir == node.DefaultDataDir():
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "sepolia")
 	case ctx.Bool(HoleskyFlag.Name) && cfg.DataDir == node.DefaultDataDir():
@@ -1575,6 +1570,18 @@ func setTxPool(ctx *cli.Context, cfg *legacypool.Config) {
 	}
 	if ctx.IsSet(TxPoolLifetimeFlag.Name) {
 		cfg.Lifetime = ctx.Duration(TxPoolLifetimeFlag.Name)
+	}
+}
+
+func setBlobPool(ctx *cli.Context, cfg *blobpool.Config) {
+	if ctx.IsSet(BlobPoolDataDirFlag.Name) {
+		cfg.Datadir = ctx.String(BlobPoolDataDirFlag.Name)
+	}
+	if ctx.IsSet(BlobPoolDataCapFlag.Name) {
+		cfg.Datacap = ctx.Uint64(BlobPoolDataCapFlag.Name)
+	}
+	if ctx.IsSet(BlobPoolPriceBumpFlag.Name) {
+		cfg.PriceBump = ctx.Uint64(BlobPoolPriceBumpFlag.Name)
 	}
 }
 
@@ -1672,13 +1679,14 @@ func CheckExclusive(ctx *cli.Context, args ...interface{}) {
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	// Avoid conflicting network flags
-	CheckExclusive(ctx, MainnetFlag, DeveloperFlag, GoerliFlag, SepoliaFlag, HoleskyFlag)
+	CheckExclusive(ctx, MainnetFlag, DeveloperFlag, SepoliaFlag, HoleskyFlag)
 	CheckExclusive(ctx, DeveloperFlag, ExternalSignerFlag) // Can't use both ephemeral unlocked and external signer
 
 	// Set configurations from CLI flags
 	setEtherbase(ctx, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
+	setBlobPool(ctx, &cfg.BlobPool)
 	setMiner(ctx, &cfg.Miner)
 	setRequiredBlocks(ctx, cfg)
 	setLes(ctx, cfg)
@@ -1793,6 +1801,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		// TODO(fjl): force-enable this in --dev mode
 		cfg.EnablePreimageRecording = ctx.Bool(VMEnableDebugFlag.Name)
 	}
+	if ctx.IsSet(CollectWitnessFlag.Name) {
+		cfg.EnableWitnessCollection = ctx.Bool(CollectWitnessFlag.Name)
+	}
 
 	if ctx.IsSet(RPCGlobalGasCapFlag.Name) {
 		cfg.RPCGasCap = ctx.Uint64(RPCGlobalGasCapFlag.Name)
@@ -1838,12 +1849,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		}
 		cfg.Genesis = core.DefaultSepoliaGenesisBlock()
 		SetDNSDiscoveryDefaults(cfg, params.SepoliaGenesisHash)
-	case ctx.Bool(GoerliFlag.Name):
-		if !ctx.IsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 5
-		}
-		cfg.Genesis = core.DefaultGoerliGenesisBlock()
-		SetDNSDiscoveryDefaults(cfg, params.GoerliGenesisHash)
 	case ctx.Bool(DeveloperFlag.Name):
 		if !ctx.IsSet(NetworkIdFlag.Name) {
 			cfg.NetworkId = 1337
@@ -2173,8 +2178,6 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		genesis = core.DefaultHoleskyGenesisBlock()
 	case ctx.Bool(SepoliaFlag.Name):
 		genesis = core.DefaultSepoliaGenesisBlock()
-	case ctx.Bool(GoerliFlag.Name):
-		genesis = core.DefaultGoerliGenesisBlock()
 	case ctx.Bool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
 	}
@@ -2231,7 +2234,10 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 	if ctx.IsSet(CacheFlag.Name) || ctx.IsSet(CacheGCFlag.Name) {
 		cache.TrieDirtyLimit = ctx.Int(CacheFlag.Name) * ctx.Int(CacheGCFlag.Name) / 100
 	}
-	vmcfg := vm.Config{EnablePreimageRecording: ctx.Bool(VMEnableDebugFlag.Name)}
+	vmcfg := vm.Config{
+		EnablePreimageRecording: ctx.Bool(VMEnableDebugFlag.Name),
+		EnableWitnessCollection: ctx.Bool(CollectWitnessFlag.Name),
+	}
 	if ctx.IsSet(VMTraceFlag.Name) {
 		if name := ctx.String(VMTraceFlag.Name); name != "" {
 			var config json.RawMessage
@@ -2246,7 +2252,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 		}
 	}
 	// Disable transaction indexing/unindexing by default.
-	chain, err := core.NewBlockChain(chainDb, cache, gspec, nil, engine, vmcfg, nil, nil)
+	chain, err := core.NewBlockChain(chainDb, cache, gspec, nil, engine, vmcfg, nil)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

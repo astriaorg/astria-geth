@@ -109,12 +109,11 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 			return err
 		}
 		if tx.Gas() < intrGas {
-			return fmt.Errorf("%w: needed %v, allowed %v", core.ErrIntrinsicGas, intrGas, tx.Gas())
+			return fmt.Errorf("%w: gas %v, minimum needed %v", core.ErrIntrinsicGas, tx.Gas(), intrGas)
 		}
-		// Ensure the gasprice is high enough to cover the requirement of the calling
-		// pool and/or block producer
+		// Ensure the gasprice is high enough to cover the requirement of the calling pool
 		if tx.GasTipCapIntCmp(opts.MinTip) < 0 {
-			return fmt.Errorf("%w: tip needed %v, tip permitted %v", ErrUnderpriced, opts.MinTip, tx.GasTipCap())
+			return fmt.Errorf("%w: gas tip cap %v, minimum needed %v", ErrUnderpriced, tx.GasTipCap(), opts.MinTip)
 		}
 	}
 	if tx.Type() == types.BlobTxType {
@@ -204,7 +203,7 @@ type ValidationOptionsWithState struct {
 // rules without duplicating code and running the risk of missed updates.
 func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, opts *ValidationOptionsWithState) error {
 	// Ensure the transaction adheres to nonce ordering
-	from, err := signer.Sender(tx) // already validated (and cached), but cleaner to check
+	from, err := types.Sender(signer, tx) // already validated (and cached), but cleaner to check
 	if err != nil {
 		log.Error("Transaction sender recovery failed", "err", err)
 		return err

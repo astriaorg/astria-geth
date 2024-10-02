@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -52,14 +53,6 @@ func initMatcher(st *testMatcher) {
 	st.skipLoad(`.*vmPerformance/loop.*`)
 	// Uses 1GB RAM per tested fork
 	st.skipLoad(`^stStaticCall/static_Call1MB`)
-
-	// These tests fail as of https://github.com/ethereum/go-ethereum/pull/28666, since we
-	// no longer delete "leftover storage" when deploying a contract.
-	st.skipLoad(`^stSStoreTest/InitCollision\.json`)
-	st.skipLoad(`^stRevertTest/RevertInCreateInInit\.json`)
-	st.skipLoad(`^stExtCodeHash/dynamicAccountOverwriteEmpty\.json`)
-	st.skipLoad(`^stCreate2/create2collisionStorage\.json`)
-	st.skipLoad(`^stCreate2/RevertInCreateInInitCreate2\.json`)
 
 	// Broken tests:
 	// EOF is not part of cancun
@@ -99,7 +92,9 @@ func TestLegacyState(t *testing.T) {
 
 // TestExecutionSpecState runs the test fixtures from execution-spec-tests.
 func TestExecutionSpecState(t *testing.T) {
-	t.Skipf("execution-spec-tests are not yet supported")
+	if !common.FileExist(executionSpecStateTestDir) {
+		t.Skipf("directory %s does not exist", executionSpecStateTestDir)
+	}
 	st := new(testMatcher)
 
 	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {

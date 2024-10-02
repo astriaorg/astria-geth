@@ -17,6 +17,11 @@
 package miner
 
 import (
+	"math/big"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -32,10 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
-	"reflect"
-	"testing"
-	"time"
 )
 
 var (

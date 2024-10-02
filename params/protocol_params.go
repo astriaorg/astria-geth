@@ -86,6 +86,7 @@ const (
 	LogTopicGas           uint64 = 375   // Multiplied by the * of the LOG*, per LOG transaction. e.g. LOG0 incurs 0 * c_txLogTopicGas, LOG4 incurs 4 * c_txLogTopicGas.
 	CreateGas             uint64 = 32000 // Once per CREATE operation & contract-creation transaction.
 	Create2Gas            uint64 = 32000 // Once per CREATE2 operation
+	CreateNGasEip4762     uint64 = 1000  // Once per CREATEn operations post-verkle
 	SelfdestructRefundGas uint64 = 24000 // Refunded following a selfdestruct operation.
 	MemoryGas             uint64 = 3     // Times the address of the (highest referenced byte in memory + 1). NOTE: referencing happens on read, write and in instructions such as RETURN and CALL.
 
@@ -173,6 +174,8 @@ const (
 
 	BlobTxTargetBlobGasPerBlock = 3 * BlobTxBlobGasPerBlob // Target consumable blob gas for data blobs per block (for 1559-like pricing)
 	MaxBlobGasPerBlock          = 6 * BlobTxBlobGasPerBlob // Maximum consumable blob gas for data blobs per block
+
+	HistoryServeWindow = 8192 // Number of blocks to serve historical block hashes for, EIP-2935.
 )
 
 // Gas discount table for BLS12-381 G1 and G2 multi exponentiation operations
@@ -186,6 +189,14 @@ var (
 
 	// BeaconRootsAddress is the address where historical beacon roots are stored as per EIP-4788
 	BeaconRootsAddress = common.HexToAddress("0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02")
+
+	// BeaconRootsCode is the code where historical beacon roots are stored as per EIP-4788
+	BeaconRootsCode = common.FromHex("3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500")
+
 	// SystemAddress is where the system-transaction is sent from as per EIP-4788
 	SystemAddress = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+	// HistoryStorageAddress is where the historical block hashes are stored.
+	HistoryStorageAddress = common.HexToAddress("0x0aae40965e6800cd9b1f4b05ff21581047e3f91e")
+	// HistoryStorageCode is the code with getters for historical block hashes.
+	HistoryStorageCode = common.FromHex("3373fffffffffffffffffffffffffffffffffffffffe1460575767ffffffffffffffff5f3511605357600143035f3511604b575f35612000014311604b57611fff5f3516545f5260205ff35b5f5f5260205ff35b5f5ffd5b5f35611fff60014303165500")
 )
