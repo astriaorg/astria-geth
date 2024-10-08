@@ -503,11 +503,16 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 
 	gasLimit := ethservice.BlockChain().GasLimit()
 
+	stateDb, err := ethservice.BlockChain().StateAt(previousBlock.Root)
+	require.Nil(t, err, "Failed to get state db")
+
+	latestNonce := stateDb.GetNonce(testAddr)
+
 	// create 5 txs
 	txs := []*types.Transaction{}
 	marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
-	for i := 10; i < 15; i++ {
-		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+	for i := 0; i < 5; i++ {
+		unsignedTx := types.NewTransaction(latestNonce+uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 		require.Nil(t, err, "Failed to sign tx")
 		txs = append(txs, tx)
@@ -520,7 +525,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 	}
 
 	// add a tx with lesser gas than the base gas
-	unsignedTx := types.NewTransaction(uint64(15), testToAddress, big.NewInt(1), gasLimit, big.NewInt(params.InitialBaseFee*2), nil)
+	unsignedTx := types.NewTransaction(latestNonce+uint64(5), testToAddress, big.NewInt(1), gasLimit, big.NewInt(params.InitialBaseFee*2), nil)
 	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 	require.Nil(t, err, "Failed to sign tx")
 	txs = append(txs, tx)
