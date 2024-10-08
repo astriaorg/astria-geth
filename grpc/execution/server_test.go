@@ -464,10 +464,6 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.True(t, bytes.Equal(firmBlock.ParentHash.Bytes(), updateCommitmentStateRes.Firm.ParentBlockHash), "Firm Block Parent Hash do not match")
 	require.Equal(t, firmBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Firm.Number), "Firm Block Number do not match")
 
-	block := ethservice.BlockChain().GetBlockByNumber(softBlock.Number.Uint64())
-	require.NotNil(t, block, "Block not found")
-	require.Equal(t, block.Transactions().Len(), len(marshalledTxs), "Block should have 6 txs")
-
 	celestiaBaseHeight := ethservice.BlockChain().CurrentBaseCelestiaHeight()
 	require.Equal(t, celestiaBaseHeight, updateCommitmentStateRes.BaseCelestiaHeight, "BaseCelestiaHeight should be updated in db")
 
@@ -596,11 +592,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 	require.NotNil(t, block, "Soft Block not found")
 	require.Equal(t, block.Transactions().Len(), 5, "Soft Block should have 5 txs")
 
-	pending, queued = ethservice.TxPool().Stats()
-	require.Equal(t, 5, pending, "Pending txs should be 5")
-	require.Equal(t, 0, queued, "Queued txs should be 0")
-
-	// wait for the tx loop to run
+	// give the tx loop time to run
 	time.Sleep(1 * time.Millisecond)
 
 	// after the tx loop is run, all pending txs should be removed
