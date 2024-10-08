@@ -528,15 +528,15 @@ func TestRemoveTxSanity(t *testing.T) {
 		t.Errorf("pool internals validation failed: %v", err)
 	}
 
-	n := pool.removeTx(tx1.Hash(), true, true)
+	n := pool.removeTx(tx1.Hash(), false, true)
 	if n != 3 {
 		t.Error("expected 3 transactions to be removed, got", n)
 	}
-	n = pool.removeTx(tx2.Hash(), true, true)
+	n = pool.removeTx(tx2.Hash(), false, true)
 	if n != 0 {
 		t.Error("expected 0 transactions to be removed, got", n)
 	}
-	n = pool.removeTx(tx3.Hash(), true, true)
+	n = pool.removeTx(tx3.Hash(), false, true)
 	if n != 0 {
 		t.Error("expected 0 transactions to be removed, got", n)
 	}
