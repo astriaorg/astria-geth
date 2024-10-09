@@ -39,7 +39,6 @@ import (
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/urfave/cli/v2"
 )
@@ -222,22 +221,23 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		overrides.OverrideVerkle = &v
 	}
-	for _, name := range []string{"chaindata", "lightchaindata"} {
-		chaindb, err := stack.OpenDatabaseWithFreezer(name, 0, 0, ctx.String(utils.AncientFlag.Name), "", false)
-		if err != nil {
-			utils.Fatalf("Failed to open database: %v", err)
-		}
-		defer chaindb.Close()
 
-		triedb := utils.MakeTrieDatabase(ctx, chaindb, ctx.Bool(utils.CachePreimagesFlag.Name), false, genesis.IsVerkle())
-		defer triedb.Close()
-
-		_, hash, err := core.SetupGenesisBlockWithOverride(chaindb, triedb, genesis, &overrides)
-		if err != nil {
-			utils.Fatalf("Failed to write genesis block: %v", err)
-		}
-		log.Info("Successfully wrote genesis state", "database", name, "hash", hash)
+	chaindb, err := stack.OpenDatabaseWithFreezer("chaindata", 0, 0, ctx.String(utils.AncientFlag.Name), "", false)
+	if err != nil {
+		utils.Fatalf("Failed to open database: %v", err)
 	}
+	defer chaindb.Close()
+
+	triedb := utils.MakeTrieDatabase(ctx, chaindb, ctx.Bool(utils.CachePreimagesFlag.Name), false, genesis.IsVerkle())
+	defer triedb.Close()
+
+	_, hash, err := core.SetupGenesisBlockWithOverride(chaindb, triedb, genesis, &overrides)
+	if err != nil {
+		utils.Fatalf("Failed to write genesis block: %v", err)
+	}
+
+	log.Info("Successfully wrote genesis state", "database", "chaindata", "hash", hash)
+
 	return nil
 }
 
@@ -259,29 +259,22 @@ func dumpGenesis(ctx *cli.Context) error {
 
 	// dump whatever already exists in the datadir
 	stack, _ := makeConfigNode(ctx)
-	for _, name := range []string{"chaindata", "lightchaindata"} {
-		db, err := stack.OpenDatabase(name, 0, 0, "", true)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-			continue
-		}
-		genesis, err := core.ReadGenesis(db)
-		if err != nil {
-			utils.Fatalf("failed to read genesis: %s", err)
-		}
-		db.Close()
 
-		if err := json.NewEncoder(os.Stdout).Encode(*genesis); err != nil {
-			utils.Fatalf("could not encode stored genesis: %s", err)
-		}
-		return nil
+	db, err := stack.OpenDatabase("chaindata", 0, 0, "", true)
+	if err != nil {
+		return err
 	}
-	if ctx.IsSet(utils.DataDirFlag.Name) {
-		utils.Fatalf("no existing datadir at %s", stack.Config().DataDir)
+	defer db.Close()
+
+	genesis, err = core.ReadGenesis(db)
+	if err != nil {
+		utils.Fatalf("failed to read genesis: %s", err)
 	}
-	utils.Fatalf("no network preset provided, and no genesis exists in the default datadir")
+
+	if err := json.NewEncoder(os.Stdout).Encode(*genesis); err != nil {
+		utils.Fatalf("could not encode stored genesis: %s", err)
+	}
+
 	return nil
 }
 
@@ -337,7 +330,7 @@ func importChain(ctx *cli.Context) error {
 	fmt.Printf("Import done in %v.\n\n", time.Since(start))
 
 	// Output pre-compaction stats mostly to see the import trashing
-	showLeveldbStats(db)
+	showDBStats(db)
 
 	// Print the memory statistics used by the importing
 	mem := new(runtime.MemStats)
@@ -360,7 +353,7 @@ func importChain(ctx *cli.Context) error {
 	}
 	fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
 
-	showLeveldbStats(db)
+	showDBStats(db)
 	return importErr
 }
 
@@ -426,8 +419,6 @@ func importHistory(ctx *cli.Context) error {
 			network = "mainnet"
 		case ctx.Bool(utils.SepoliaFlag.Name):
 			network = "sepolia"
-		case ctx.Bool(utils.GoerliFlag.Name):
-			network = "goerli"
 		}
 	} else {
 		// No network flag set, try to determine network based on files
@@ -516,7 +507,7 @@ func importPreimages(ctx *cli.Context) error {
 	return nil
 }
 
-func parseDumpConfig(ctx *cli.Context, stack *node.Node, db ethdb.Database) (*state.DumpConfig, common.Hash, error) {
+func parseDumpConfig(ctx *cli.Context, db ethdb.Database) (*state.DumpConfig, common.Hash, error) {
 	var header *types.Header
 	if ctx.NArg() > 1 {
 		return nil, common.Hash{}, fmt.Errorf("expected 1 argument (number or hash), got %d", ctx.NArg())
@@ -560,7 +551,7 @@ func parseDumpConfig(ctx *cli.Context, stack *node.Node, db ethdb.Database) (*st
 	default:
 		return nil, common.Hash{}, fmt.Errorf("invalid start argument: %x. 20 or 32 hex-encoded bytes required", startArg)
 	}
-	var conf = &state.DumpConfig{
+	conf := &state.DumpConfig{
 		SkipCode:          ctx.Bool(utils.ExcludeCodeFlag.Name),
 		SkipStorage:       ctx.Bool(utils.ExcludeStorageFlag.Name),
 		OnlyWithAddresses: !ctx.Bool(utils.IncludeIncompletesFlag.Name),
@@ -580,14 +571,14 @@ func dump(ctx *cli.Context) error {
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()
 
-	conf, root, err := parseDumpConfig(ctx, stack, db)
+	conf, root, err := parseDumpConfig(ctx, db)
 	if err != nil {
 		return err
 	}
 	triedb := utils.MakeTrieDatabase(ctx, db, true, true, false) // always enable preimage lookup
 	defer triedb.Close()
 
-	state, err := state.New(root, state.NewDatabaseWithNodeDB(db, triedb), nil)
+	state, err := state.New(root, state.NewDatabase(triedb, nil))
 	if err != nil {
 		return err
 	}

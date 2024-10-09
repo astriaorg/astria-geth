@@ -106,12 +106,11 @@ func TestAdjustTime(t *testing.T) {
 	block2, _ := client.BlockByNumber(context.Background(), nil)
 	prevTime := block1.Time()
 	newTime := block2.Time()
-	if newTime-prevTime != uint64(time.Minute) {
+	if newTime-prevTime != 60 {
 		t.Errorf("adjusted time not equal to 60 seconds. prev: %v, new: %v", prevTime, newTime)
 	}
 }
 
-//
 //func TestSendTransaction(t *testing.T) {
 //	sim := simTestBackend(testAddr)
 //	defer sim.Close()
@@ -191,12 +190,13 @@ func TestFork(t *testing.T) {
 // TestForkResendTx checks that re-sending a TX after a fork
 // is possible and does not cause a "nonce mismatch" panic.
 // Steps:
-//  1. Save the current block which will serve as parent for the fork.
-//  2. Send a transaction.
-//  3. Check that the TX is included in block 1.
-//  4. Fork by using the parent block as ancestor.
-//  5. Mine a block, Re-send the transaction and mine another one.
-//  6. Check that the TX is now included in block 2.
+// 1. Save the current block which will serve as parent for the fork.
+// 2. Send a transaction.
+// 3. Check that the TX is included in block 1.
+// 4. Fork by using the parent block as ancestor.
+// 5. Mine a block. We expect the out-forked tx to have trickled to the pool, and into the new block.
+// 6. Check that the TX is now included in (the new) block 1.
+// TODO - Tests which rely on the simulated backend won't work because we require a mock astria sequencer to be able to test this.
 //func TestForkResendTx(t *testing.T) {
 //	t.Parallel()
 //	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
@@ -214,7 +214,9 @@ func TestFork(t *testing.T) {
 //	if err != nil {
 //		t.Fatalf("could not create transaction: %v", err)
 //	}
-//	client.SendTransaction(ctx, tx)
+//	if err := client.SendTransaction(ctx, tx); err != nil {
+//		t.Fatalf("sending transaction: %v", err)
+//	}
 //	sim.Commit()
 //
 //	// 3.
@@ -230,58 +232,53 @@ func TestFork(t *testing.T) {
 //
 //	// 5.
 //	sim.Commit()
-//	if err := client.SendTransaction(ctx, tx); err != nil {
-//		t.Fatalf("sending transaction: %v", err)
-//	}
-//	sim.Commit()
 //	receipt, _ = client.TransactionReceipt(ctx, tx.Hash())
-//	if h := receipt.BlockNumber.Uint64(); h != 2 {
+//	if h := receipt.BlockNumber.Uint64(); h != 1 {
 //		t.Errorf("TX included in wrong block: %d", h)
 //	}
 //}
-
-func TestCommitReturnValue(t *testing.T) {
-	t.Parallel()
-	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	sim := simTestBackend(testAddr)
-	defer sim.Close()
-
-	client := sim.Client()
-	ctx := context.Background()
-
-	// Test if Commit returns the correct block hash
-	h1 := sim.Commit()
-	cur, _ := client.HeaderByNumber(ctx, nil)
-	if h1 != cur.Hash() {
-		t.Error("Commit did not return the hash of the last block.")
-	}
-
-	// Create a block in the original chain (containing a transaction to force different block hashes)
-	head, _ := client.HeaderByNumber(ctx, nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
-	tx, _ := types.SignTx(_tx, types.HomesteadSigner{}, testKey)
-	client.SendTransaction(ctx, tx)
-
-	h2 := sim.Commit()
-
-	// Create another block in the original chain
-	sim.Commit()
-
-	// Fork at the first bock
-	if err := sim.Fork(h1); err != nil {
-		t.Errorf("forking: %v", err)
-	}
-
-	// Test if Commit returns the correct block hash after the reorg
-	h2fork := sim.Commit()
-	if h2 == h2fork {
-		t.Error("The block in the fork and the original block are the same block!")
-	}
-	if header, err := client.HeaderByHash(ctx, h2fork); err != nil || header == nil {
-		t.Error("Could not retrieve the just created block (side-chain)")
-	}
-}
+//
+//func TestCommitReturnValue(t *testing.T) {
+//	t.Parallel()
+//	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+//	sim := simTestBackend(testAddr)
+//	defer sim.Close()
+//
+//	client := sim.Client()
+//	ctx := context.Background()
+//
+//	// Test if Commit returns the correct block hash
+//	h1 := sim.Commit()
+//	cur, _ := client.HeaderByNumber(ctx, nil)
+//	if h1 != cur.Hash() {
+//		t.Error("Commit did not return the hash of the last block.")
+//	}
+//
+//	// Create a block in the original chain (containing a transaction to force different block hashes)
+//	tx, _ := newTx(sim, testKey)
+//	if err := client.SendTransaction(ctx, tx); err != nil {
+//		t.Errorf("sending transaction: %v", err)
+//	}
+//
+//	h2 := sim.Commit()
+//
+//	// Create another block in the original chain
+//	sim.Commit()
+//
+//	// Fork at the first bock
+//	if err := sim.Fork(h1); err != nil {
+//		t.Errorf("forking: %v", err)
+//	}
+//
+//	// Test if Commit returns the correct block hash after the reorg
+//	h2fork := sim.Commit()
+//	if h2 == h2fork {
+//		t.Error("The block in the fork and the original block are the same block!")
+//	}
+//	if header, err := client.HeaderByHash(ctx, h2fork); err != nil || header == nil {
+//		t.Error("Could not retrieve the just created block (side-chain)")
+//	}
+//}
 
 // TestAdjustTimeAfterFork ensures that after a fork, AdjustTime uses the pending fork
 // block's parent rather than the canonical head's parent.

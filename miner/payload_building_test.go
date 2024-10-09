@@ -17,6 +17,11 @@
 package miner
 
 import (
+	"math/big"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -32,10 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
-	"reflect"
-	"testing"
-	"time"
 )
 
 var (
@@ -107,7 +108,7 @@ type testWorkerBackend struct {
 func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, n int) *testWorkerBackend {
 	var gspec = &core.Genesis{
 		Config: chainConfig,
-		Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+		Alloc:  types.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 	}
 	switch e := engine.(type) {
 	case *clique.Clique:
@@ -120,7 +121,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 	default:
 		t.Fatalf("unexpected consensus engine type: %T", engine)
 	}
-	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieDirtyDisabled: true}, gspec, nil, engine, vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieDirtyDisabled: true}, gspec, nil, engine, vm.Config{}, nil)
 	if err != nil {
 		t.Fatalf("core.NewBlockChain failed: %v", err)
 	}
@@ -216,7 +217,7 @@ func TestBuildPayloadNotEnoughGas(t *testing.T) {
 		FeeRecipient: recipient,
 	}
 
-	payload, err := w.buildPayload(args)
+	payload, err := w.buildPayload(args, false)
 	if err != nil {
 		t.Fatalf("Failed to build payload %v", err)
 	}
@@ -301,8 +302,7 @@ func TestBuildPayloadTimeout(t *testing.T) {
 		Random:       common.Hash{},
 		FeeRecipient: recipient,
 	}
-
-	payload, err := w.buildPayload(args)
+	payload, err := w.buildPayload(args, false)
 	if err != nil {
 		t.Fatalf("Failed to build payload %v", err)
 	}
@@ -466,7 +466,7 @@ func TestBuildPayload(t *testing.T) {
 				FeeRecipient: recipient,
 			}
 
-			payload, err := w.buildPayload(args)
+			payload, err := w.buildPayload(args, false)
 			if err != nil {
 				t.Fatalf("Failed to build payload %v", err)
 			}
