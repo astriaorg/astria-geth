@@ -489,6 +489,67 @@ func TestChainFork(t *testing.T) {
 	}
 }
 
+func TestRemoveTxSanity(t *testing.T) {
+	t.Parallel()
+
+	pool, key := setupPool()
+	defer pool.Close()
+
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+	resetState := func() {
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		statedb.AddBalance(addr, uint256.NewInt(100000000000000), tracing.BalanceChangeUnspecified)
+
+		pool.chain = newTestBlockChain(pool.chainconfig, 1000000, statedb, new(event.Feed))
+		<-pool.requestReset(nil, nil)
+	}
+	resetState()
+
+	tx1 := transaction(0, 100000, key)
+	tx2 := transaction(1, 100000, key)
+	tx3 := transaction(2, 100000, key)
+
+	if err := pool.addLocal(tx1); err != nil {
+		t.Error("didn't expect error", err)
+	}
+	if err := pool.addLocal(tx2); err != nil {
+		t.Error("didn't expect error", err)
+	}
+	if err := pool.addLocal(tx3); err != nil {
+		t.Error("didn't expect error", err)
+	}
+
+	pendingTxs := pool.pending[addr]
+	if pendingTxs.Len() != 3 {
+		t.Error("expected 3 pending transactions, got", pendingTxs.Len())
+	}
+
+	if err := validatePoolInternals(pool); err != nil {
+		t.Errorf("pool internals validation failed: %v", err)
+	}
+
+	n := pool.removeTx(tx1.Hash(), false, true)
+	if n != 3 {
+		t.Error("expected 3 transactions to be removed, got", n)
+	}
+	n = pool.removeTx(tx2.Hash(), false, true)
+	if n != 0 {
+		t.Error("expected 0 transactions to be removed, got", n)
+	}
+	n = pool.removeTx(tx3.Hash(), false, true)
+	if n != 0 {
+		t.Error("expected 0 transactions to be removed, got", n)
+	}
+
+	if len(pool.pending) != 0 {
+		t.Error("expected 0 pending transactions, got", pendingTxs.Len())
+	}
+
+	if err := validatePoolInternals(pool); err != nil {
+		t.Errorf("pool internals validation failed: %v", err)
+	}
+}
+
 func TestDoubleNonce(t *testing.T) {
 	t.Parallel()
 
