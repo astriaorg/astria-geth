@@ -339,6 +339,8 @@ func (pool *LegacyPool) ClearAstriaOrdered() {
 	if pool.astria == nil {
 		return
 	}
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 
 	astriaExcludedFromBlockMeter.Mark(int64(len(pool.astria.excludedFromBlock)))
 	for _, tx := range pool.astria.excludedFromBlock {
