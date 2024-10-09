@@ -217,7 +217,7 @@ func TestBuildPayloadNotEnoughGas(t *testing.T) {
 		FeeRecipient: recipient,
 	}
 
-	payload, err := w.buildPayload(args)
+	payload, err := w.buildPayload(args, false)
 	if err != nil {
 		t.Fatalf("Failed to build payload %v", err)
 	}
@@ -466,7 +466,7 @@ func TestBuildPayload(t *testing.T) {
 				FeeRecipient: recipient,
 			}
 
-			payload, err := w.buildPayload(args)
+			payload, err := w.buildPayload(args, false)
 			if err != nil {
 				t.Fatalf("Failed to build payload %v", err)
 			}

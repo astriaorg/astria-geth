@@ -3573,7 +3573,7 @@ func testEIP1559Transition(t *testing.T, scheme string) {
 	)
 	expected = expected.Add(expected, totalBaseFee)
 
-	if actual.Cmp(uint256.MustFromBig(expected)) != 0 {
+	if actual.Cmp(expected) != 0 {
 		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
 	}
 

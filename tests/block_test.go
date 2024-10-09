@@ -67,6 +67,7 @@ func TestBlockchain(t *testing.T) {
 	// which run natively, so there's no reason to run them here.
 }
 
+// TODO: bharath - The state roots will not match as we are not burning the base fee
 // TestExecutionSpecBlocktests runs the test fixtures from execution-spec-tests.
 //func TestExecutionSpecBlocktests(t *testing.T) {
 //	if !common.FileExist(executionSpecBlockchainTestDir) {

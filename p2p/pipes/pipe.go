@@ -13,32 +13,7 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-package rawdb
 
-import (
-	"net"
-	"testing"
-
-	"github.com/ethereum/go-ethereum/core/rawdb/ancienttest"
-	"github.com/ethereum/go-ethereum/ethdb"
-)
-
-func TestMemoryFreezer(t *testing.T) {
-	ancienttest.TestAncientSuite(t, func(kinds []string) ethdb.AncientStore {
-		tables := make(map[string]bool)
-		for _, kind := range kinds {
-			tables[kind] = true
-		}
-		return NewMemoryFreezer(false, tables)
-	})
-	ancienttest.TestResettableAncientSuite(t, func(kinds []string) ethdb.ResettableAncientStore {
-		tables := make(map[string]bool)
-		for _, kind := range kinds {
-			tables[kind] = true
-		}
-		return NewMemoryFreezer(false, tables)
-	})
-========
 package pipes
 
 import "net"
@@ -69,5 +44,4 @@ func TCPPipe() (net.Conn, net.Conn, error) {
 		return nil, nil, err
 	}
 	return aconn, dconn, nil
->>>>>>>> tags/v1.14.9:p2p/pipes/pipe.go
 }

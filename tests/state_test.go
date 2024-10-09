@@ -29,7 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -90,17 +89,18 @@ func TestLegacyState(t *testing.T) {
 	})
 }
 
+// TODO: bharath - The state roots will not match as we are not burning the base fee
 // TestExecutionSpecState runs the test fixtures from execution-spec-tests.
-func TestExecutionSpecState(t *testing.T) {
-	if !common.FileExist(executionSpecStateTestDir) {
-		t.Skipf("directory %s does not exist", executionSpecStateTestDir)
-	}
-	st := new(testMatcher)
-
-	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
-		execStateTest(t, st, test)
-	})
-}
+//func TestExecutionSpecState(t *testing.T) {
+//	if !common.FileExist(executionSpecStateTestDir) {
+//		t.Skipf("directory %s does not exist", executionSpecStateTestDir)
+//	}
+//	st := new(testMatcher)
+//
+//	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
+//		execStateTest(t, st, test)
+//	})
+//}
 
 func execStateTest(t *testing.T, st *testMatcher, test *StateTest) {
 	for _, subtest := range test.Subtests() {
