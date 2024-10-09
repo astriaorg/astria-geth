@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	crand "crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -1366,146 +1367,142 @@ func allBodies(blocks []*types.Block) []*types.Body {
 	return bodies
 }
 
-// TODO: bharath - fix this test
-//
-//func TestGetBlockBodiesByHash(t *testing.T) {
-//	node, eth, blocks := setupBodies(t)
-//	api := NewConsensusAPI(eth)
-//	defer node.Close()
-//
-//	tests := []struct {
-//		results []*types.Body
-//		hashes  []common.Hash
-//	}{
-//		// First pow block
-//		{
-//			results: []*types.Body{eth.BlockChain().GetBlockByNumber(0).Body()},
-//			hashes:  []common.Hash{eth.BlockChain().GetBlockByNumber(0).Hash()},
-//		},
-//		// Last pow block
-//		{
-//			results: []*types.Body{blocks[9].Body()},
-//			hashes:  []common.Hash{blocks[9].Hash()},
-//		},
-//		// First post-merge block
-//		{
-//			results: []*types.Body{blocks[10].Body()},
-//			hashes:  []common.Hash{blocks[10].Hash()},
-//		},
-//		// Pre & post merge blocks
-//		{
-//			results: []*types.Body{blocks[0].Body(), blocks[9].Body(), blocks[14].Body()},
-//			hashes:  []common.Hash{blocks[0].Hash(), blocks[9].Hash(), blocks[14].Hash()},
-//		},
-//		// unavailable block
-//		{
-//			results: []*types.Body{blocks[0].Body(), nil, blocks[14].Body()},
-//			hashes:  []common.Hash{blocks[0].Hash(), {1, 2}, blocks[14].Hash()},
-//		},
-//		// same block multiple times
-//		{
-//			results: []*types.Body{blocks[0].Body(), nil, blocks[0].Body(), blocks[0].Body()},
-//			hashes:  []common.Hash{blocks[0].Hash(), {1, 2}, blocks[0].Hash(), blocks[0].Hash()},
-//		},
-//		// all blocks
-//		{
-//			results: allBodies(blocks),
-//			hashes:  allHashes(blocks),
-//		},
-//	}
-//
-//	for k, test := range tests {
-//		result := api.GetPayloadBodiesByHashV2(test.hashes)
-//		for i, r := range result {
-//			if !equalBody(test.results[i], r) {
-//				t.Fatalf("test %v: invalid response: expected %+v got %+v", k, test.results[i], r)
-//			}
-//		}
-//	}
-//}
+func TestGetBlockBodiesByHash(t *testing.T) {
+	node, eth, blocks := setupBodies(t)
+	api := NewConsensusAPI(eth)
+	defer node.Close()
 
-// TODO: bharath - fix this test
-//
-//func TestGetBlockBodiesByRange(t *testing.T) {
-//	node, eth, blocks := setupBodies(t)
-//	api := NewConsensusAPI(eth)
-//	defer node.Close()
-//
-//	tests := []struct {
-//		results []*types.Body
-//		start   hexutil.Uint64
-//		count   hexutil.Uint64
-//	}{
-//		{
-//			results: []*types.Body{blocks[9].Body()},
-//			start:   10,
-//			count:   1,
-//		},
-//		// Genesis
-//		{
-//			results: []*types.Body{blocks[0].Body()},
-//			start:   1,
-//			count:   1,
-//		},
-//		// First post-merge block
-//		{
-//			results: []*types.Body{blocks[9].Body()},
-//			start:   10,
-//			count:   1,
-//		},
-//		// Pre & post merge blocks
-//		{
-//			results: []*types.Body{blocks[7].Body(), blocks[8].Body(), blocks[9].Body(), blocks[10].Body()},
-//			start:   8,
-//			count:   4,
-//		},
-//		// unavailable block
-//		{
-//			results: []*types.Body{blocks[18].Body(), blocks[19].Body()},
-//			start:   19,
-//			count:   3,
-//		},
-//		// unavailable block
-//		{
-//			results: []*types.Body{blocks[19].Body()},
-//			start:   20,
-//			count:   2,
-//		},
-//		{
-//			results: []*types.Body{blocks[19].Body()},
-//			start:   20,
-//			count:   1,
-//		},
-//		// whole range unavailable
-//		{
-//			results: make([]*types.Body, 0),
-//			start:   22,
-//			count:   2,
-//		},
-//		// allBlocks
-//		{
-//			results: allBodies(blocks),
-//			start:   1,
-//			count:   hexutil.Uint64(len(blocks)),
-//		},
-//	}
-//
-//	for k, test := range tests {
-//		result, err := api.GetPayloadBodiesByRangeV2(test.start, test.count)
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//		if len(result) == len(test.results) {
-//			for i, r := range result {
-//				if !equalBody(test.results[i], r) {
-//					t.Fatalf("test %d: invalid response: expected \n%+v\ngot\n%+v", k, test.results[i], r)
-//				}
-//			}
-//		} else {
-//			t.Fatalf("test %d: invalid length want %v got %v", k, len(test.results), len(result))
-//		}
-//	}
-//}
+	tests := []struct {
+		results []*types.Body
+		hashes  []common.Hash
+	}{
+		// First pow block
+		{
+			results: []*types.Body{eth.BlockChain().GetBlockByNumber(0).Body()},
+			hashes:  []common.Hash{eth.BlockChain().GetBlockByNumber(0).Hash()},
+		},
+		// Last pow block
+		{
+			results: []*types.Body{blocks[9].Body()},
+			hashes:  []common.Hash{blocks[9].Hash()},
+		},
+		// First post-merge block
+		{
+			results: []*types.Body{blocks[10].Body()},
+			hashes:  []common.Hash{blocks[10].Hash()},
+		},
+		// Pre & post merge blocks
+		{
+			results: []*types.Body{blocks[0].Body(), blocks[9].Body(), blocks[14].Body()},
+			hashes:  []common.Hash{blocks[0].Hash(), blocks[9].Hash(), blocks[14].Hash()},
+		},
+		// unavailable block
+		{
+			results: []*types.Body{blocks[0].Body(), nil, blocks[14].Body()},
+			hashes:  []common.Hash{blocks[0].Hash(), {1, 2}, blocks[14].Hash()},
+		},
+		// same block multiple times
+		{
+			results: []*types.Body{blocks[0].Body(), nil, blocks[0].Body(), blocks[0].Body()},
+			hashes:  []common.Hash{blocks[0].Hash(), {1, 2}, blocks[0].Hash(), blocks[0].Hash()},
+		},
+		// all blocks
+		{
+			results: allBodies(blocks),
+			hashes:  allHashes(blocks),
+		},
+	}
+
+	for k, test := range tests {
+		result := api.GetPayloadBodiesByHashV2(test.hashes)
+		for i, r := range result {
+			if err := checkEqualBody(test.results[i], r); err != nil {
+				t.Fatalf("test %v: invalid response: %v\nexpected %+v\ngot %+v", k, err, test.results[i], r)
+			}
+		}
+	}
+}
+
+func TestGetBlockBodiesByRange(t *testing.T) {
+	node, eth, blocks := setupBodies(t)
+	api := NewConsensusAPI(eth)
+	defer node.Close()
+
+	tests := []struct {
+		results []*types.Body
+		start   hexutil.Uint64
+		count   hexutil.Uint64
+	}{
+		{
+			results: []*types.Body{blocks[9].Body()},
+			start:   10,
+			count:   1,
+		},
+		// Genesis
+		{
+			results: []*types.Body{blocks[0].Body()},
+			start:   1,
+			count:   1,
+		},
+		// First post-merge block
+		{
+			results: []*types.Body{blocks[9].Body()},
+			start:   10,
+			count:   1,
+		},
+		// Pre & post merge blocks
+		{
+			results: []*types.Body{blocks[7].Body(), blocks[8].Body(), blocks[9].Body(), blocks[10].Body()},
+			start:   8,
+			count:   4,
+		},
+		// unavailable block
+		{
+			results: []*types.Body{blocks[18].Body(), blocks[19].Body()},
+			start:   19,
+			count:   3,
+		},
+		// unavailable block
+		{
+			results: []*types.Body{blocks[19].Body()},
+			start:   20,
+			count:   2,
+		},
+		{
+			results: []*types.Body{blocks[19].Body()},
+			start:   20,
+			count:   1,
+		},
+		// whole range unavailable
+		{
+			results: make([]*types.Body, 0),
+			start:   22,
+			count:   2,
+		},
+		// allBlocks
+		{
+			results: allBodies(blocks),
+			start:   1,
+			count:   hexutil.Uint64(len(blocks)),
+		},
+	}
+
+	for k, test := range tests {
+		result, err := api.GetPayloadBodiesByRangeV2(test.start, test.count)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result) == len(test.results) {
+			for i, r := range result {
+				if err = checkEqualBody(test.results[i], r); err != nil {
+					t.Fatalf("test %v: invalid response: %v\nexpected %+v\ngot %+v", k, err, test.results[i], r)
+				}
+			}
+		} else {
+			t.Fatalf("test %d: invalid length want %v got %v", k, len(test.results), len(result))
+		}
+	}
+}
 
 func TestGetBlockBodiesByRangeInvalidParams(t *testing.T) {
 	node, eth, _ := setupBodies(t)
@@ -1550,40 +1547,6 @@ func TestGetBlockBodiesByRangeInvalidParams(t *testing.T) {
 			t.Fatalf("test %d: have %s, want %s", i, have, want)
 		}
 	}
-}
-
-func equalBody(a *types.Body, b *engine.ExecutionPayloadBody) bool {
-	if a == nil && b == nil {
-		return true
-	} else if a == nil || b == nil {
-		return false
-	}
-	if len(a.Transactions) != len(b.TransactionData) {
-		return false
-	}
-	for i, tx := range a.Transactions {
-		data, _ := tx.MarshalBinary()
-		if !bytes.Equal(data, b.TransactionData[i]) {
-			return false
-		}
-	}
-
-	if !reflect.DeepEqual(a.Withdrawals, b.Withdrawals) {
-		return false
-	}
-
-	var deposits types.Deposits
-	if a.Requests != nil {
-		// If requests is non-nil, it means deposits are available in block and we
-		// should return an empty slice instead of nil if there are no deposits.
-		deposits = make(types.Deposits, 0)
-	}
-	for _, r := range a.Requests {
-		if d, ok := r.Inner().(*types.Deposit); ok {
-			deposits = append(deposits, d)
-		}
-	}
-	return reflect.DeepEqual(deposits, b.Deposits)
 }
 
 func TestBlockToPayloadWithBlobs(t *testing.T) {
@@ -1705,6 +1668,27 @@ func TestParentBeaconBlockRoot(t *testing.T) {
 	if root := db.GetState(params.BeaconRootsAddress, rootIdx); root != *blockParams.BeaconRoot {
 		t.Fatalf("incorrect root stored: want %s, got %s", *blockParams.BeaconRoot, root)
 	}
+}
+
+func checkEqualBody(a *types.Body, b *engine.ExecutionPayloadBody) error {
+	if a == nil && b == nil {
+		return nil
+	} else if a == nil || b == nil {
+		return errors.New("nil vs. non-nil")
+	}
+	if len(a.Transactions) != len(b.TransactionData) {
+		return errors.New("transactions length mismatch")
+	}
+	for i, tx := range a.Transactions {
+		data, _ := tx.MarshalBinary()
+		if !bytes.Equal(data, b.TransactionData[i]) {
+			return fmt.Errorf("transaction %d mismatch", i)
+		}
+	}
+	if !reflect.DeepEqual(a.Withdrawals, b.Withdrawals) {
+		return fmt.Errorf("withdrawals mismatch")
+	}
+	return nil
 }
 
 // TODO: bharath - We need a mock astria sequencer for this
