@@ -759,13 +759,11 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 		require.Nil(t, txErr, "Failed to add tx to mempool")
 	}
 
-	pendingTxs = ethservice.TxPool().Pending(txpool.PendingFilter{
-		OnlyPlainTxs: true,
-	})
-	require.Len(t, pendingTxs, 1, "Mempool should have 1 tx")
-	addrTxs := pendingTxs[testAddr]
-	require.Len(t, addrTxs, 5, "Mempool should have 5 txs for test address")
+	pending, queued := ethservice.TxPool().Stats()
+	require.Equal(t, pending, 5, "Mempool should have 5 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
+	// give some time for the txs to stream
 	time.Sleep(5 * time.Second)
 
 	// close the mempool to error the method out
