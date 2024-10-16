@@ -1376,11 +1376,10 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 				delete(events, addr)
 			}
 		}
-		/// bharath: don't promote any addresses since we are going to be clearing the mempool
-		//promoteAddrs = make([]common.Address, 0, len(pool.queue))
-		//for addr := range pool.queue {
-		//	promoteAddrs = append(promoteAddrs, addr)
-		//}
+		promoteAddrs = make([]common.Address, 0, len(pool.queue))
+		for addr := range pool.queue {
+			promoteAddrs = append(promoteAddrs, addr)
+		}
 	}
 	// Check for pending transactions for every account that sent new ones
 	promoted := pool.promoteExecutables(promoteAddrs)
