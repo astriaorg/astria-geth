@@ -2,6 +2,7 @@ package node
 
 import (
 	"net"
+	"os"
 	"sync"
 
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
@@ -14,7 +15,8 @@ import (
 type GRPCServerHandler struct {
 	mu sync.Mutex
 
-	endpoint                   string
+	tcpEndpoint                string
+	udsEndpoint                string
 	server                     *grpc.Server
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
 }
@@ -25,10 +27,11 @@ type GRPCServerHandler struct {
 func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, cfg *Config) error {
 	server := grpc.NewServer()
 
-	log.Info("gRPC server enabled", "endpoint", cfg.GRPCEndpoint())
+	log.Info("gRPC server enabled", "tcpEndpoint", cfg.GRPCTcpEndpoint(), "udsEndpoint", cfg.GRPCUdsEndpoint())
 
 	serverHandler := &GRPCServerHandler{
-		endpoint:                   cfg.GRPCEndpoint(),
+		tcpEndpoint:                cfg.GRPCTcpEndpoint(),
+		udsEndpoint:                cfg.GRPCUdsEndpoint(),
 		server:                     server,
 		executionServiceServerV1a2: &execServ,
 	}
@@ -44,17 +47,31 @@ func (handler *GRPCServerHandler) Start() error {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
 
-	if handler.endpoint == "" {
+	if handler.tcpEndpoint == "" {
+		return nil
+	}
+	if handler.udsEndpoint == "" {
 		return nil
 	}
 
 	// Start the gRPC server
-	lis, err := net.Listen("tcp", handler.endpoint)
+	tcpLis, err := net.Listen("tcp", handler.tcpEndpoint)
 	if err != nil {
 		return err
 	}
-	go handler.server.Serve(lis)
-	log.Info("gRPC server started", "endpoint", handler.endpoint)
+
+	// Remove any existing socket file
+	if err := os.RemoveAll(handler.udsEndpoint); err != nil {
+		return err
+	}
+	udsLis, err := net.Listen("unix", handler.udsEndpoint)
+	if err != nil {
+		return err
+	}
+
+	go handler.server.Serve(tcpLis)
+	go handler.server.Serve(udsLis)
+	log.Info("gRPC server started", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
 	return nil
 }
 
@@ -64,6 +81,6 @@ func (handler *GRPCServerHandler) Stop() error {
 	defer handler.mu.Unlock()
 
 	handler.server.GracefulStop()
-	log.Info("gRPC server stopped", "endpoint", handler.endpoint)
+	log.Info("gRPC server stopped", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
 	return nil
 }

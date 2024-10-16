@@ -35,8 +35,9 @@ const (
 	DefaultAuthHost = "localhost" // Default host interface for the authenticated apis
 	DefaultAuthPort = 8551        // Default port for the authenticated apis
 	// grpc
-	DefaultGRPCHost = "[::1]" // Default host interface for the gRPC server
-	DefaultGRPCPort = 50051   // Default port for the gRPC server
+	DefaultGRPCHost      = "[::1]"                // Default host interface for the gRPC server for the execution api
+	DefaultGRPCPort      = 50051                  // Default port for the gRPC server for the execution api
+	DefaultGRPCUdsSocket = "/tmp/auctioneer.sock" // Default UDS socket for the gRPC auctioneer streams
 )
 
 const (

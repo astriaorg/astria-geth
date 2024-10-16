@@ -724,9 +724,14 @@ func (n *Node) HTTPEndpoint() string {
 	return "http://" + n.http.listenAddr()
 }
 
-// GRPCENDPOINT returns the URL of the GRPC server.
-func (n *Node) GRPCEndpoint() string {
-	return "http://" + n.grpcServerHandler.endpoint
+// GRPCTcpEndpoint returns the URL of the GRPC server.
+func (n *Node) GRPCTcpEndpoint() string {
+	return "http://" + n.grpcServerHandler.tcpEndpoint
+}
+
+// GRPCUdsEndpoint returns the URL of the GRPC server UDS endpoint
+func (n *Node) GRPCUdsEndpoint() string {
+	return n.grpcServerHandler.udsEndpoint
 }
 
 // WSEndpoint returns the current JSON-RPC over WebSocket endpoint.
