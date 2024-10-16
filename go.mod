@@ -3,10 +3,10 @@ module github.com/ethereum/go-ethereum
 go 1.21
 
 require (
-	buf.build/gen/go/astria/execution-apis/grpc/go v1.4.0-20240725205400-4746841755df.1
-	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.34.1-20240725205400-4746841755df.1
-	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.34.2-20240911152449-eeebd3decdce.2
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.34.2-20240911152449-b41cca615e35.2
+	buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-00000000000000-21f1b77897ba.1
+	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.35.1-00000000000000-21f1b77897ba.1
+	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.35.1-00000000000000-68c4cd4acb9f.1
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.35.1-00000000000000-3a358734821d.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
@@ -79,16 +79,12 @@ require (
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
 	google.golang.org/grpc v1.64.1
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.35.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	buf.build/gen/go/astria/primitives/grpc/go v1.5.1-20240911152449-eeebd3decdce.1 // indirect
-	buf.build/gen/go/astria/protocol-apis/grpc/go v1.3.0-20240829200558-cd9207200425.3 // indirect
-	buf.build/gen/go/astria/protocol-apis/protocolbuffers/go v1.34.1-20240829200558-cd9207200425.1 // indirect
-	buf.build/gen/go/astria/sequencerblock-apis/grpc/go v1.5.1-20240911152449-b41cca615e35.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -154,6 +150,7 @@ require (
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
