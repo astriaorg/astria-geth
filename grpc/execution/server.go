@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -30,9 +30,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ExecutionServiceServerV1Alpha2 is the implementation of the
+// ExecutionServiceServerV1 is the implementation of the
 // ExecutionServiceServer interface.
-type ExecutionServiceServerV1Alpha2 struct {
+type ExecutionServiceServerV1 struct {
 	// NOTE - from the generated code: All implementations must embed
 	// UnimplementedExecutionServiceServer for forward compatibility
 	astriaGrpc.UnimplementedExecutionServiceServer
@@ -74,7 +74,7 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServerV1Alpha2, error) {
+func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, error) {
 	bc := eth.BlockChain()
 
 	if bc.Config().AstriaRollupName == "" {
@@ -143,7 +143,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 		}
 	}
 
-	return &ExecutionServiceServerV1Alpha2{
+	return &ExecutionServiceServerV1{
 		eth:                 eth,
 		bc:                  bc,
 		bridgeAddresses:     bridgeAddresses,
@@ -152,7 +152,7 @@ func NewExecutionServiceServerV1Alpha2(eth *eth.Ethereum) (*ExecutionServiceServ
 	}, nil
 }
 
-func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
+func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
 	log.Debug("GetGenesisInfo called")
 	getGenesisInfoRequestCount.Inc(1)
 
@@ -172,7 +172,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetGenesisInfo(ctx context.Context, req
 }
 
 // GetBlock will return a block given an identifier.
-func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV1) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
 	if req.GetIdentifier() == nil {
 		return nil, status.Error(codes.InvalidArgument, "identifier cannot be empty")
 	}
@@ -193,7 +193,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetBlock(ctx context.Context, req *astr
 
 // BatchGetBlocks will return an array of Blocks given an array of block
 // identifiers.
-func (s *ExecutionServiceServerV1Alpha2) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
+func (s *ExecutionServiceServerV1) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
 	if req.Identifiers == nil || len(req.Identifiers) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "identifiers cannot be empty")
 	}
@@ -232,7 +232,7 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
-func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
 	if err := validateStaticExecuteBlockRequest(req); err != nil {
 		log.Error("ExecuteBlock called with invalid ExecuteBlockRequest", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "ExecuteBlockRequest is invalid")
@@ -323,7 +323,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteBlock(ctx context.Context, req *
 }
 
 // GetCommitmentState fetches the current CommitmentState of the chain.
-func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
+func (s *ExecutionServiceServerV1) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	log.Info("GetCommitmentState called")
 	getCommitmentStateRequestCount.Inc(1)
 
@@ -354,7 +354,7 @@ func (s *ExecutionServiceServerV1Alpha2) GetCommitmentState(ctx context.Context,
 
 // UpdateCommitmentState replaces the whole CommitmentState with a new
 // CommitmentState.
-func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
+func (s *ExecutionServiceServerV1) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
 	if err := validateStaticCommitmentState(req.CommitmentState); err != nil {
 		log.Error("UpdateCommitmentState called with invalid CommitmentState", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "CommitmentState is invalid")
@@ -434,7 +434,7 @@ func (s *ExecutionServiceServerV1Alpha2) UpdateCommitmentState(ctx context.Conte
 	return req.CommitmentState, nil
 }
 
-func (s *ExecutionServiceServerV1Alpha2) getBlockFromIdentifier(identifier *astriaPb.BlockIdentifier) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV1) getBlockFromIdentifier(identifier *astriaPb.BlockIdentifier) (*astriaPb.Block, error) {
 	var header *types.Header
 
 	// Grab the header based on the identifier provided
@@ -475,6 +475,6 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 	}, nil
 }
 
-func (s *ExecutionServiceServerV1Alpha2) syncMethodsCalled() bool {
+func (s *ExecutionServiceServerV1) syncMethodsCalled() bool {
 	return s.genesisInfoCalled && s.getCommitmentStateCalled
 }
