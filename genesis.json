@@ -30,6 +30,7 @@
             },
             {
                 "bridgeAddress": "astria1xnlvg0rle2u6auane79t4p27g8hxnj36ja960z",
+                "senderAddress": "0x0000000000000000000000000000000000000000",
                 "startHeight": 1,
                 "assetDenom": "transfer/channel-1/usdc",
                 "assetPrecision": 6,
@@ -39,7 +40,6 @@
                 }
             }
         ],
-        "astriaBridgeSenderAddress": "0x0000000000000000000000000000000000000000",
         "astriaFeeCollectors": {
             "1": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30"
         },

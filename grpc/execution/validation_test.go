@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
-	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
+	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -86,14 +86,14 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	tests := []struct {
 		description string
-		sequencerTx *sequencerblockv1alpha1.RollupData
+		sequencerTx *sequencerblockv1.RollupData
 		// just check if error contains the string since error contains other details
 		wantErr string
 	}{
 		{
 			description: "unmarshallable sequencer tx",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{
-				Value: &sequencerblockv1alpha1.RollupData_SequencedData{
+			sequencerTx: &sequencerblockv1.RollupData{
+				Value: &sequencerblockv1.RollupData_SequencedData{
 					SequencedData: []byte("unmarshallable tx"),
 				},
 			},
@@ -101,8 +101,8 @@ func TestSequenceTxValidation(t *testing.T) {
 		},
 		{
 			description: "blob type sequence tx",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{
-				Value: &sequencerblockv1alpha1.RollupData_SequencedData{
+			sequencerTx: &sequencerblockv1.RollupData{
+				Value: &sequencerblockv1.RollupData_SequencedData{
 					SequencedData: blobTx,
 				},
 			},
@@ -110,8 +110,8 @@ func TestSequenceTxValidation(t *testing.T) {
 		},
 		{
 			description: "deposit type sequence tx",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{
-				Value: &sequencerblockv1alpha1.RollupData_SequencedData{
+			sequencerTx: &sequencerblockv1.RollupData{
+				Value: &sequencerblockv1.RollupData_SequencedData{
 					SequencedData: depositTx,
 				},
 			},
@@ -119,7 +119,7 @@ func TestSequenceTxValidation(t *testing.T) {
 		},
 		{
 			description: "deposit tx with an unknown bridge address",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: generateBech32MAddress(),
 				},
@@ -127,12 +127,16 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "unknown bridge address",
 		},
 		{
 			description: "deposit tx with a disallowed asset id",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: bridgeAddress,
 				},
@@ -140,12 +144,16 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "disallowed asset",
 		},
 		{
 			description: "deposit tx with a height and asset below the bridge start height",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: invalidHeightBridgeAddressBech32m,
 				},
@@ -153,12 +161,16 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "not allowed before height",
 		},
 		{
 			description: "valid deposit tx",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 				BridgeAddress: &primitivev1.Address{
 					Bech32M: bridgeAddress,
 				},
@@ -166,13 +178,17 @@ func TestSequenceTxValidation(t *testing.T) {
 				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
 				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
 				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
 			}}},
 			wantErr: "",
 		},
 		{
 			description: "valid sequencer tx",
-			sequencerTx: &sequencerblockv1alpha1.RollupData{
-				Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: validMarshalledTx},
+			sequencerTx: &sequencerblockv1.RollupData{
+				Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: validMarshalledTx},
 			},
 			wantErr: "",
 		},
@@ -180,7 +196,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, common.Address{})
+			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
 			if test.wantErr == "" && err == nil {
 				return
 			}
