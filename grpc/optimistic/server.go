@@ -140,7 +140,7 @@ func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimist
 	}
 }
 
-func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
+func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
 	// we need to execute the optimistic block
 	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
 	executeOptimisticBlockRequestCount.Inc(1)
@@ -150,7 +150,7 @@ func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("BaseBlock is invalid: %s", err.Error()))
 	}
 
-	if !s.SyncMethodsCalled() {
+	if !o.SyncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
 	}
 
@@ -158,27 +158,27 @@ func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	executionStart := time.Now()
 	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
-	s.CommitmentUpdateLock().Lock()
+	o.CommitmentUpdateLock().Lock()
 	// get the soft block
-	softBlock := s.Bc().CurrentSafeBlock()
-	s.CommitmentUpdateLock().Unlock()
+	softBlock := o.Bc().CurrentSafeBlock()
+	o.CommitmentUpdateLock().Unlock()
 
-	s.BlockExecutionLock().Lock()
-	nextFeeRecipient := s.NextFeeRecipient()
-	s.BlockExecutionLock().Unlock()
+	o.BlockExecutionLock().Lock()
+	nextFeeRecipient := o.NextFeeRecipient()
+	o.BlockExecutionLock().Unlock()
 
 	// the height that this block will be at
-	height := s.Bc().CurrentBlock().Number.Uint64() + 1
+	height := o.Bc().CurrentBlock().Number.Uint64() + 1
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, s.BridgeAddresses(), s.BridgeAllowedAssets(), s.BridgeSenderAddress())
+		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, o.BridgeAddresses(), o.BridgeAllowedAssets(), o.BridgeSenderAddress())
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
 
-		err = s.Eth().TxPool().ValidateTx(unmarshalledTx)
+		err = o.Eth().TxPool().ValidateTx(unmarshalledTx)
 		if err != nil {
 			log.Debug("failed to validate tx, ignoring", "tx", tx, "err", err)
 			continue
@@ -196,7 +196,7 @@ func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 		OverrideTransactions:  txsToProcess,
 		IsOptimisticExecution: true,
 	}
-	payload, err := s.Eth().Miner().BuildPayload(payloadAttributes)
+	payload, err := o.Eth().Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
@@ -210,7 +210,7 @@ func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	// this will insert the optimistic block into the chain and persist it's state without
 	// setting it as the HEAD.
-	err = s.Bc().InsertBlockWithoutSetHead(block)
+	err = o.Bc().InsertBlockWithoutSetHead(block)
 	if err != nil {
 		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", block.ParentHash(), "err", err)
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
@@ -218,7 +218,7 @@ func (s *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	// we store a pointer to the optimistic block in the chain so that we can use it
 	// to retrieve the state of the optimistic block
-	s.Bc().SetOptimistic(block)
+	o.Bc().SetOptimistic(block)
 
 	res := &astriaPb.Block{
 		Number:          uint32(block.NumberU64()),
