@@ -9,7 +9,6 @@ import (
 	"context"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/grpc/execution"
@@ -240,6 +239,15 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 		})
 	}
 
+	txErrors := ethservice.TxPool().Add(txs, true, false)
+	for _, txErr := range txErrors {
+		require.Nil(t, txErr, "Failed to add tx to mempool")
+	}
+
+	pending, queued := ethservice.TxPool().Stats()
+	require.Equal(t, pending, 5, "Mempool should have 5 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
+
 	req := optimsticPb.StreamExecuteOptimisticBlockRequest{Block: &optimsticPb.BaseBlock{
 		SequencerBlockHash: sequencerBlockHash,
 		Transactions:       marshalledTxs,
@@ -280,10 +288,9 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 	astriaOrdered := ethservice.TxPool().AstriaOrdered()
 	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
-	pendingTxs := ethservice.TxPool().Pending(txpool.PendingFilter{
-		OnlyPlainTxs: true,
-	})
-	require.Equal(t, len(pendingTxs), 0, "Mempool should be empty")
+	pending, queued = ethservice.TxPool().Stats()
+	require.Equal(t, pending, 0, "Mempool should have 0 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
 	mockServerSideStreaming := MockServerSideStreaming[optimsticPb.Bundle]{
 		sentResponses: []*optimsticPb.Bundle{},
@@ -294,11 +301,16 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 		errorCh <- optimisticServiceV1Alpha1.StreamBundles(&optimsticPb.StreamBundlesRequest{}, &mockServerSideStreaming)
 	}()
 
+	stateDb, err := ethservice.BlockChain().StateAt(currentOptimisticBlock.Root)
+	require.Nil(t, err, "Failed to get state db")
+
+	latestNonce := stateDb.GetNonce(shared.TestAddr)
+
 	// optimistic block is created, we can now add txs and check if they get streamed
 	// create 5 txs
 	txs = []*types.Transaction{}
-	for i := 5; i < 10; i++ {
-		unsignedTx := types.NewTransaction(uint64(i), shared.TestToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+	for i := 0; i < 5; i++ {
+		unsignedTx := types.NewTransaction(latestNonce+uint64(i), shared.TestToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), shared.TestKey)
 		require.Nil(t, err, "Failed to sign tx")
 		txs = append(txs, tx)
@@ -310,12 +322,12 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 		})
 	}
 
-	txErrors := ethservice.TxPool().Add(txs, true, false)
+	txErrors = ethservice.TxPool().Add(txs, true, false)
 	for _, txErr := range txErrors {
 		require.Nil(t, txErr, "Failed to add tx to mempool")
 	}
 
-	pending, queued := ethservice.TxPool().Stats()
+	pending, queued = ethservice.TxPool().Stats()
 	require.Equal(t, pending, 5, "Mempool should have 5 pending txs")
 	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
@@ -333,8 +345,17 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 
 	require.Len(t, mockServerSideStreaming.sentResponses, 5, "Number of responses should match the number of requests")
 
+	txIndx := 0
 	for _, resp := range mockServerSideStreaming.sentResponses {
 		require.Len(t, resp.Transactions, 1, "Bundle should have 1 tx")
+
+		receivedTx := resp.Transactions[0]
+		sentTx := txs[txIndx]
+		marshalledSentTx, err := sentTx.MarshalBinary()
+		require.Nil(t, err, "Failed to marshal tx")
+		require.True(t, bytes.Equal(receivedTx, marshalledSentTx), "Received tx does not match sent tx")
+		txIndx += 1
+
 		require.True(t, bytes.Equal(resp.PrevRollupBlockHash, currentOptimisticBlock.Hash().Bytes()), "PrevRollupBlockHash should match the current optimistic block hash")
 		require.True(t, bytes.Equal(resp.BaseSequencerBlockHash, *optimisticServiceV1Alpha1.currentOptimisticSequencerBlock.Load()), "BaseSequencerBlockHash should match the current optimistic sequencer block hash")
 	}
