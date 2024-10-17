@@ -97,9 +97,9 @@ func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.StreamBundlesRe
 	}
 }
 
-func (s *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_StreamExecuteOptimisticBlockServer) error {
+func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_StreamExecuteOptimisticBlockServer) error {
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
-	mempoolClearingEvent := s.Eth().TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
+	mempoolClearingEvent := o.Eth().TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()
 
 	for {
@@ -115,7 +115,7 @@ func (s *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimist
 		baseBlock := msg.GetBlock()
 
 		// execute the optimistic block and wait for the mempool clearing event
-		optimisticBlock, err := s.ExecuteOptimisticBlock(stream.Context(), baseBlock)
+		optimisticBlock, err := o.ExecuteOptimisticBlock(stream.Context(), baseBlock)
 		if err != nil {
 			return status.Error(codes.Internal, "failed to execute optimistic block")
 		}
@@ -127,7 +127,7 @@ func (s *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimist
 			if event.NewHead.Hash() != optimisticBlockHash {
 				return status.Error(codes.Internal, "failed to clear mempool after optimistic block execution")
 			}
-			s.currentOptimisticSequencerBlock.Store(&baseBlock.SequencerBlockHash)
+			o.currentOptimisticSequencerBlock.Store(&baseBlock.SequencerBlockHash)
 			err = stream.Send(&optimsticPb.StreamExecuteOptimisticBlockResponse{
 				Block:                  optimisticBlock,
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
