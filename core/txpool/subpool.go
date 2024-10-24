@@ -168,4 +168,6 @@ type SubPool interface {
 	AddToAstriaExcludedFromBlock(tx *types.Transaction)
 	AstriaExcludedFromBlock() *types.Transactions
 	AstriaOrdered() *types.Transactions
+
+	ValidateTx(tx *types.Transaction) error
 }

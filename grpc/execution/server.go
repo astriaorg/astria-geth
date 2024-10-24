@@ -267,6 +267,13 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Cont
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
+
+		err = s.eth.TxPool().ValidateTx(unmarshalledTx)
+		if err != nil {
+			log.Debug("failed to validate tx, ignoring", "tx", tx, "err", err)
+			continue
+		}
+
 		txsToProcess = append(txsToProcess, unmarshalledTx)
 	}
 

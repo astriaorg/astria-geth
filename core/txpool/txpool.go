@@ -318,6 +318,17 @@ func (p *TxPool) ClearAstriaOrdered() {
 	}
 }
 
+func (p *TxPool) ValidateTx(tx *types.Transaction) error {
+	for _, subpool := range p.subpools {
+		err := subpool.ValidateTx(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (p *TxPool) AddToAstriaExcludedFromBlock(tx *types.Transaction) {
 	for _, subpool := range p.subpools {
 		subpool.AddToAstriaExcludedFromBlock(tx)

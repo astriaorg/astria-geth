@@ -301,6 +301,10 @@ func (ao *astriaOrdered) clear() {
 	ao.excludedFromBlock = types.Transactions{}
 }
 
+func (pool *LegacyPool) ValidateTx(tx *types.Transaction) error {
+	return pool.validateTxBasics(tx, false)
+}
+
 func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 	astriaRequestedMeter.Mark(int64(len(txs)))
 
