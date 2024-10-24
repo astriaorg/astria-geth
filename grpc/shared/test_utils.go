@@ -1,6 +1,7 @@
 package shared
 
 import (
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"crypto/ecdsa"
 	"math/big"
 	"testing"
@@ -128,4 +129,10 @@ func StartEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 
 	ethservice.SetSynced()
 	return ethservice
+}
+
+func BigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
+	lo := i.Uint64()
+	hi := new(big.Int).Rsh(i, 64).Uint64()
+	return &primitivev1.Uint128{Lo: lo, Hi: hi}
 }

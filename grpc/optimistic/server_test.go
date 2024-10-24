@@ -23,12 +23,6 @@ import (
 	"time"
 )
 
-func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
-	lo := i.Uint64()
-	hi := new(big.Int).Rsh(i, 64).Uint64()
-	return &primitivev1.Uint128{Lo: lo, Hi: hi}
-}
-
 func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 	ethService, _ := shared.SetupSharedService(t, 10)
 
@@ -111,7 +105,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 
 			// create deposit tx if depositTxAmount is non zero
 			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
-				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
+				depositAmount := shared.BigIntToProtoU128(tt.depositTxAmount)
 				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
 				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
