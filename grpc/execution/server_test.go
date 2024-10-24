@@ -658,15 +658,15 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 	require.Nil(t, err, "GetCommitmentState failed")
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
-	ethservice.BlockChain().SetSafe(ethservice.BlockChain().CurrentBlock())
+	previousBlockHeader := ethservice.BlockChain().CurrentBlock()
+	previousBlock := ethservice.BlockChain().GetBlockByHash(previousBlockHeader.Hash())
 
-	// get previous block hash
-	previousBlock := ethservice.BlockChain().CurrentSafeBlock()
+	ethservice.BlockChain().SetOptimistic(previousBlock)
+	ethservice.BlockChain().SetSafe(previousBlockHeader)
+
 	require.NotNil(t, previousBlock, "Previous block not found")
 
-	gasLimit := ethservice.BlockChain().GasLimit()
-
-	stateDb, err := ethservice.BlockChain().StateAt(previousBlock.Root)
+	stateDb, err := ethservice.BlockChain().StateAt(previousBlock.Root())
 	require.Nil(t, err, "Failed to get state db")
 
 	latestNonce := stateDb.GetNonce(testAddr)
@@ -688,7 +688,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 	}
 
 	// add a tx with lesser gas than the base gas
-	unsignedTx := types.NewTransaction(latestNonce+uint64(5), testToAddress, big.NewInt(1), gasLimit, big.NewInt(params.InitialBaseFee*2), nil)
+	unsignedTx := types.NewTransaction(latestNonce+uint64(5), testToAddress, big.NewInt(1), ethservice.BlockChain().GasLimit(), big.NewInt(params.InitialBaseFee*2), nil)
 	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 	require.Nil(t, err, "Failed to sign tx")
 	txs = append(txs, tx)
@@ -699,19 +699,10 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 		Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
 	})
 
-	errors := ethservice.TxPool().Add(txs, true, false)
-	for _, err := range errors {
-		require.Nil(t, err, "Failed to add tx to pool")
-	}
-
-	pending, queued := ethservice.TxPool().Stats()
-	require.Equal(t, 6, pending, "Pending txs should be 6")
-	require.Equal(t, 0, queued, "Queued txs should be 0")
-
 	executeBlockReq := &astriaPb.ExecuteBlockRequest{
 		PrevBlockHash: previousBlock.Hash().Bytes(),
 		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(previousBlock.Time + 2),
+			Seconds: int64(previousBlock.Time() + 2),
 		},
 		Transactions: marshalledTxs,
 	}
@@ -758,14 +749,6 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 	block := ethservice.BlockChain().GetBlockByNumber(softBlock.Number.Uint64())
 	require.NotNil(t, block, "Soft Block not found")
 	require.Equal(t, block.Transactions().Len(), 5, "Soft Block should have 5 txs")
-
-	// give the tx loop time to run
-	time.Sleep(1 * time.Millisecond)
-
-	// after the tx loop is run, all pending txs should be removed
-	pending, queued = ethservice.TxPool().Stats()
-	require.Equal(t, 0, pending, "Pending txs should be 0")
-	require.Equal(t, 0, queued, "Queued txs should be 0")
 
 	// check if the soft and firm block are set correctly
 	require.True(t, bytes.Equal(softBlock.Hash().Bytes(), updateCommitmentStateRes.Soft.Hash), "Soft Block Hashes do not match")
