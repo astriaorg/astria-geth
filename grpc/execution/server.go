@@ -277,12 +277,16 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Cont
 		txsToProcess = append(txsToProcess, unmarshalledTx)
 	}
 
+	s.blockExecutionLock.Lock()
+	nextFeeRecipient := s.nextFeeRecipient
+	s.blockExecutionLock.Unlock()
+
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
 		Parent:                softBlock.Hash(),
 		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
 		Random:                common.Hash{},
-		FeeRecipient:          s.nextFeeRecipient,
+		FeeRecipient:          nextFeeRecipient,
 		OverrideTransactions:  txsToProcess,
 		IsOptimisticExecution: true,
 	}
