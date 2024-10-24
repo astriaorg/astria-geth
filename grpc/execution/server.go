@@ -280,7 +280,7 @@ func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisti
 				Block:                  optimisticBlock,
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
 			})
-		case <-time.After(10 * time.Second):
+		case <-time.After(500 * time.Millisecond):
 			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
 		case err := <-mempoolClearingEvent.Err():
 			return status.Error(codes.Internal, fmt.Sprintf("error waiting for mempool clearing event: %v", err))
