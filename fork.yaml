@@ -4,7 +4,7 @@ footer: |
 base:
   name: go-ethereum
   url: https://github.com/ethereum/go-ethereum
-  ref: refs/heads/go-ethereum/release/1.14.3
+  ref: refs/tags/v1.14.3
 fork:
   name: astria-geth
   url: https://github.com/astriaorg/astria-geth
@@ -30,35 +30,55 @@ def:
           globs:
             - "grpc/execution/*"
             - "grpc/*"
-        - title: "Tx-pool"
+        - title: "TX Pool"
           description: |
             Transactions ordering as set by the shared sequencer
           globs:
             - "core/txpool/blobpool/*"
             - "core/txpool/*"
             - "core/txpool/legacypool/*"
-        - title: "State-transition modifications"
-          description: ""
-          sub:
-            - title: "Deposit Transaction type"
-              description: |
-                `Deposit` transaction type enable changes to the rollup based on sequencer layer events
-              globs:
-                - "core/types/deposit_tx.go"
-                - "core/types/transaction.go"
-                - "core/state_transition.go"
-                - "core/types/receipt.go"
-            
+            - "eth/catalyst/*_test.go"
+        - title: "Deposit Transaction type"
+          description: |
+            `Deposit` transaction type enable changes to the rollup based on sequencer layer events
+          globs:
+            - "core/types/deposit_tx.go"
+            - "core/types/transaction.go"
+            - "core/state_transition.go"
+            - "core/types/receipt.go"
+        - title: "ERC-20 Bridging"
+          description: |
+              ERC-20 bridging support for the shared sequencer.
+          globs:
+              - "contracts/*"
+        - title: "EIP-1559 modifications"
+          description: |
+            EIP-1559 modifications to allow configuration of the base fee and the maximum fee cap.
+          globs:
+            - "consensus/misc/eip1559/eip1559.go"
+            - "core/chain_makers.go"
+            - "cmd/evm/internal/t8ntool/transaction.go"
+            - "core/blockchain_test.go"
+            - "core/bench_test.go"
+            - "core/state_processor_test.go"
+            - "tests/transaction_test_util.go"
         - title: "Block-building modifications"
           description: |
             The block-building code implements changes to support shared sequencer transactions ordering.
-            Transactions are now being fethced from the `TxPool` based on the shared sequencer.
+            Transactions are now being fetched from the `TxPool` based on the shared sequencer.
           globs:
             - "miner/*"
+        - title: "TX Submission"
+          description: |
+            We don't accept blob transactions or deposit transactions from the user.
+          globs:
+            - "internal/ethapi/api.go"
     - title: "Node modifications"
       description: Changes to the node configuration and services.
       sub:
         - title: Node config
+          description: |
+            Node configuration changes to support grpc server.
           globs:
             - "node/config.go"
             - "node/defaults.go"
@@ -73,24 +93,42 @@ def:
             - "internal/flags/categories.go"
             - "cmd/geth/config.go"
     - title: "Chain Configuration"
-      sub:
-        - title: "Chain config"
-          description: |
-            Configuration changes for integrating the shared seuqnecer
-          globs:
-            - "params/config.go"
-            - "params/protocol_params.go"
-            - "core/genesis.go"
-            - "genesis.json"
-            - "core/blockchain.go"
-            - "eth/backend.go"
+      description: |
+        Configuration changes, and storage for integrating the shared sequencer
+      globs:
+        - "params/*"
+        - "core/genesis.go"
+        - "core/blockchain.go"
+        - "eth/backend.go"
+        - "core/rawdb/*"
+        - "core/blockchain_reader.go"
+    - title: "Miscellaneous Tests"
+      description: |
+        Some tests have been omitted from the fork (no support for beacon client), others have been edited due to changes
+        in the default configuration.
+      globs:
+        - "cmd/evm/testdata/**/*"
+        - "accounts/abi/bind/*_test.go"
+        - "consensus/clique/clique_test.go"
+        - "tests/state_test.go"
+        - "eth/tracers/internal/tracetest/testdata/prestate_tracer_with_diff_mode/create_failed.json"
+        - "eth/tracers/internal/tracetest/testdata/prestate_tracer_with_diff_mode/create_post_eip158.json"
+        - "ethclient/ethclient_test.go"
+        - "ethclient/simulated/backend_test.go"
+        - "tests/block_test.go"
+
 
 # ignored globally, does not count towards line count
 ignore:
+  - "Dockerfile"
+  - "Dockerfile.alltools"
+  - ".gitattributes"
+  - ".gitignore"
+  - ".gitmodules"
   - ".circleci/*"
   - "*.sum"
   - "go.mod"
   - "fork.yaml"
   - ".github/*"
   - ".github/workflows/*"
-
+  - "genesis.json"
