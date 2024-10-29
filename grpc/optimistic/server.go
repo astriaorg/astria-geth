@@ -3,7 +3,7 @@ package optimistic
 import (
 	optimisticGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/bundle/v1alpha1/bundlev1alpha1grpc"
 	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	"context"
 	"errors"
 	"fmt"
@@ -54,7 +54,7 @@ func NewOptimisticServiceV1Alpha(sharedServiceContainer *shared.SharedServiceCon
 	return optimisticService
 }
 
-func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.StreamBundlesRequest, stream optimisticGrpc.BundleService_StreamBundlesServer) error {
+func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.GetBundleStreamRequest, stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
 	pendingTxEventCh := make(chan core.NewTxsEvent)
 	pendingTxEvent := o.Eth().TxPool().SubscribeTransactions(pendingTxEventCh, false)
 	defer pendingTxEvent.Unsubscribe()
@@ -85,7 +85,7 @@ func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.StreamBundlesRe
 				bundle.BaseSequencerBlockHash = *o.currentOptimisticSequencerBlock.Load()
 				bundle.PrevRollupBlockHash = optimisticBlock.Hash().Bytes()
 
-				err = stream.Send(&bundle)
+				err = stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
 				if err != nil {
 					return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
 				}
@@ -97,7 +97,7 @@ func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.StreamBundlesRe
 	}
 }
 
-func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_StreamExecuteOptimisticBlockServer) error {
+func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := o.Eth().TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()
@@ -112,7 +112,7 @@ func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimist
 			return err
 		}
 
-		baseBlock := msg.GetBlock()
+		baseBlock := msg.GetBaseBlock()
 
 		// execute the optimistic block and wait for the mempool clearing event
 		optimisticBlock, err := o.ExecuteOptimisticBlock(stream.Context(), baseBlock)
@@ -128,7 +128,7 @@ func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimist
 				return status.Error(codes.Internal, "failed to clear mempool after optimistic block execution")
 			}
 			o.currentOptimisticSequencerBlock.Store(&baseBlock.SequencerBlockHash)
-			err = stream.Send(&optimsticPb.StreamExecuteOptimisticBlockResponse{
+			err = stream.Send(&optimsticPb.ExecuteOptimisticBlockStreamResponse{
 				Block:                  optimisticBlock,
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
 			})
@@ -172,7 +172,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, o.BridgeAddresses(), o.BridgeAllowedAssets(), o.BridgeSenderAddress())
+		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, o.BridgeAddresses(), o.BridgeAllowedAssets())
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
@@ -281,10 +281,6 @@ func (s *OptimisticServiceV1Alpha1) BridgeAddresses() map[string]*params.AstriaB
 
 func (s *OptimisticServiceV1Alpha1) BridgeAllowedAssets() map[string]struct{} {
 	return s.sharedServiceContainer.BridgeAllowedAssets()
-}
-
-func (s *OptimisticServiceV1Alpha1) BridgeSenderAddress() common.Address {
-	return s.sharedServiceContainer.BridgeSenderAddress()
 }
 
 func (s *OptimisticServiceV1Alpha1) SyncMethodsCalled() bool {

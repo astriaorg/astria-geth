@@ -202,11 +202,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-<<<<<<< HEAD:grpc/execution/validation_test.go
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
-=======
-			_, err := ValidateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), common.Address{})
->>>>>>> 21f5aa7f7 (separate out execution api services and optimistic execution api services):grpc/shared/validation_test.go
+			_, err := ValidateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets())
 			if test.wantErr == "" && err == nil {
 				return
 			}

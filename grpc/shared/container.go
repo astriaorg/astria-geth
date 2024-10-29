@@ -23,7 +23,6 @@ type SharedServiceContainer struct {
 
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
-	bridgeSenderAddress common.Address                               // address from which AstriaBridgeableERC20 contracts are called
 
 	// TODO: bharath - we could make this an atomic pointer???
 	nextFeeRecipient common.Address // Fee recipient for the next block
@@ -67,11 +66,12 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 				nativeBridgeSeen = true
 			}
 
-			if cfg.Erc20Asset != nil && bc.Config().AstriaBridgeSenderAddress == (common.Address{}) {
+			if cfg.Erc20Asset != nil && cfg.SenderAddress == (common.Address{}) {
 				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
 			}
 
-			bridgeAddresses[cfg.BridgeAddress] = &cfg
+			bridgeCfg := cfg
+			bridgeAddresses[cfg.BridgeAddress] = &bridgeCfg
 			bridgeAllowedAssets[cfg.AssetDenom] = struct{}{}
 			if cfg.Erc20Asset == nil {
 				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
@@ -96,13 +96,11 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 			}
 		}
 	}
-
 	sharedServiceContainer := &SharedServiceContainer{
 		eth:                 eth,
 		bc:                  bc,
 		bridgeAddresses:     bridgeAddresses,
 		bridgeAllowedAssets: bridgeAllowedAssets,
-		bridgeSenderAddress: bc.Config().AstriaBridgeSenderAddress,
 		nextFeeRecipient:    nextFeeRecipient,
 	}
 
@@ -160,8 +158,4 @@ func (s *SharedServiceContainer) BridgeAddresses() map[string]*params.AstriaBrid
 
 func (s *SharedServiceContainer) BridgeAllowedAssets() map[string]struct{} {
 	return s.bridgeAllowedAssets
-}
-
-func (s *SharedServiceContainer) BridgeSenderAddress() common.Address {
-	return s.bridgeSenderAddress
 }

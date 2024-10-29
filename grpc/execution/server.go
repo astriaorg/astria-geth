@@ -61,7 +61,7 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV1Alpha2(sharedServiceContainer *shared.SharedServiceContainer) *ExecutionServiceServerV1 {
+func NewExecutionServiceServerV1(sharedServiceContainer *shared.SharedServiceContainer) *ExecutionServiceServerV1 {
 	execServiceServerV1Alpha2 := &ExecutionServiceServerV1{
 		sharedServiceContainer: sharedServiceContainer,
 	}
@@ -433,10 +433,6 @@ func (s *ExecutionServiceServerV1) BridgeAddresses() map[string]*params.AstriaBr
 
 func (s *ExecutionServiceServerV1) BridgeAllowedAssets() map[string]struct{} {
 	return s.sharedServiceContainer.BridgeAllowedAssets()
-}
-
-func (s *ExecutionServiceServerV1) BridgeSenderAddress() common.Address {
-	return s.sharedServiceContainer.BridgeSenderAddress()
 }
 
 func (s *ExecutionServiceServerV1) SyncMethodsCalled() bool {
