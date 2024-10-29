@@ -245,7 +245,7 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
-func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_StreamExecuteOptimisticBlockServer) error {
+func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := s.eth.TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()
@@ -260,7 +260,7 @@ func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisti
 			return err
 		}
 
-		baseBlock := msg.GetBlock()
+		baseBlock := msg.GetBaseBlock()
 
 		// execute the optimistic block and wait for the mempool clearing event
 		optimisticBlock, err := s.ExecuteOptimisticBlock(stream.Context(), baseBlock)
@@ -276,7 +276,7 @@ func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisti
 				return status.Error(codes.Internal, "failed to clear mempool after optimistic block execution")
 			}
 			s.currentOptimisticSequencerBlock.Store(&baseBlock.SequencerBlockHash)
-			err = stream.Send(&optimsticPb.StreamExecuteOptimisticBlockResponse{
+			err = stream.Send(&optimsticPb.ExecuteOptimisticBlockStreamResponse{
 				Block:                  optimisticBlock,
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
 			})
