@@ -121,6 +121,17 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 	return nil
 }
 
+func validateStaticExecuteOptimisticBlockRequest(req *sequencerblockv1alpha1.BaseBlock) error {
+	if req.Timestamp == nil {
+		return fmt.Errorf("Timestamp cannot be nil")
+	}
+	if len(req.SequencerBlockHash) == 0 {
+		return fmt.Errorf("SequencerBlockHash cannot be empty")
+	}
+
+	return nil
+}
+
 // `validateStaticCommitment` validates the given commitment without regard to the current state of the system.
 func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState) error {
 	if commitmentState == nil {

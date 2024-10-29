@@ -16,6 +16,7 @@ import (
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
+	optimsticPb "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -53,25 +54,28 @@ type ExecutionServiceServerV1 struct {
 }
 
 var (
-	getGenesisInfoRequestCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_requests", nil)
-	getGenesisInfoSuccessCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_success", nil)
-	getBlockRequestCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_requests", nil)
-	getBlockSuccessCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_success", nil)
-	batchGetBlockRequestCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_requests", nil)
-	batchGetBlockSuccessCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_success", nil)
-	executeBlockRequestCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_requests", nil)
-	executeBlockSuccessCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_success", nil)
-	getCommitmentStateRequestCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_requests", nil)
-	getCommitmentStateSuccessCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_success", nil)
-	updateCommitmentStateRequestCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_requests", nil)
-	updateCommitmentStateSuccessCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_success", nil)
+	getGenesisInfoRequestCount         = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_requests", nil)
+	getGenesisInfoSuccessCount         = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_success", nil)
+	getBlockRequestCount               = metrics.GetOrRegisterCounter("astria/execution/get_block_requests", nil)
+	getBlockSuccessCount               = metrics.GetOrRegisterCounter("astria/execution/get_block_success", nil)
+	batchGetBlockRequestCount          = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_requests", nil)
+	batchGetBlockSuccessCount          = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_success", nil)
+	executeBlockRequestCount           = metrics.GetOrRegisterCounter("astria/execution/execute_block_requests", nil)
+	executeBlockSuccessCount           = metrics.GetOrRegisterCounter("astria/execution/execute_block_success", nil)
+	executeOptimisticBlockRequestCount = metrics.GetOrRegisterCounter("astria/execution/execute_optimistic_block_requests", nil)
+	executeOptimisticBlockSuccessCount = metrics.GetOrRegisterCounter("astria/execution/execute_optimistic_block_success", nil)
+	getCommitmentStateRequestCount     = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_requests", nil)
+	getCommitmentStateSuccessCount     = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_success", nil)
+	updateCommitmentStateRequestCount  = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_requests", nil)
+	updateCommitmentStateSuccessCount  = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_success", nil)
 
 	softCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/soft_commitment_height", nil)
 	firmCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/firm_commitment_height", nil)
 	totalExecutedTxCount = metrics.GetOrRegisterCounter("astria/execution/total_executed_tx", nil)
 
-	executeBlockTimer          = metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil)
-	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
+	executeBlockTimer             = metrics.GetOrRegisterTimer("astria/execution/execute_block_time", nil)
+	executionOptimisticBlockTimer = metrics.GetOrRegisterTimer("astria/execution/execute_optimistic_block_time", nil)
+	commitmentStateUpdateTimer    = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
 func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, error) {
@@ -230,6 +234,89 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
+	if err := validateStaticExecuteOptimisticBlockRequest(req); err != nil {
+		log.Error("ExecuteOptimisticBlock called with invalid BaseBlock", "err", err)
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("BaseBlock is invalid: %s", err.Error()))
+	}
+
+	if !s.syncMethodsCalled() {
+		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
+	// we need to execute the optimistic block
+	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
+	executeOptimisticBlockRequestCount.Inc(1)
+
+	// Deliberately called after lock, to more directly measure the time spent executing
+	executionStart := time.Now()
+	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
+
+	// get the soft block
+	softBlock := s.bc.CurrentSafeBlock()
+
+	// the height that this block will be at
+	height := s.bc.CurrentBlock().Number.Uint64() + 1
+
+	txsToProcess := types.Transactions{}
+	for _, tx := range req.Transactions {
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+		if err != nil {
+			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			continue
+		}
+		txsToProcess = append(txsToProcess, unmarshalledTx)
+	}
+
+	// Build a payload to add to the chain
+	payloadAttributes := &miner.BuildPayloadArgs{
+		Parent:               softBlock.Hash(),
+		Timestamp:            uint64(req.GetTimestamp().GetSeconds()),
+		Random:               common.Hash{},
+		FeeRecipient:         s.nextFeeRecipient,
+		OverrideTransactions: txsToProcess,
+	}
+	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
+	if err != nil {
+		log.Error("failed to build payload", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
+	}
+
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
+	if err != nil {
+		log.Error("failed to convert executable data to block", err)
+		return nil, status.Error(codes.Internal, "failed to execute block")
+	}
+
+	// this will insert the optimistic block into the chain and persist it's state without
+	// setting it as the HEAD.
+	err = s.bc.InsertBlockWithoutSetHead(block)
+	if err != nil {
+		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", block.ParentHash(), "err", err)
+		return nil, status.Error(codes.Internal, "failed to insert block to chain")
+	}
+
+	// we store a pointer to the optimistic block in the chain so that we can use it
+	// to retrieve the state of the optimistic block
+	s.bc.SetOptimistic(block.Header())
+
+	res := &astriaPb.Block{
+		Number:          uint32(block.NumberU64()),
+		Hash:            block.Hash().Bytes(),
+		ParentBlockHash: block.ParentHash().Bytes(),
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(block.Time()),
+		},
+	}
+
+	// TODO - we need to send an event after inserting the optimistic block
+
+	log.Info("ExecuteOptimisticBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
+	executeOptimisticBlockSuccessCount.Inc(1)
+
+	return res, nil
+}
+
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
@@ -276,10 +363,11 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
-		Parent:       prevHeadHash,
-		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
-		Random:       common.Hash{},
-		FeeRecipient: s.nextFeeRecipient,
+		Parent:               prevHeadHash,
+		Timestamp:            uint64(req.GetTimestamp().GetSeconds()),
+		Random:               common.Hash{},
+		FeeRecipient:         s.nextFeeRecipient,
+		OverrideTransactions: types.Transactions{},
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
