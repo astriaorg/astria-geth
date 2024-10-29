@@ -1,16 +1,17 @@
 package execution
 
 import (
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1alpha2"
-	sequencerblockv1alpha1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"crypto/sha256"
 	"fmt"
+	"math/big"
+
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
 )
 
 // `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction.
@@ -19,10 +20,9 @@ import (
 // tx is not a blob tx or a deposit tx.
 func validateAndUnmarshalSequencerTx(
 	height uint64,
-	tx *sequencerblockv1alpha1.RollupData,
+	tx *sequencerblockv1.RollupData,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{},
-	bridgeSenderAddress common.Address,
 ) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := deposit.BridgeAddress.GetBech32M()
@@ -62,16 +62,16 @@ func validateAndUnmarshalSequencerTx(
 			}
 
 			txdata := types.DepositTx{
-				From:  bridgeSenderAddress,
+				From:  bac.SenderAddress,
 				Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
 				// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
 				//
 				// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
 				// address defined by consensus, so the gas cost is not actually deducted from any account.
-				Gas:  16000,
-				To:   &bac.Erc20Asset.ContractAddress,
-				Data: calldata,
-				SourceTransactionId: *deposit.SourceTransactionId,
+				Gas:                    64000,
+				To:                     &bac.Erc20Asset.ContractAddress,
+				Data:                   calldata,
+				SourceTransactionId:    *deposit.SourceTransactionId,
 				SourceTransactionIndex: deposit.SourceActionIndex,
 			}
 
@@ -80,11 +80,11 @@ func validateAndUnmarshalSequencerTx(
 		}
 
 		txdata := types.DepositTx{
-			From:  bridgeSenderAddress,
-			To:    &recipient,
-			Value: amount,
-			Gas:   0,
-			SourceTransactionId: *deposit.SourceTransactionId,
+			From:                   bac.SenderAddress,
+			To:                     &recipient,
+			Value:                  amount,
+			Gas:                    0,
+			SourceTransactionId:    *deposit.SourceTransactionId,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 		return types.NewTx(&txdata), nil

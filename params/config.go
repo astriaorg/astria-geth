@@ -386,7 +386,6 @@ type ChainConfig struct {
 	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
 	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
-	AstriaBridgeSenderAddress      common.Address              `json:"astriaBridgeSenderAddress,omitempty"`
 	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
 	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
 }
@@ -1055,6 +1054,7 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 
 type AstriaBridgeAddressConfig struct {
 	BridgeAddress  string                  `json:"bridgeAddress"`
+	SenderAddress  common.Address          `json:"senderAddress,omitempty"`
 	StartHeight    uint32                  `json:"startHeight"`
 	AssetDenom     string                  `json:"assetDenom"`
 	AssetPrecision uint16                  `json:"assetPrecision"`

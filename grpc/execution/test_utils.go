@@ -67,6 +67,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
 		{
 			BridgeAddress:  bech32mBridgeAddress,
+			SenderAddress:  common.Address{},
 			StartHeight:    2,
 			AssetDenom:     "nria",
 			AssetPrecision: 18,
@@ -129,12 +130,12 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	return ethservice
 }
 
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1Alpha2) {
+func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1) {
 	t.Helper()
 	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
 	ethservice := startEthService(t, genesis)
 
-	serviceV1Alpha1, err := NewExecutionServiceServerV1Alpha2(ethservice)
+	serviceV1Alpha1, err := NewExecutionServiceServerV1(ethservice)
 	require.Nil(t, err, "can't create execution service")
 
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)

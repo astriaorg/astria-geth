@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1alpha2/executionv1alpha2grpc"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
 	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 )
