@@ -9,10 +9,12 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"sync"
 	"time"
 
+	optimisticGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/bundle/v1alpha1/bundlev1alpha1grpc"
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
 	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
@@ -37,6 +39,8 @@ type ExecutionServiceServerV1 struct {
 	// NOTE - from the generated code: All implementations must embed
 	// UnimplementedExecutionServiceServer for forward compatibility
 	astriaGrpc.UnimplementedExecutionServiceServer
+	optimisticGrpc.UnimplementedOptimisticExecutionServiceServer
+	optimisticGrpc.UnimplementedBundleServiceServer
 
 	eth *eth.Ethereum
 	bc  *core.BlockChain
@@ -51,6 +55,8 @@ type ExecutionServiceServerV1 struct {
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
 
 	nextFeeRecipient common.Address // Fee recipient for the next block
+
+	currentOptimisticSequencerBlock []byte
 }
 
 var (
@@ -148,11 +154,12 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 	}
 
 	return &ExecutionServiceServerV1{
-		eth:                 eth,
-		bc:                  bc,
-		bridgeAddresses:     bridgeAddresses,
-		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
+		eth:                             eth,
+		bc:                              bc,
+		bridgeAddresses:                 bridgeAddresses,
+		bridgeAllowedAssets:             bridgeAllowedAssets,
+		nextFeeRecipient:                nextFeeRecipient,
+		currentOptimisticSequencerBlock: []byte{},
 	}, nil
 }
 
@@ -234,6 +241,48 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func (s *ExecutionServiceServerV1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_StreamExecuteOptimisticBlockServer) error {
+	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
+	mempoolClearingEvent := s.eth.TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
+	defer mempoolClearingEvent.Unsubscribe()
+
+	for {
+		msg, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		baseBlock := msg.GetBlock()
+
+		// execute the optimistic block and wait for the mempool clearing event
+		optimisticBlock, err := s.ExecuteOptimisticBlock(context.Background(), baseBlock)
+		if err != nil {
+			return status.Error(codes.Internal, "failed to execute optimistic block")
+		}
+		optimisticBlockHash := common.BytesToHash(optimisticBlock.Hash)
+
+		// listen to the mempool clearing event and send the response back to the auctioneer when the mempool is cleared
+		select {
+		case event := <-mempoolClearingEventCh:
+			if event.NewHead.Hash() != optimisticBlockHash {
+				return status.Error(codes.Internal, "failed to clear mempool after optimistic block execution")
+			}
+			s.currentOptimisticSequencerBlock = baseBlock.SequencerBlockHash
+			err = stream.Send(&optimsticPb.StreamExecuteOptimisticBlockResponse{
+				Block:                  optimisticBlock,
+				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
+			})
+		case <-time.After(10 * time.Second):
+			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
+		case err := <-mempoolClearingEvent.Err():
+			return status.Error(codes.Internal, fmt.Sprintf("error waiting for mempool clearing event: %v", err))
+		}
+	}
+}
+
 func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
 	// we need to execute the optimistic block
 	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
@@ -253,6 +302,7 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
 	// get the soft block
+	// TODO - we will have to take an update commitment lock here
 	softBlock := s.bc.CurrentSafeBlock()
 
 	s.blockExecutionLock.Lock()
