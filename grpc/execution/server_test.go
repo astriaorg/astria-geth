@@ -1,6 +1,7 @@
 package execution
 
 import (
+	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
@@ -303,7 +304,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 				marshalledTxs = append(marshalledTxs, depositTx)
 			}
 
-			baseBlockReq := &sequencerblockv1alpha1.BaseBlock{
+			baseBlockReq := &optimsticPb.BaseBlock{
 				Timestamp: &timestamppb.Timestamp{
 					Seconds: int64(tt.timestamp),
 				},
