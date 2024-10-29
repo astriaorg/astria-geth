@@ -261,7 +261,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 			// create the txs to send
 			// create 5 txs
 			txs := []*types.Transaction{}
-			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
+			marshalledTxs := []*sequencerblockv1.RollupData{}
 			for i := 0; i < 5; i++ {
 				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
@@ -270,8 +270,8 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 
 				marshalledTx, err := tx.MarshalBinary()
 				require.Nil(t, err, "Failed to marshal tx")
-				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
-					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+					Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
 				})
 			}
 
@@ -287,7 +287,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 
 				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
 
-				depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 					BridgeAddress: &primitivev1.Address{
 						Bech32M: bridgeAddress,
 					},

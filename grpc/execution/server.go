@@ -234,7 +234,7 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
-func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
 	// we need to execute the optimistic block
 	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
 	executeOptimisticBlockRequestCount.Inc(1)
@@ -262,7 +262,7 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Cont
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.bridgeSenderAddress)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
