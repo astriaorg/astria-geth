@@ -10,7 +10,6 @@ import (
 	"crypto/sha256"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -688,10 +687,9 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 		require.Nil(t, err, "Failed to add tx to mempool")
 	}
 
-	pendingTxs := ethservice.TxPool().Pending(txpool.PendingFilter{OnlyPlainTxs: true})
-	require.Len(t, pendingTxs, 1, "Mempool should have 1 tx")
-	addrTxs := pendingTxs[testAddr]
-	require.Len(t, addrTxs, 5, "Mempool should have 5 txs for test address")
+	pending, queued := ethservice.TxPool().Stats()
+	require.Equal(t, pending, 5, "Mempool should have 5 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
 	req := optimsticPb.StreamExecuteOptimisticBlockRequest{Block: &optimsticPb.BaseBlock{
 		SequencerBlockHash: sequencerBlockHash,
@@ -724,6 +722,8 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 
 	require.Equal(t, len(accumulatedResponses), len(mockStream.requestStream), "Number of responses should match the number of requests")
 
+	require.True(t, bytes.Equal(*serviceV1Alpha1.currentOptimisticSequencerBlock.Load(), sequencerBlockHash), "Optimistic sequencer block hash should be set correctly")
+
 	blockCounter := 1
 	for _, response := range accumulatedResponses {
 		require.True(t, bytes.Equal(response.GetBaseSequencerBlockHash(), sequencerBlockHash), "Sequencer block hash does not match")
@@ -738,10 +738,9 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 	astriaOrdered := ethservice.TxPool().AstriaOrdered()
 	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
-	pending := ethservice.TxPool().Pending(txpool.PendingFilter{
-		OnlyPlainTxs: true,
-	})
-	require.Len(t, pending, 0, "Mempool should be empty")
+	pending, queued = ethservice.TxPool().Stats()
+	require.Equal(t, pending, 0, "Mempool should have 0 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 }
 
 // Check that invalid transactions are not added into a block and are removed from the mempool
