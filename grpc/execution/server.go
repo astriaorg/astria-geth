@@ -14,9 +14,9 @@ import (
 	"time"
 
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
+	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
-	optimsticPb "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1alpha1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -235,6 +235,10 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 }
 
 func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
+	// we need to execute the optimistic block
+	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
+	executeOptimisticBlockRequestCount.Inc(1)
+
 	if err := validateStaticExecuteOptimisticBlockRequest(req); err != nil {
 		log.Error("ExecuteOptimisticBlock called with invalid BaseBlock", "err", err)
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("BaseBlock is invalid: %s", err.Error()))
@@ -244,16 +248,14 @@ func (s *ExecutionServiceServerV1Alpha2) ExecuteOptimisticBlock(ctx context.Cont
 		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
 	}
 
-	// we need to execute the optimistic block
-	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
-	executeOptimisticBlockRequestCount.Inc(1)
-
 	// Deliberately called after lock, to more directly measure the time spent executing
 	executionStart := time.Now()
 	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
+	s.commitmentUpdateLock.Lock()
 	// get the soft block
 	softBlock := s.bc.CurrentSafeBlock()
+	s.commitmentUpdateLock.Unlock()
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1

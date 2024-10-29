@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
@@ -121,7 +122,7 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 	return nil
 }
 
-func validateStaticExecuteOptimisticBlockRequest(req *sequencerblockv1alpha1.BaseBlock) error {
+func validateStaticExecuteOptimisticBlockRequest(req *optimsticPb.BaseBlock) error {
 	if req.Timestamp == nil {
 		return fmt.Errorf("Timestamp cannot be nil")
 	}
