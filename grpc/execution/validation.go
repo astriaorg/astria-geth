@@ -2,6 +2,7 @@ package execution
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -39,8 +40,9 @@ func validateAndUnmarshalSequencerTx(
 			return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
 		}
 
-		if deposit.Asset != bac.AssetDenom {
-			return nil, fmt.Errorf("asset %s does not match bridge address %s asset", deposit.Asset, bridgeAddress)
+		assetHash := sha256.Sum256([]byte(deposit.Asset))
+		if deposit.Asset != bac.AssetDenom && ("ibc/" + hex.EncodeToString(assetHash[:])) != bac.AssetDenom {
+			return nil, fmt.Errorf("neither trace nor IBC prefixed asset %s match bridge address %s asset", deposit.Asset, bridgeAddress)
 		}
 
 		recipient := common.HexToAddress(deposit.DestinationChainAddress)
