@@ -1603,7 +1603,7 @@ func (p *BlobPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool
 }
 
 func (p *BlobPool) SubscribeMempoolClearance(ch chan<- core.NewMempoolCleared) event.Subscription {
-	panic("not implemented")
+	return nil
 }
 
 // Nonce returns the next nonce of an account, with all transactions executable

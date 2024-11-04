@@ -433,9 +433,12 @@ func (p *TxPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) 
 
 // SubscribeMempoolClearance registers a subscription for new mempool clearance events
 func (p *TxPool) SubscribeMempoolClearance(ch chan<- core.NewMempoolCleared) event.Subscription {
-	subs := make([]event.Subscription, len(p.subpools))
-	for i, subpool := range p.subpools {
-		subs[i] = subpool.SubscribeMempoolClearance(ch)
+	subs := []event.Subscription{}
+	for _, subpool := range p.subpools {
+		sub := subpool.SubscribeMempoolClearance(ch)
+		if sub != nil {
+			subs = append(subs, sub)
+		}
 	}
 	return p.subs.Track(event.JoinSubscriptions(subs...))
 }
