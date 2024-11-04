@@ -199,173 +199,6 @@ func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
 	return &primitivev1.Uint128{Lo: lo, Hi: hi}
 }
 
-func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
-	ethservice, _ := setupExecutionService(t, 10)
-
-	tests := []struct {
-		description                          string
-		callGenesisInfoAndGetCommitmentState bool
-		numberOfTxs                          int
-		prevBlockHash                        []byte
-		timestamp                            uint64
-		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
-		expectedReturnCode                   codes.Code
-	}{
-		{
-			description:                          "ExecuteOptimisticBlock without calling GetGenesisInfo and GetCommitmentState",
-			callGenesisInfoAndGetCommitmentState: false,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   codes.PermissionDenied,
-		},
-		{
-			description:                          "ExecuteOptimisticBlock with 5 txs and no deposit tx",
-			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   0,
-		},
-		{
-			description:                          "ExecuteOptimisticBlock with 5 txs and a deposit tx",
-			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(1000000000000000000),
-			expectedReturnCode:                   0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			// reset the blockchain with each test
-			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
-
-			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
-			var genesisInfo *astriaPb.GenesisInfo
-			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
-			if tt.callGenesisInfoAndGetCommitmentState {
-				// call getGenesisInfo and getCommitmentState before calling executeBlock
-				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
-				require.Nil(t, err, "GetGenesisInfo failed")
-				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
-
-				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-				require.Nil(t, err, "GetCommitmentState failed")
-				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
-			}
-
-			// create the txs to send
-			// create 5 txs
-			txs := []*types.Transaction{}
-			marshalledTxs := []*sequencerblockv1.RollupData{}
-			for i := 0; i < 5; i++ {
-				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
-				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
-				require.Nil(t, err, "Failed to sign tx")
-				txs = append(txs, tx)
-
-				marshalledTx, err := tx.MarshalBinary()
-				require.Nil(t, err, "Failed to marshal tx")
-				marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
-					Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
-				})
-			}
-
-			// create deposit tx if depositTxAmount is non zero
-			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
-				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
-				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
-
-				// create new chain destination address for better testing
-				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
-				require.Nil(t, err, "Failed to generate chain destination address")
-
-				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
-
-				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-					BridgeAddress: &primitivev1.Address{
-						Bech32M: bridgeAddress,
-					},
-					Asset:                   bridgeAssetDenom,
-					Amount:                  depositAmount,
-					RollupId:                genesisInfo.RollupId,
-					DestinationChainAddress: chainDestinationAddress.String(),
-					SourceTransactionId: &primitivev1.TransactionId{
-						Inner: "test_tx_hash",
-					},
-					SourceActionIndex: 0,
-				}}}
-
-				marshalledTxs = append(marshalledTxs, depositTx)
-			}
-
-			optimisticHeadCh := make(chan core.ChainOptimisticHeadEvent, 1)
-			optimsticHeadSub := ethservice.BlockChain().SubscribeChainOptimisticHeadEvent(optimisticHeadCh)
-			defer optimsticHeadSub.Unsubscribe()
-
-			baseBlockReq := &optimsticPb.BaseBlock{
-				Timestamp: &timestamppb.Timestamp{
-					Seconds: int64(tt.timestamp),
-				},
-				Transactions:       marshalledTxs,
-				SequencerBlockHash: []byte("test_hash"),
-			}
-
-			res, err := serviceV1Alpha1.ExecuteOptimisticBlock(context.Background(), baseBlockReq)
-			if tt.expectedReturnCode > 0 {
-				require.NotNil(t, err, "ExecuteOptimisticBlock should return an error")
-				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteOptimisticBlock failed")
-			} else {
-				require.Nil(t, err, "ExecuteOptimisticBlock failed")
-			}
-			if err == nil {
-				require.NotNil(t, res, "ExecuteOptimisticBlock response is nil")
-
-				astriaOrdered := ethservice.TxPool().AstriaOrdered()
-				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
-
-				// check if commitment state is not updated
-				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-				require.Nil(t, err, "GetCommitmentState failed")
-
-				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
-
-				// check if the optimistic block is set
-				optimisticBlock := ethservice.BlockChain().CurrentOptimisticBlock()
-				require.NotNil(t, optimisticBlock, "Optimistic block is not set")
-
-				// check if the optimistic block is correct
-				require.Equal(t, common.BytesToHash(res.Hash), optimisticBlock.Hash(), "Optimistic block hashes do not match")
-				require.Equal(t, common.BytesToHash(res.ParentBlockHash), optimisticBlock.ParentHash, "Optimistic block parent hashes do not match")
-				require.Equal(t, uint64(res.Number), optimisticBlock.Number.Uint64(), "Optimistic block numbers do not match")
-
-				// check if optimistic block is inserted into chain
-				block := ethservice.BlockChain().GetBlockByHash(optimisticBlock.Hash())
-				require.NotNil(t, block, "Optimistic block not found in blockchain")
-				require.Equal(t, uint64(res.Number), block.NumberU64(), "Block number is not correct")
-
-				// timeout for optimistic head event
-				select {
-				case blockEvent := <-optimisticHeadCh:
-					require.NotNil(t, blockEvent, "Optimistic head event not received")
-					require.Equal(t, block.Hash(), blockEvent.Block.Hash(), "Optimistic head event block hash is not correct")
-					require.Equal(t, block.NumberU64(), blockEvent.Block.NumberU64(), "Optimistic head event block number is not correct")
-				case <-time.After(2 * time.Second):
-					require.FailNow(t, "Optimistic head event not received")
-				case err := <-optimsticHeadSub.Err():
-					require.Nil(t, err, "Optimistic head event subscription failed")
-				}
-			}
-		})
-	}
-}
-
 func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	ethservice, _ := setupExecutionService(t, 10)
 
@@ -644,6 +477,270 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 	balanceDiff := new(uint256.Int).Sub(chainDestinationAddressBalanceAfter, chainDestinationAddressBalanceBefore)
 	require.True(t, balanceDiff.Cmp(uint256.NewInt(1000000000000000000)) == 0, "Chain destination address balance is not correct")
+}
+
+func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
+	ethservice, _ := setupExecutionService(t, 10)
+
+	tests := []struct {
+		description                          string
+		callGenesisInfoAndGetCommitmentState bool
+		numberOfTxs                          int
+		prevBlockHash                        []byte
+		timestamp                            uint64
+		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
+		expectedReturnCode                   codes.Code
+	}{
+		{
+			description:                          "ExecuteOptimisticBlock without calling GetGenesisInfo and GetCommitmentState",
+			callGenesisInfoAndGetCommitmentState: false,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
+			depositTxAmount:                      big.NewInt(0),
+			expectedReturnCode:                   codes.PermissionDenied,
+		},
+		{
+			description:                          "ExecuteOptimisticBlock with 5 txs and no deposit tx",
+			callGenesisInfoAndGetCommitmentState: true,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:                      big.NewInt(0),
+			expectedReturnCode:                   0,
+		},
+		{
+			description:                          "ExecuteOptimisticBlock with 5 txs and a deposit tx",
+			callGenesisInfoAndGetCommitmentState: true,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:                      big.NewInt(1000000000000000000),
+			expectedReturnCode:                   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// reset the blockchain with each test
+			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+
+			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
+			var genesisInfo *astriaPb.GenesisInfo
+			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
+			if tt.callGenesisInfoAndGetCommitmentState {
+				// call getGenesisInfo and getCommitmentState before calling executeBlock
+				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+				require.Nil(t, err, "GetGenesisInfo failed")
+				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+
+				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				require.Nil(t, err, "GetCommitmentState failed")
+				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
+			}
+
+			// create the txs to send
+			// create 5 txs
+			txs := []*types.Transaction{}
+			marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
+			for i := 0; i < 5; i++ {
+				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+				require.Nil(t, err, "Failed to sign tx")
+				txs = append(txs, tx)
+
+				marshalledTx, err := tx.MarshalBinary()
+				require.Nil(t, err, "Failed to marshal tx")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+					Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+				})
+			}
+
+			// create deposit tx if depositTxAmount is non zero
+			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
+				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
+				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+
+				// create new chain destination address for better testing
+				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
+				require.Nil(t, err, "Failed to generate chain destination address")
+
+				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
+
+				depositTx := &sequencerblockv1alpha1.RollupData{Value: &sequencerblockv1alpha1.RollupData_Deposit{Deposit: &sequencerblockv1alpha1.Deposit{
+					BridgeAddress: &primitivev1.Address{
+						Bech32M: bridgeAddress,
+					},
+					Asset:                   bridgeAssetDenom,
+					Amount:                  depositAmount,
+					RollupId:                genesisInfo.RollupId,
+					DestinationChainAddress: chainDestinationAddress.String(),
+					SourceTransactionId: &primitivev1.TransactionId{
+						Inner: "test_tx_hash",
+					},
+					SourceActionIndex: 0,
+				}}}
+
+				marshalledTxs = append(marshalledTxs, depositTx)
+			}
+
+			optimisticHeadCh := make(chan core.ChainOptimisticHeadEvent, 1)
+			optimsticHeadSub := ethservice.BlockChain().SubscribeChainOptimisticHeadEvent(optimisticHeadCh)
+			defer optimsticHeadSub.Unsubscribe()
+
+			baseBlockReq := &optimsticPb.BaseBlock{
+				Timestamp: &timestamppb.Timestamp{
+					Seconds: int64(tt.timestamp),
+				},
+				Transactions:       marshalledTxs,
+				SequencerBlockHash: []byte("test_hash"),
+			}
+
+			res, err := serviceV1Alpha1.ExecuteOptimisticBlock(context.Background(), baseBlockReq)
+			if tt.expectedReturnCode > 0 {
+				require.NotNil(t, err, "ExecuteOptimisticBlock should return an error")
+				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteOptimisticBlock failed")
+			} else {
+				require.Nil(t, err, "ExecuteOptimisticBlock failed")
+			}
+			if err == nil {
+				require.NotNil(t, res, "ExecuteOptimisticBlock response is nil")
+
+				astriaOrdered := ethservice.TxPool().AstriaOrdered()
+				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+				// check if commitment state is not updated
+				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				require.Nil(t, err, "GetCommitmentState failed")
+
+				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
+
+				// check if the optimistic block is set
+				optimisticBlock := ethservice.BlockChain().CurrentOptimisticBlock()
+				require.NotNil(t, optimisticBlock, "Optimistic block is not set")
+
+				// check if the optimistic block is correct
+				require.Equal(t, common.BytesToHash(res.Hash), optimisticBlock.Hash(), "Optimistic block hashes do not match")
+				require.Equal(t, common.BytesToHash(res.ParentBlockHash), optimisticBlock.ParentHash, "Optimistic block parent hashes do not match")
+				require.Equal(t, uint64(res.Number), optimisticBlock.Number.Uint64(), "Optimistic block numbers do not match")
+
+				// check if optimistic block is inserted into chain
+				block := ethservice.BlockChain().GetBlockByHash(optimisticBlock.Hash())
+				require.NotNil(t, block, "Optimistic block not found in blockchain")
+				require.Equal(t, uint64(res.Number), block.NumberU64(), "Block number is not correct")
+
+				// timeout for optimistic head event
+				select {
+				case blockEvent := <-optimisticHeadCh:
+					require.NotNil(t, blockEvent, "Optimistic head event not received")
+					require.Equal(t, block.Hash(), blockEvent.Block.Hash(), "Optimistic head event block hash is not correct")
+					require.Equal(t, block.NumberU64(), blockEvent.Block.NumberU64(), "Optimistic head event block number is not correct")
+				case <-time.After(2 * time.Second):
+					require.FailNow(t, "Optimistic head event not received")
+				case err := <-optimsticHeadSub.Err():
+					require.Nil(t, err, "Optimistic head event subscription failed")
+				}
+			}
+		})
+	}
+}
+
+func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.T) {
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+
+	// call genesis info
+	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	require.Nil(t, err, "GetGenesisInfo failed")
+	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+
+	// call get commitment state
+	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	require.Nil(t, err, "GetCommitmentState failed")
+	require.NotNil(t, commitmentState, "CommitmentState is nil")
+
+	// get previous block hash
+	previousBlock := ethservice.BlockChain().CurrentSafeBlock()
+	require.NotNil(t, previousBlock, "Previous block not found")
+
+	requestStreams := []*optimsticPb.StreamExecuteOptimisticBlockRequest{}
+	sequencerBlockHash := []byte("sequencer_block_hash")
+
+	// create 1 stream item with 5 txs
+	txs := []*types.Transaction{}
+	marshalledTxs := []*sequencerblockv1alpha1.RollupData{}
+	for i := 0; i < 5; i++ {
+		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+		require.Nil(t, err, "Failed to sign tx")
+		txs = append(txs, tx)
+
+		marshalledTx, err := tx.MarshalBinary()
+		require.Nil(t, err, "Failed to marshal tx")
+		marshalledTxs = append(marshalledTxs, &sequencerblockv1alpha1.RollupData{
+			Value: &sequencerblockv1alpha1.RollupData_SequencedData{SequencedData: marshalledTx},
+		})
+	}
+
+	errs := ethservice.TxPool().Add(txs, true, false)
+	for _, err := range errs {
+		require.Nil(t, err, "Failed to add tx to mempool")
+	}
+
+	pendingTxs := ethservice.TxPool().Pending(txpool.PendingFilter{OnlyPlainTxs: true})
+	require.Len(t, pendingTxs, 1, "Mempool should have 1 tx")
+	addrTxs := pendingTxs[testAddr]
+	require.Len(t, addrTxs, 5, "Mempool should have 5 txs for test address")
+
+	req := optimsticPb.StreamExecuteOptimisticBlockRequest{Block: &optimsticPb.BaseBlock{
+		SequencerBlockHash: sequencerBlockHash,
+		Transactions:       marshalledTxs,
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(previousBlock.Time + 2),
+		},
+	}}
+
+	requestStreams = append(requestStreams, &req)
+
+	mockStream := &MockBidirectionalStreaming[optimsticPb.StreamExecuteOptimisticBlockRequest, optimsticPb.StreamExecuteOptimisticBlockResponse]{
+		requestStream:        requestStreams,
+		accumulatedResponses: []*optimsticPb.StreamExecuteOptimisticBlockResponse{},
+		requestCounter:       0,
+	}
+
+	errorCh := make(chan error)
+	go func(errorCh chan error) {
+		errorCh <- serviceV1Alpha1.StreamExecuteOptimisticBlock(mockStream)
+	}(errorCh)
+
+	select {
+	// stream either errors out of gets closed
+	case err := <-errorCh:
+		require.Nil(t, err, "StreamExecuteOptimisticBlock failed")
+	}
+
+	accumulatedResponses := mockStream.accumulatedResponses
+
+	require.Equal(t, len(accumulatedResponses), len(mockStream.requestStream), "Number of responses should match the number of requests")
+
+	blockCounter := 1
+	for _, response := range accumulatedResponses {
+		require.True(t, bytes.Equal(response.GetBaseSequencerBlockHash(), sequencerBlockHash), "Sequencer block hash does not match")
+		block := response.GetBlock()
+		require.True(t, bytes.Equal(block.ParentBlockHash, previousBlock.Hash().Bytes()), "Parent block hash does not match")
+		requiredBlockNumber := big.NewInt(0).Add(previousBlock.Number, big.NewInt(int64(blockCounter)))
+		require.Equal(t, requiredBlockNumber.Uint64(), uint64(block.Number), "Block number is not correct")
+		blockCounter += 1
+	}
+
+	// ensure mempool is cleared
+	astriaOrdered := ethservice.TxPool().AstriaOrdered()
+	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+	pending := ethservice.TxPool().Pending(txpool.PendingFilter{
+		OnlyPlainTxs: true,
+	})
+	require.Len(t, pending, 0, "Mempool should be empty")
 }
 
 // Check that invalid transactions are not added into a block and are removed from the mempool
