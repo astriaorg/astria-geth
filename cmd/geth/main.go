@@ -191,6 +191,7 @@ var (
 		utils.GRPCEnabledFlag,
 		utils.GRPCHostFlag,
 		utils.GRPCPortFlag,
+		utils.GRPCUdsFlag,
 	}
 
 	metricsFlags = []cli.Flag{
