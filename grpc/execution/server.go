@@ -258,31 +258,32 @@ func (s *ExecutionServiceServerV1) StreamBundles(stream optimisticGrpc.BundleSer
 			// this is an in-memory read, so there shouldn't be a lot of concerns on speed
 			optimisticBlock := s.eth.BlockChain().CurrentOptimisticBlock()
 
-			totalCost := big.NewInt(0)
-			marshalledTxs := make([][]byte, len(pendingTxs.Txs))
-			bundle := optimsticPb.Bundle{}
 			for _, pendingTx := range pendingTxs.Txs {
+				bundle := optimsticPb.Bundle{}
+
+				totalCost := big.NewInt(0)
 				effectiveTip := cmath.BigMin(pendingTx.GasTipCap(), new(big.Int).Sub(pendingTx.GasFeeCap(), optimisticBlock.BaseFee))
 				totalCost.Add(totalCost, effectiveTip)
 				baseFee := new(big.Int).SetUint64(pendingTx.Gas())
 				baseFee.Mul(baseFee, optimisticBlock.BaseFee)
 				totalCost.Add(totalCost, baseFee)
 
+				marshalledTxs := [][]byte{}
 				marshalledTx, err := pendingTx.MarshalBinary()
 				if err != nil {
 					return status.Errorf(codes.Internal, "error marshalling tx: %v", err)
 				}
 				marshalledTxs = append(marshalledTxs, marshalledTx)
-			}
 
-			bundle.Fee = totalCost.Uint64()
-			bundle.Transactions = marshalledTxs
-			bundle.BaseSequencerBlockHash = *s.currentOptimisticSequencerBlock.Load()
-			bundle.PrevRollupBlockHash = optimisticBlock.Hash().Bytes()
+				bundle.Fee = totalCost.Uint64()
+				bundle.Transactions = marshalledTxs
+				bundle.BaseSequencerBlockHash = *s.currentOptimisticSequencerBlock.Load()
+				bundle.PrevRollupBlockHash = optimisticBlock.Hash().Bytes()
 
-			err := stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
-			if err != nil {
-				return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
+				err = stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
+				if err != nil {
+					return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
+				}
 			}
 
 		case err := <-pendingTxEvent.Err():

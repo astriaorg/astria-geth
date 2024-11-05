@@ -55,3 +55,37 @@ func (ms *MockBidirectionalStreaming[K, V]) SendMsg(m any) error {
 func (ms *MockBidirectionalStreaming[K, V]) RecvMsg(m any) error {
 	panic("implement me")
 }
+
+type MockServerSideStreaming[K any] struct {
+	sentResponses []*K
+}
+
+func (ms *MockServerSideStreaming[K]) SendMsg(m any) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (ms *MockServerSideStreaming[K]) Send(res *K) error {
+	ms.sentResponses = append(ms.sentResponses, res)
+	return nil
+}
+
+func (ms *MockServerSideStreaming[K]) SetHeader(md metadata.MD) error {
+	panic("implement me")
+}
+
+func (ms *MockServerSideStreaming[K]) SendHeader(md metadata.MD) error {
+	panic("implement me")
+}
+
+func (ms *MockServerSideStreaming[K]) SetTrailer(md metadata.MD) {
+	panic("implement me")
+}
+
+func (ms *MockServerSideStreaming[K]) Context() context.Context {
+	return context.Background()
+}
+
+func (ms *MockServerSideStreaming[K]) RecvMsg(m any) error {
+	panic("implement me")
+}

@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -646,6 +647,146 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 	}
 }
 
+func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+
+	// call genesis info
+	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	require.Nil(t, err, "GetGenesisInfo failed")
+	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+
+	// call get commitment state
+	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	require.Nil(t, err, "GetCommitmentState failed")
+	require.NotNil(t, commitmentState, "CommitmentState is nil")
+
+	// get previous block hash
+	previousBlock := ethservice.BlockChain().CurrentSafeBlock()
+	require.NotNil(t, previousBlock, "Previous block not found")
+
+	// create the optimistic block via the StreamExecuteOptimisticBlock rpc
+	requestStreams := []*optimsticPb.ExecuteOptimisticBlockStreamRequest{}
+	sequencerBlockHash := []byte("sequencer_block_hash")
+
+	// create 1 stream item with 5 txs
+	txs := []*types.Transaction{}
+	marshalledTxs := []*sequencerblockv1.RollupData{}
+	for i := 0; i < 5; i++ {
+		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+		require.Nil(t, err, "Failed to sign tx")
+		txs = append(txs, tx)
+
+		marshalledTx, err := tx.MarshalBinary()
+		require.Nil(t, err, "Failed to marshal tx")
+		marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+			Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
+		})
+	}
+
+	req := optimsticPb.ExecuteOptimisticBlockStreamRequest{BaseBlock: &optimsticPb.BaseBlock{
+		SequencerBlockHash: sequencerBlockHash,
+		Transactions:       marshalledTxs,
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(previousBlock.Time + 2),
+		},
+	}}
+
+	requestStreams = append(requestStreams, &req)
+
+	mockBidirectionalStream := &MockBidirectionalStreaming[optimsticPb.ExecuteOptimisticBlockStreamRequest, optimsticPb.ExecuteOptimisticBlockStreamResponse]{
+		requestStream:        requestStreams,
+		accumulatedResponses: []*optimsticPb.ExecuteOptimisticBlockStreamResponse{},
+		requestCounter:       0,
+	}
+
+	errorCh := make(chan error)
+	go func(errorCh chan error) {
+		errorCh <- serviceV1Alpha1.ExecuteOptimisticBlockStream(mockBidirectionalStream)
+	}(errorCh)
+
+	select {
+	// stream either errors out of gets closed
+	case err := <-errorCh:
+		require.Nil(t, err, "StreamExecuteOptimisticBlock failed")
+	}
+
+	require.Len(t, mockBidirectionalStream.accumulatedResponses, 1, "Number of responses should match the number of requests")
+	accumulatedResponse := mockBidirectionalStream.accumulatedResponses[0]
+
+	currentOptimisticBlock := ethservice.BlockChain().CurrentOptimisticBlock()
+	require.NotNil(t, currentOptimisticBlock, "Optimistic block is not set")
+	require.True(t, bytes.Equal(accumulatedResponse.GetBlock().Hash, currentOptimisticBlock.Hash().Bytes()), "Optimistic block hashes do not match")
+	require.True(t, bytes.Equal(accumulatedResponse.GetBlock().ParentBlockHash, currentOptimisticBlock.ParentHash.Bytes()), "Optimistic block parent hashes do not match")
+	require.Equal(t, uint64(accumulatedResponse.GetBlock().Number), currentOptimisticBlock.Number.Uint64(), "Optimistic block numbers do not match")
+
+	// assert mempool is cleared
+	astriaOrdered := ethservice.TxPool().AstriaOrdered()
+	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+	pendingTxs := ethservice.TxPool().Pending(txpool.PendingFilter{
+		OnlyPlainTxs: true,
+	})
+	require.Equal(t, len(pendingTxs), 0, "Mempool should be empty")
+
+	mockServerSideStreaming := MockServerSideStreaming[optimsticPb.GetBundleStreamResponse]{
+		sentResponses: []*optimsticPb.GetBundleStreamResponse{},
+	}
+
+	errorCh = make(chan error)
+	go func() {
+		errorCh <- serviceV1Alpha1.StreamBundles(&mockServerSideStreaming)
+	}()
+
+	// optimistic block is created, we can now add txs and check if they get streamed
+	// create 5 txs
+	txs = []*types.Transaction{}
+	for i := 5; i < 10; i++ {
+		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+		require.Nil(t, err, "Failed to sign tx")
+		txs = append(txs, tx)
+
+		marshalledTx, err := tx.MarshalBinary()
+		require.Nil(t, err, "Failed to marshal tx")
+		marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+			Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
+		})
+	}
+
+	txErrors := ethservice.TxPool().Add(txs, true, false)
+	for _, txErr := range txErrors {
+		require.Nil(t, txErr, "Failed to add tx to mempool")
+	}
+
+	pendingTxs = ethservice.TxPool().Pending(txpool.PendingFilter{
+		OnlyPlainTxs: true,
+	})
+	require.Len(t, pendingTxs, 1, "Mempool should have 1 tx")
+	addrTxs := pendingTxs[testAddr]
+	require.Len(t, addrTxs, 5, "Mempool should have 5 txs for test address")
+
+	time.Sleep(5 * time.Second)
+
+	// close the mempool to error the method out
+	err = ethservice.TxPool().Close()
+	require.Nil(t, err, "Failed to close mempool")
+
+	select {
+	case err := <-errorCh:
+		require.ErrorContains(t, err, "error waiting for pending transactions")
+	}
+
+	require.Len(t, mockServerSideStreaming.sentResponses, 5, "Number of responses should match the number of requests")
+
+	for _, resp := range mockServerSideStreaming.sentResponses {
+		bundle := resp.GetBundle()
+		require.Len(t, bundle.Transactions, 1, "Bundle should have 1 tx")
+		require.True(t, bytes.Equal(bundle.PrevRollupBlockHash, currentOptimisticBlock.Hash().Bytes()), "PrevRollupBlockHash should match the current optimistic block hash")
+		require.True(t, bytes.Equal(bundle.BaseSequencerBlockHash, *serviceV1Alpha1.currentOptimisticSequencerBlock.Load()), "BaseSequencerBlockHash should match the current optimistic sequencer block hash")
+	}
+}
+
 func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlockStream(t *testing.T) {
 	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
@@ -713,7 +854,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlockStream(t *testing.
 	}(errorCh)
 
 	select {
-	// stream either errors out of gets closed
+	// the stream will either errors out or gets closed
 	case err := <-errorCh:
 		require.Nil(t, err, "StreamExecuteOptimisticBlock failed")
 	}
