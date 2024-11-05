@@ -54,7 +54,7 @@ func NewOptimisticServiceV1Alpha(sharedServiceContainer *shared.SharedServiceCon
 	return optimisticService
 }
 
-func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.GetBundleStreamRequest, stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
+func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStreamRequest, stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
 	pendingTxEventCh := make(chan core.NewTxsEvent)
 	pendingTxEvent := o.Eth().TxPool().SubscribeTransactions(pendingTxEventCh, false)
 	defer pendingTxEvent.Unsubscribe()
@@ -97,7 +97,7 @@ func (o *OptimisticServiceV1Alpha1) StreamBundles(_ *optimsticPb.GetBundleStream
 	}
 }
 
-func (o *OptimisticServiceV1Alpha1) StreamExecuteOptimisticBlock(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
+func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := o.Eth().TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()

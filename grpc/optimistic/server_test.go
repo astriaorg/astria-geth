@@ -260,7 +260,7 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 
 	errorCh := make(chan error)
 	go func(errorCh chan error) {
-		errorCh <- optimisticServiceV1Alpha1.StreamExecuteOptimisticBlock(mockBidirectionalStream)
+		errorCh <- optimisticServiceV1Alpha1.ExecuteOptimisticBlockStream(mockBidirectionalStream)
 	}(errorCh)
 
 	select {
@@ -292,7 +292,7 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 
 	errorCh = make(chan error)
 	go func() {
-		errorCh <- optimisticServiceV1Alpha1.StreamBundles(&optimsticPb.GetBundleStreamRequest{}, &mockServerSideStreaming)
+		errorCh <- optimisticServiceV1Alpha1.GetBundleStream(&optimsticPb.GetBundleStreamRequest{}, &mockServerSideStreaming)
 	}()
 
 	stateDb, err := ethservice.BlockChain().StateAt(currentOptimisticBlock.Root)
@@ -423,7 +423,7 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 
 	errorCh := make(chan error)
 	go func(errorCh chan error) {
-		errorCh <- optimisticServiceV1Alpha1.StreamExecuteOptimisticBlock(mockStream)
+		errorCh <- optimisticServiceV1Alpha1.ExecuteOptimisticBlockStream(mockStream)
 	}(errorCh)
 
 	select {
