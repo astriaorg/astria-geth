@@ -10,7 +10,6 @@ import (
 	"crypto/sha256"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -724,10 +723,9 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 	astriaOrdered := ethservice.TxPool().AstriaOrdered()
 	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
-	pendingTxs := ethservice.TxPool().Pending(txpool.PendingFilter{
-		OnlyPlainTxs: true,
-	})
-	require.Equal(t, len(pendingTxs), 0, "Mempool should be empty")
+	pending, queued := ethservice.TxPool().Stats()
+	require.Equal(t, pending, 0, "Mempool should have 0 pending txs")
+	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
 	mockServerSideStreaming := MockServerSideStreaming[optimsticPb.GetBundleStreamResponse]{
 		sentResponses: []*optimsticPb.GetBundleStreamResponse{},
@@ -735,7 +733,7 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 
 	errorCh = make(chan error)
 	go func() {
-		errorCh <- serviceV1Alpha1.StreamBundles(&mockServerSideStreaming)
+		errorCh <- serviceV1Alpha1.GetBundleStream(&mockServerSideStreaming)
 	}()
 
 	// optimistic block is created, we can now add txs and check if they get streamed
@@ -759,7 +757,7 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 		require.Nil(t, txErr, "Failed to add tx to mempool")
 	}
 
-	pending, queued := ethservice.TxPool().Stats()
+	pending, queued = ethservice.TxPool().Stats()
 	require.Equal(t, pending, 5, "Mempool should have 5 pending txs")
 	require.Equal(t, queued, 0, "Mempool should have 0 queued txs")
 
