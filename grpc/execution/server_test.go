@@ -646,7 +646,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.T) {
+func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlockStream(t *testing.T) {
 	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
 
 	// call genesis info
@@ -709,7 +709,7 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 
 	errorCh := make(chan error)
 	go func(errorCh chan error) {
-		errorCh <- serviceV1Alpha1.StreamExecuteOptimisticBlock(mockStream)
+		errorCh <- serviceV1Alpha1.ExecuteOptimisticBlockStream(mockStream)
 	}(errorCh)
 
 	select {
