@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	cmath "github.com/ethereum/go-ethereum/common/math"
 	"io"
 	"math/big"
 	"sync"
@@ -245,6 +246,51 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func (s *ExecutionServiceServerV1) StreamBundles(stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
+	pendingTxEventCh := make(chan core.NewTxsEvent)
+	pendingTxEvent := s.eth.TxPool().SubscribeTransactions(pendingTxEventCh, false)
+	defer pendingTxEvent.Unsubscribe()
+
+	for {
+		select {
+		case pendingTxs := <-pendingTxEventCh:
+			// get the optimistic block
+			// this is an in-memory read, so there shouldn't be a lot of concerns on speed
+			optimisticBlock := s.eth.BlockChain().CurrentOptimisticBlock()
+
+			totalCost := big.NewInt(0)
+			marshalledTxs := make([][]byte, len(pendingTxs.Txs))
+			bundle := optimsticPb.Bundle{}
+			for _, pendingTx := range pendingTxs.Txs {
+				effectiveTip := cmath.BigMin(pendingTx.GasTipCap(), new(big.Int).Sub(pendingTx.GasFeeCap(), optimisticBlock.BaseFee))
+				totalCost.Add(totalCost, effectiveTip)
+				baseFee := new(big.Int).SetUint64(pendingTx.Gas())
+				baseFee.Mul(baseFee, optimisticBlock.BaseFee)
+				totalCost.Add(totalCost, baseFee)
+
+				marshalledTx, err := pendingTx.MarshalBinary()
+				if err != nil {
+					return status.Errorf(codes.Internal, "error marshalling tx: %v", err)
+				}
+				marshalledTxs = append(marshalledTxs, marshalledTx)
+			}
+
+			bundle.Fee = totalCost.Uint64()
+			bundle.Transactions = marshalledTxs
+			bundle.BaseSequencerBlockHash = *s.currentOptimisticSequencerBlock.Load()
+			bundle.PrevRollupBlockHash = optimisticBlock.Hash().Bytes()
+
+			err := stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
+			if err != nil {
+				return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
+			}
+
+		case err := <-pendingTxEvent.Err():
+			return status.Errorf(codes.Internal, "error waiting for pending transactions: %v", err)
+		}
+	}
+}
+
 func (s *ExecutionServiceServerV1) ExecuteOptimisticBlockStream(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := s.eth.TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
@@ -283,7 +329,7 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlockStream(stream optimisti
 		case <-time.After(500 * time.Millisecond):
 			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
 		case err := <-mempoolClearingEvent.Err():
-			return status.Error(codes.Internal, fmt.Sprintf("error waiting for mempool clearing event: %v", err))
+			return status.Errorf(codes.Internal, "error waiting for mempool clearing event: %v", err)
 		}
 	}
 }
