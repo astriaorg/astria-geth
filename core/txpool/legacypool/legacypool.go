@@ -1754,22 +1754,6 @@ func (pool *LegacyPool) truncateQueue() {
 // it assumes that the pool lock is being held
 func (pool *LegacyPool) clearPendingAndQueued() {
 	// Iterate over all accounts and demote any non-executable transactions
-	for addr, list := range pool.queue {
-		dropped, invalids := list.ClearList()
-		queuedGauge.Dec(int64(len(dropped) + len(invalids)))
-
-		for _, tx := range dropped {
-			pool.all.Remove(tx.Hash())
-		}
-		for _, tx := range invalids {
-			pool.all.Remove(tx.Hash())
-		}
-
-		if list.Empty() {
-			delete(pool.queue, addr)
-		}
-	}
-
 	for addr, list := range pool.pending {
 		dropped, invalids := list.ClearList()
 		pendingGauge.Dec(int64(len(dropped) + len(invalids)))
@@ -1786,6 +1770,26 @@ func (pool *LegacyPool) clearPendingAndQueued() {
 			delete(pool.beats, addr)
 		}
 	}
+
+	for addr, list := range pool.queue {
+		dropped, invalids := list.ClearList()
+		queuedGauge.Dec(int64(len(dropped) + len(invalids)))
+
+		for _, tx := range dropped {
+			pool.all.Remove(tx.Hash())
+		}
+		for _, tx := range invalids {
+			pool.all.Remove(tx.Hash())
+		}
+
+		if list.Empty() {
+			if _, ok := pool.queue[addr]; !ok {
+				pool.reserve(addr, false)
+			}
+			delete(pool.queue, addr)
+		}
+	}
+
 }
 
 // demoteUnexecutables removes invalid and processed transactions from the pools
