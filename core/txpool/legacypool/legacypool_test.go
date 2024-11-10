@@ -300,6 +300,10 @@ func TestStateChangeDuringReset(t *testing.T) {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
 
+	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
+	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
+	defer mempoolClearedSub.Unsubscribe()
+
 	// trigger state change in the background
 	trigger = true
 	<-pool.requestReset(nil, nil)
@@ -308,6 +312,17 @@ func TestStateChangeDuringReset(t *testing.T) {
 	// mempool is cleared
 	if nonce != 0 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
+	}
+
+	select {
+	case mempoolClear := <-mempoolClearedCh:
+		if mempoolClear.NewHead != nil {
+			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Mempool cleared event not received")
+	case err := <-mempoolClearedSub.Err():
+		t.Fatalf("Mempool cleared subscription error: %v", err)
 	}
 }
 
@@ -700,6 +715,11 @@ func TestDropping(t *testing.T) {
 	if pool.all.Count() != 6 {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
+
+	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
+	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
+	defer mempoolClearedSub.Unsubscribe()
+
 	<-pool.requestReset(nil, nil)
 
 	pending, queued := pool.Stats()
@@ -712,6 +732,17 @@ func TestDropping(t *testing.T) {
 	}
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+
+	select {
+	case mempoolClear := <-mempoolClearedCh:
+		if mempoolClear.NewHead != nil {
+			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Mempool cleared event not received")
+	case err := <-mempoolClearedSub.Err():
+		t.Fatalf("Mempool cleared subscription error: %v", err)
 	}
 }
 
@@ -767,6 +798,11 @@ func TestPostponing(t *testing.T) {
 	if pool.all.Count() != len(txs) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
 	}
+
+	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
+	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
+	defer mempoolClearedSub.Unsubscribe()
+
 	<-pool.requestReset(nil, nil)
 
 	pending, queued := pool.Stats()
@@ -780,6 +816,17 @@ func TestPostponing(t *testing.T) {
 
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+
+	select {
+	case mempoolClear := <-mempoolClearedCh:
+		if mempoolClear.NewHead != nil {
+			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Mempool cleared event not received")
+	case err := <-mempoolClearedSub.Err():
+		t.Fatalf("Mempool cleared subscription error: %v", err)
 	}
 }
 
@@ -1057,6 +1104,11 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 	// remove current transactions and increase nonce to prepare for a reset and cleanup
 	statedb.SetNonce(crypto.PubkeyToAddress(remote.PublicKey), 2)
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 2)
+
+	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
+	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
+	defer mempoolClearedSub.Unsubscribe()
+
 	<-pool.requestReset(nil, nil)
 
 	// make sure queue, pending are cleared
@@ -1069,6 +1121,17 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 	}
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+
+	select {
+	case mempoolClear := <-mempoolClearedCh:
+		if mempoolClear.NewHead != nil {
+			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("Mempool cleared event not received")
+	case err := <-mempoolClearedSub.Err():
+		t.Fatalf("Mempool cleared subscription error: %v", err)
 	}
 }
 
@@ -2362,6 +2425,11 @@ func testJournaling(t *testing.T, nolocals bool) {
 	}
 	// Bump the nonce temporarily and ensure the newly invalidated transaction is removed
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 2)
+
+	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
+	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
+	defer mempoolClearedSub.Unsubscribe()
+
 	<-pool.requestReset(nil, nil)
 	time.Sleep(2 * config.Rejournal)
 	pool.Close()
@@ -2382,6 +2450,18 @@ func testJournaling(t *testing.T, nolocals bool) {
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
+
+	select {
+	case mempoolClear := <-mempoolClearedCh:
+		if mempoolClear.NewHead != nil {
+			t.Fatalf("mempool clear event should not have a new head")
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("mempool clear event not received")
+	case err := <-mempoolClearedSub.Err():
+		t.Fatalf("mempool clear event subscription error: %v", err)
+	}
+
 	pool.Close()
 }
 

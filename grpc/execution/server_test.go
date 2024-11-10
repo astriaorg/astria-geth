@@ -358,6 +358,8 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 					require.Equal(t, block.NumberU64(), blockEvent.Block.NumberU64(), "Optimistic head event block number is not correct")
 				case <-time.After(2 * time.Second):
 					require.FailNow(t, "Optimistic head event not received")
+				case err := <-optimsticHeadSub.Err():
+					require.Nil(t, err, "Optimistic head event subscription failed")
 				}
 			}
 		})
