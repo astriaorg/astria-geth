@@ -1421,9 +1421,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 	pool.mu.Unlock()
 
 	if reset != nil {
-		if reset.newHead != nil {
-			pool.mempoolClearFeed.Send(core.NewMempoolCleared{NewHead: reset.newHead})
-		}
+		pool.mempoolClearFeed.Send(core.NewMempoolCleared{NewHead: reset.newHead})
 	}
 
 	// Notify subsystems for newly added transactions
