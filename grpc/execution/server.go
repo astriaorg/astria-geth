@@ -285,6 +285,9 @@ func (s *ExecutionServiceServerV1) GetBundleStream(stream optimisticGrpc.BundleS
 
 		case err := <-pendingTxEvent.Err():
 			return status.Errorf(codes.Internal, "error waiting for pending transactions: %v", err)
+		case <-stream.Context().Done():
+			log.Debug("GetBundleStream stream closed by client with error", "err", stream.Context().Err())
+			return stream.Context().Err()
 		}
 	}
 }
