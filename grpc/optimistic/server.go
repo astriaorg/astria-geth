@@ -93,6 +93,10 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 
 		case err := <-pendingTxEvent.Err():
 			return status.Errorf(codes.Internal, "error waiting for pending transactions: %v", err)
+
+		case <-stream.Context().Done():
+			log.Debug("GetBundleStream stream closed with error", "err", stream.Context().Err())
+			return stream.Context().Err()
 		}
 	}
 }
