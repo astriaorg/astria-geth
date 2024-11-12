@@ -34,7 +34,7 @@ func NewMemory() *Memory {
 // Set sets offset + size to value
 func (m *Memory) Set(offset, size uint64, value []byte) {
 	// It's possible the offset is greater than 0 and size equals 0. This is because
-	// the calcMemSize (container.go) could potentially return 0 when size is zero (NO-OP)
+	// the calcMemSize (common.go) could potentially return 0 when size is zero (NO-OP)
 	if size > 0 {
 		// length of store may never be less than offset + size.
 		// The store should be resized PRIOR to setting the memory
