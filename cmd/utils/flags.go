@@ -770,6 +770,13 @@ var (
 		Category: flags.APICategory,
 	}
 
+	// auctioneer
+	AuctioneerEnabledFlag = &cli.BoolFlag{
+		Name:     "auctioneer",
+		Usage:    "Enable the auctioneer server",
+		Category: flags.MinerCategory,
+	}
+
 	// Network Settings
 	MaxPeersFlag = &cli.IntFlag{
 		Name:     "maxpeers",

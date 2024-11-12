@@ -78,22 +78,25 @@ type TxPool struct {
 	term chan struct{}           // Termination channel to detect a closed pool
 
 	sync chan chan error // Testing / simulator channel to block until internal reset is done
+
+	auctioneerEnabled bool
 }
 
 // New creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func New(gasTip uint64, chain BlockChain, subpools []SubPool) (*TxPool, error) {
+func New(gasTip uint64, chain BlockChain, subpools []SubPool, auctioneerEnabled bool) (*TxPool, error) {
 	// Retrieve the current head so that all subpools and this main coordinator
 	// pool will have the same starting state, even if the chain moves forward
 	// during initialization.
 	head := chain.CurrentBlock()
 
 	pool := &TxPool{
-		subpools:     subpools,
-		reservations: make(map[common.Address]SubPool),
-		quit:         make(chan chan error),
-		term:         make(chan struct{}),
-		sync:         make(chan chan error),
+		subpools:          subpools,
+		reservations:      make(map[common.Address]SubPool),
+		quit:              make(chan chan error),
+		term:              make(chan struct{}),
+		sync:              make(chan chan error),
+		auctioneerEnabled: auctioneerEnabled,
 	}
 	for i, subpool := range subpools {
 		if err := subpool.Init(gasTip, head, pool.reserver(i, subpool)); err != nil {
@@ -192,6 +195,12 @@ func (p *TxPool) loop(head *types.Header, chain BlockChain) {
 	)
 	defer newOptimisticHeadSub.Unsubscribe()
 
+	var (
+		newHeadCh  = make(chan core.ChainHeadEvent)
+		newHeadSub = chain.SubscribeChainHeadEvent(newHeadCh)
+	)
+	defer newHeadSub.Unsubscribe()
+
 	// Track the previous and current head to feed to an idle reset
 	var (
 		oldHead = head
@@ -245,8 +254,15 @@ func (p *TxPool) loop(head *types.Header, chain BlockChain) {
 		// Wait for the next chain head event or a previous reset finish
 		select {
 		case event := <-newOptimisticHeadCh:
-			// Chain moved forward, store the head for later consumption
-			newHead = event.Block.Header()
+			if p.auctioneerEnabled {
+				// Chain moved forward, store the head for later consumption
+				newHead = event.Block.Header()
+			}
+		case event := <-newHeadCh:
+			if !p.auctioneerEnabled {
+				// Chain moved forward, store the head for later consumption
+				newHead = event.Block.Header()
+			}
 
 		case head := <-resetDone:
 			// Previous reset finished, update the old head and allow a new reset

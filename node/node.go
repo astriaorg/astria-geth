@@ -69,6 +69,8 @@ type Node struct {
 	// grpc
 	grpcServerHandler *GRPCServerHandler // Stores information about the grpc server
 
+	enableAuctioneer bool
+
 	databases map[*closeTrackingDB]struct{} // All open databases
 }
 
@@ -158,6 +160,10 @@ func New(conf *Config) (*Node, error) {
 	node.ws = newHTTPServer(node.log, rpc.DefaultHTTPTimeouts)
 	node.wsAuth = newHTTPServer(node.log, rpc.DefaultHTTPTimeouts)
 	node.ipc = newIPCServer(node.log, conf.IPCEndpoint())
+
+	if conf.EnableAuctioneer {
+		node.enableAuctioneer = true
+	}
 
 	return node, nil
 }
@@ -754,6 +760,10 @@ func (n *Node) WSAuthEndpoint() string {
 // the current protocol stack.
 func (n *Node) EventMux() *event.TypeMux {
 	return n.eventmux
+}
+
+func (n *Node) AuctioneerEnabled() bool {
+	return n.enableAuctioneer
 }
 
 // OpenDatabase opens an existing database with the given name (or creates one if no

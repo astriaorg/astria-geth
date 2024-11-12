@@ -59,11 +59,12 @@ func (m *mockBackend) TxPool() *txpool.TxPool {
 }
 
 type testBlockChain struct {
-	root          common.Hash
-	config        *params.ChainConfig
-	statedb       *state.StateDB
-	gasLimit      uint64
-	chainHeadFeed *event.Feed
+	root                    common.Hash
+	config                  *params.ChainConfig
+	statedb                 *state.StateDB
+	gasLimit                uint64
+	chainHeadFeed           *event.Feed
+	chainOptimisticHeadFeed *event.Feed
 }
 
 func (bc *testBlockChain) Config() *params.ChainConfig {
@@ -94,7 +95,7 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 
 func (bc *testBlockChain) SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainOptimisticHeadEvent) event.Subscription {
-	return bc.chainHeadFeed.Subscribe(ch)
+	return bc.chainOptimisticHeadFeed.Subscribe(ch)
 }
 
 func TestBuildPendingBlocks(t *testing.T) {
@@ -161,10 +162,10 @@ func createMiner(t *testing.T) *Miner {
 		t.Fatalf("can't create new chain %v", err)
 	}
 	statedb, _ := state.New(bc.Genesis().Root(), bc.StateCache(), nil)
-	blockchain := &testBlockChain{bc.Genesis().Root(), chainConfig, statedb, 10000000, new(event.Feed)}
+	blockchain := &testBlockChain{bc.Genesis().Root(), chainConfig, statedb, 10000000, new(event.Feed), new(event.Feed)}
 
-	pool := legacypool.New(testTxPoolConfig, blockchain)
-	txpool, _ := txpool.New(testTxPoolConfig.PriceLimit, blockchain, []txpool.SubPool{pool})
+	pool := legacypool.New(testTxPoolConfig, blockchain, true)
+	txpool, _ := txpool.New(testTxPoolConfig.PriceLimit, blockchain, []txpool.SubPool{pool}, true)
 
 	// Create Miner
 	backend := NewMockBackend(bc, txpool)
