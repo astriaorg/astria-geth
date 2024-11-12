@@ -20,6 +20,8 @@ type GRPCServerHandler struct {
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
 	optimisticExecServ         *optimisticGrpc.OptimisticExecutionServiceServer
 	streamBundleServ           *optimisticGrpc.BundleServiceServer
+
+	enableAuctioneer bool
 }
 
 // NewServer creates a new gRPC server.
@@ -36,11 +38,14 @@ func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer
 		executionServiceServerV1a2: &execServ,
 		optimisticExecServ:         &optimisticExecServ,
 		streamBundleServ:           &streamBundleServ,
+		enableAuctioneer:           cfg.EnableAuctioneer,
 	}
 
 	astriaGrpc.RegisterExecutionServiceServer(execServer, execServ)
-	optimisticGrpc.RegisterOptimisticExecutionServiceServer(execServer, optimisticExecServ)
-	optimisticGrpc.RegisterBundleServiceServer(execServer, streamBundleServ)
+	if cfg.EnableAuctioneer {
+		optimisticGrpc.RegisterOptimisticExecutionServiceServer(execServer, optimisticExecServ)
+		optimisticGrpc.RegisterBundleServiceServer(execServer, streamBundleServ)
+	}
 
 	node.RegisterGRPCServer(serverHandler)
 	return nil
@@ -62,6 +67,7 @@ func (handler *GRPCServerHandler) Start() error {
 	}
 
 	go handler.execServer.Serve(tcpLis)
+
 	log.Info("gRPC server started", "endpoint", handler.endpoint)
 	return nil
 }
@@ -72,6 +78,7 @@ func (handler *GRPCServerHandler) Stop() error {
 	defer handler.mu.Unlock()
 
 	handler.execServer.GracefulStop()
+
 	log.Info("gRPC server stopped", "endpoint", handler.endpoint)
 	return nil
 }

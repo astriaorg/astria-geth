@@ -235,9 +235,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
 	}
-	legacyPool := legacypool.New(config.TxPool, eth.blockchain)
+	legacyPool := legacypool.New(config.TxPool, eth.blockchain, stack.AuctioneerEnabled())
 
-	eth.txPool, err = txpool.New(config.TxPool.PriceLimit, eth.blockchain, []txpool.SubPool{legacyPool, blobPool})
+	eth.txPool, err = txpool.New(config.TxPool.PriceLimit, eth.blockchain, []txpool.SubPool{legacyPool, blobPool}, stack.AuctioneerEnabled())
 	if err != nil {
 		return nil, err
 	}

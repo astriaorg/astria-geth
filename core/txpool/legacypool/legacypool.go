@@ -239,6 +239,8 @@ type LegacyPool struct {
 	initDoneCh      chan struct{}  // is closed once the pool is initialized (for tests)
 
 	changesSinceReorg int // A counter for how many drops we've performed in-between reorg.
+
+	auctioneerEnabled bool
 }
 
 type txpoolResetRequest struct {
@@ -247,26 +249,27 @@ type txpoolResetRequest struct {
 
 // New creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func New(config Config, chain BlockChain) *LegacyPool {
+func New(config Config, chain BlockChain, auctioneerEnabled bool) *LegacyPool {
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
 	// Create the transaction pool with its initial settings
 	pool := &LegacyPool{
-		config:          config,
-		chain:           chain,
-		chainconfig:     chain.Config(),
-		signer:          types.LatestSigner(chain.Config()),
-		pending:         make(map[common.Address]*list),
-		queue:           make(map[common.Address]*list),
-		beats:           make(map[common.Address]time.Time),
-		all:             newLookup(),
-		reqResetCh:      make(chan *txpoolResetRequest),
-		reqPromoteCh:    make(chan *accountSet),
-		queueTxEventCh:  make(chan *types.Transaction),
-		reorgDoneCh:     make(chan chan struct{}),
-		reorgShutdownCh: make(chan struct{}),
-		initDoneCh:      make(chan struct{}),
+		config:            config,
+		chain:             chain,
+		chainconfig:       chain.Config(),
+		signer:            types.LatestSigner(chain.Config()),
+		pending:           make(map[common.Address]*list),
+		queue:             make(map[common.Address]*list),
+		beats:             make(map[common.Address]time.Time),
+		all:               newLookup(),
+		reqResetCh:        make(chan *txpoolResetRequest),
+		reqPromoteCh:      make(chan *accountSet),
+		queueTxEventCh:    make(chan *types.Transaction),
+		reorgDoneCh:       make(chan chan struct{}),
+		reorgShutdownCh:   make(chan struct{}),
+		initDoneCh:        make(chan struct{}),
+		auctioneerEnabled: auctioneerEnabled,
 	}
 	pool.locals = newAccountSet(pool.signer)
 	for _, addr := range config.Locals {
@@ -1373,8 +1376,16 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 	}
 	pool.mu.Lock()
 	if reset != nil {
-		// Reset from the old head to the new, rescheduling any reorged transactions
-		pool.reset(reset.oldHead, reset.newHead)
+		// only reset the state root and the head of the txpool when we are running the auctioneer node.
+		// when we are not running the auctioneer node, we re-inject any re-orged transactions which is similar
+		// to the current functionality of geth
+		if pool.auctioneerEnabled {
+			// only reset from the old head to the new head
+			pool.resetHeadOnly(reset.oldHead, reset.newHead)
+		} else {
+			// Reset from the old head to the new, rescheduling any reorged transactions
+			pool.reset(reset.oldHead, reset.newHead)
+		}
 
 		// Nonces were reset, discard any events that became stale
 		for addr := range events {
@@ -1395,7 +1406,13 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 	// remove any transaction that has been included in the block or was invalidated
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
-		pool.clearPendingAndQueued(reset.newHead)
+		if pool.auctioneerEnabled {
+			// if we are running the pool as an auctioneer, then we should clear the mempool each time the head
+			// is reset
+			pool.clearPendingAndQueued(reset.newHead)
+		} else {
+			pool.demoteUnexecutables()
+		}
 		if reset.newHead != nil {
 			if pool.chainconfig.IsLondon(new(big.Int).Add(reset.newHead.Number, big.NewInt(1))) {
 				pendingBaseFee := eip1559.CalcBaseFee(pool.chainconfig, reset.newHead)

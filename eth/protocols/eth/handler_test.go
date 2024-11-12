@@ -116,8 +116,8 @@ func newTestBackendWithGenerator(blocks int, shanghai bool, generator func(int, 
 	txconfig := legacypool.DefaultConfig
 	txconfig.Journal = "" // Don't litter the disk with test journals
 
-	pool := legacypool.New(txconfig, chain)
-	txpool, _ := txpool.New(txconfig.PriceLimit, chain, []txpool.SubPool{pool})
+	pool := legacypool.New(txconfig, chain, true)
+	txpool, _ := txpool.New(txconfig.PriceLimit, chain, []txpool.SubPool{pool}, true)
 
 	return &testBackend{
 		db:     db,

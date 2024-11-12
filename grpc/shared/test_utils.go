@@ -119,7 +119,9 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 
 // startEthService creates a full node instance for testing.
 func StartEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
-	n, err := node.New(&node.Config{})
+	n, err := node.New(&node.Config{
+		EnableAuctioneer: true,
+	})
 	require.Nil(t, err, "can't create node")
 	mcfg := miner.DefaultConfig
 	mcfg.PendingFeeRecipient = TestAddr
