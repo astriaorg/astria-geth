@@ -13,18 +13,15 @@
 //
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+
 package legacypool
 
 import (
 	"crypto/ecdsa"
-	crand "crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,17 +35,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/holiman/uint256"
-)
-
-var (
-	// testTxPoolConfig is a transaction pool configuration without stateful disk
-	// sideeffects used during testing.
-	testTxPoolConfig Config
-
-	// eip1559Config is a chain config with EIP-1559 enabled at block 0.
-	eip1559Config *params.ChainConfig
 )
 
 func init() {
@@ -61,213 +48,10 @@ func init() {
 	eip1559Config.LondonBlock = common.Big0
 }
 
-type testBlockChain struct {
-	config                 *params.ChainConfig
-	gasLimit               atomic.Uint64
-	statedb                *state.StateDB
-	chainHeadFeed          *event.Feed
-	chainOptimisticHeadFee *event.Feed
-}
-
-func newTestBlockChain(config *params.ChainConfig, gasLimit uint64, statedb *state.StateDB, chainHeadFeed *event.Feed) *testBlockChain {
-	bc := testBlockChain{config: config, statedb: statedb, chainHeadFeed: new(event.Feed), chainOptimisticHeadFee: new(event.Feed)}
-	bc.gasLimit.Store(gasLimit)
-	return &bc
-}
-
-func (bc *testBlockChain) Config() *params.ChainConfig {
-	return bc.config
-}
-
-func (bc *testBlockChain) CurrentBlock() *types.Header {
-	return &types.Header{
-		Number:   new(big.Int),
-		GasLimit: bc.gasLimit.Load(),
-	}
-}
-
-func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
-	return types.NewBlock(bc.CurrentBlock(), nil, nil, trie.NewStackTrie(nil))
-}
-
-func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
-	return bc.statedb, nil
-}
-
-func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return bc.chainHeadFeed.Subscribe(ch)
-}
-
-func (bc *testBlockChain) SubscribeChainOptimisticHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return bc.chainOptimisticHeadFee.Subscribe(ch)
-}
-
-func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
-	return pricedTransaction(nonce, gaslimit, big.NewInt(1), key)
-}
-
-func pricedTransaction(nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) *types.Transaction {
-	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, big.NewInt(100), gaslimit, gasprice, nil), types.HomesteadSigner{}, key)
-	return tx
-}
-
-func pricedDataTransaction(nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey, bytes uint64) *types.Transaction {
-	data := make([]byte, bytes)
-	crand.Read(data)
-
-	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, big.NewInt(0), gaslimit, gasprice, data), types.HomesteadSigner{}, key)
-	return tx
-}
-
-func dynamicFeeTx(nonce uint64, gaslimit uint64, gasFee *big.Int, tip *big.Int, key *ecdsa.PrivateKey) *types.Transaction {
-	tx, _ := types.SignNewTx(key, types.LatestSignerForChainID(params.TestChainConfig.ChainID), &types.DynamicFeeTx{
-		ChainID:    params.TestChainConfig.ChainID,
-		Nonce:      nonce,
-		GasTipCap:  tip,
-		GasFeeCap:  gasFee,
-		Gas:        gaslimit,
-		To:         &common.Address{},
-		Value:      big.NewInt(100),
-		Data:       nil,
-		AccessList: nil,
-	})
-	return tx
-}
-
-func makeAddressReserver() txpool.AddressReserver {
-	var (
-		reserved = make(map[common.Address]struct{})
-		lock     sync.Mutex
-	)
-	return func(addr common.Address, reserve bool) error {
-		lock.Lock()
-		defer lock.Unlock()
-
-		_, exists := reserved[addr]
-		if reserve {
-			if exists {
-				panic("already reserved")
-			}
-			reserved[addr] = struct{}{}
-			return nil
-		}
-		if !exists {
-			panic("not reserved")
-		}
-		delete(reserved, addr)
-		return nil
-	}
-}
-
-func setupPool(auctioneerEnabled bool) (*LegacyPool, *ecdsa.PrivateKey) {
-	return setupPoolWithConfig(params.TestChainConfig, auctioneerEnabled)
-}
-
-func setupPoolWithConfig(config *params.ChainConfig, auctioneerEnabled bool) (*LegacyPool, *ecdsa.PrivateKey) {
-	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-	blockchain := newTestBlockChain(config, 10000000, statedb, new(event.Feed))
-
-	key, _ := crypto.GenerateKey()
-	pool := New(testTxPoolConfig, blockchain, auctioneerEnabled)
-	if err := pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver()); err != nil {
-		panic(err)
-	}
-	// wait for the pool to initialize
-	<-pool.initDoneCh
-	return pool, key
-}
-
-// validatePoolInternals checks various consistency invariants within the pool.
-func validatePoolInternals(pool *LegacyPool) error {
-	pool.mu.RLock()
-	defer pool.mu.RUnlock()
-
-	// Ensure the total transaction set is consistent with pending + queued
-	pending, queued := pool.stats()
-	if total := pool.all.Count(); total != pending+queued {
-		return fmt.Errorf("total transaction count %d != %d pending + %d queued", total, pending, queued)
-	}
-	pool.priced.Reheap()
-	priced, remote := pool.priced.urgent.Len()+pool.priced.floating.Len(), pool.all.RemoteCount()
-	if priced != remote {
-		return fmt.Errorf("total priced transaction count %d != %d", priced, remote)
-	}
-	// Ensure the next nonce to assign is the correct one
-	for addr, txs := range pool.pending {
-		// Find the last transaction
-		var last uint64
-		for nonce := range txs.txs.items {
-			if last < nonce {
-				last = nonce
-			}
-		}
-		if nonce := pool.pendingNonces.get(addr); nonce != last+1 {
-			return fmt.Errorf("pending nonce mismatch: have %v, want %v", nonce, last+1)
-		}
-	}
-	return nil
-}
-
-// validateEvents checks that the correct number of transaction addition events
-// were fired on the pool's event feed.
-func validateEvents(events chan core.NewTxsEvent, count int) error {
-	var received []*types.Transaction
-
-	for len(received) < count {
-		select {
-		case ev := <-events:
-			received = append(received, ev.Txs...)
-		case <-time.After(time.Second):
-			return fmt.Errorf("event #%d not fired", len(received))
-		}
-	}
-	if len(received) > count {
-		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
-	}
-	select {
-	case ev := <-events:
-		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
-
-	case <-time.After(50 * time.Millisecond):
-		// This branch should be "default", but it's a data race between goroutines,
-		// reading the event channel and pushing into it, so better wait a bit ensuring
-		// really nothing gets injected.
-	}
-	return nil
-}
-
-func deriveSender(tx *types.Transaction) (common.Address, error) {
-	return types.Sender(types.HomesteadSigner{}, tx)
-}
-
-type testChain struct {
-	*testBlockChain
-	address common.Address
-	trigger *bool
-}
-
-// testChain.State() is used multiple times to reset the pending state.
-// when simulate is true it will create a state that indicates
-// that tx0 and tx1 are included in the chain.
-func (c *testChain) State() (*state.StateDB, error) {
-	// delay "state change" by one. The tx pool fetches the
-	// state multiple times and by delaying it a bit we simulate
-	// a state change between those fetches.
-	stdb := c.statedb
-	if *c.trigger {
-		c.statedb, _ = state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-		// simulate that the new head block included tx0 and tx1
-		c.statedb.SetNonce(c.address, 2)
-		c.statedb.SetBalance(c.address, new(uint256.Int).SetUint64(params.Ether), tracing.BalanceChangeUnspecified)
-		*c.trigger = false
-	}
-	return stdb, nil
-}
-
 // This test simulates a scenario where a new block is imported during a
 // state reset and tests whether the pending state is in sync with the
 // block head event that initiated the resetState().
-func TestStateChangeDuringReset(t *testing.T) {
+func TestStateChangeDuringResetNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -284,7 +68,7 @@ func TestStateChangeDuringReset(t *testing.T) {
 	tx0 := transaction(0, 100000, key)
 	tx1 := transaction(1, 100000, key)
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -300,48 +84,20 @@ func TestStateChangeDuringReset(t *testing.T) {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
 
-	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
-	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
-	defer mempoolClearedSub.Unsubscribe()
-
 	// trigger state change in the background
 	trigger = true
 	<-pool.requestReset(nil, nil)
 
 	nonce = pool.Nonce(address)
-	// mempool is cleared
-	if nonce != 0 {
+	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
-
-	select {
-	case mempoolClear := <-mempoolClearedCh:
-		if mempoolClear.NewHead != nil {
-			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("Mempool cleared event not received")
-	case err := <-mempoolClearedSub.Err():
-		t.Fatalf("Mempool cleared subscription error: %v", err)
-	}
 }
 
-func testAddBalance(pool *LegacyPool, addr common.Address, amount *big.Int) {
-	pool.mu.Lock()
-	pool.currentState.AddBalance(addr, uint256.MustFromBig(amount), tracing.BalanceChangeUnspecified)
-	pool.mu.Unlock()
-}
-
-func testSetNonce(pool *LegacyPool, addr common.Address, nonce uint64) {
-	pool.mu.Lock()
-	pool.currentState.SetNonce(addr, nonce)
-	pool.mu.Unlock()
-}
-
-func TestInvalidTransactions(t *testing.T) {
+func TestInvalidTransactionsNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	tx := transaction(0, 100, key)
@@ -376,10 +132,10 @@ func TestInvalidTransactions(t *testing.T) {
 	}
 }
 
-func TestQueue(t *testing.T) {
+func TestQueueNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	tx := transaction(0, 100, key)
@@ -407,10 +163,10 @@ func TestQueue(t *testing.T) {
 	}
 }
 
-func TestQueue2(t *testing.T) {
+func TestQueue2NoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	tx1 := transaction(0, 100, key)
@@ -433,10 +189,10 @@ func TestQueue2(t *testing.T) {
 	}
 }
 
-func TestNegativeValue(t *testing.T) {
+func TestNegativeValueNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	tx, _ := types.SignTx(types.NewTransaction(0, common.Address{}, big.NewInt(-1), 100, big.NewInt(1), nil), types.HomesteadSigner{}, key)
@@ -447,10 +203,10 @@ func TestNegativeValue(t *testing.T) {
 	}
 }
 
-func TestTipAboveFeeCap(t *testing.T) {
+func TestTipAboveFeeCapNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPoolWithConfig(eip1559Config, true)
+	pool, key := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 
 	tx := dynamicFeeTx(0, 100, big.NewInt(1), big.NewInt(2), key)
@@ -460,10 +216,10 @@ func TestTipAboveFeeCap(t *testing.T) {
 	}
 }
 
-func TestVeryHighValues(t *testing.T) {
+func TestVeryHighValuesNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPoolWithConfig(eip1559Config, true)
+	pool, key := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 
 	veryBigNumber := big.NewInt(1)
@@ -480,10 +236,10 @@ func TestVeryHighValues(t *testing.T) {
 	}
 }
 
-func TestChainFork(t *testing.T) {
+func TestChainForkNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -509,10 +265,10 @@ func TestChainFork(t *testing.T) {
 	}
 }
 
-func TestRemoveTxSanity(t *testing.T) {
+func TestRemoveTxSanityNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -570,10 +326,10 @@ func TestRemoveTxSanity(t *testing.T) {
 	}
 }
 
-func TestDoubleNonce(t *testing.T) {
+func TestDoubleNonceNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -621,10 +377,10 @@ func TestDoubleNonce(t *testing.T) {
 	}
 }
 
-func TestMissingNonce(t *testing.T) {
+func TestMissingNonceNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -644,11 +400,11 @@ func TestMissingNonce(t *testing.T) {
 	}
 }
 
-func TestNonceRecovery(t *testing.T) {
+func TestNonceRecoveryNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	const n = 10
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	addr := crypto.PubkeyToAddress(key.PublicKey)
@@ -670,11 +426,11 @@ func TestNonceRecovery(t *testing.T) {
 
 // Tests that if an account runs out of funds, any pending and queued transactions
 // are dropped.
-func TestDropping(t *testing.T) {
+func TestDroppingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create a test account and fund it
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -715,48 +471,73 @@ func TestDropping(t *testing.T) {
 	if pool.all.Count() != 6 {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
-
-	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
-	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
-	defer mempoolClearedSub.Unsubscribe()
-
+	<-pool.requestReset(nil, nil)
+	if pool.pending[account].Len() != 3 {
+		t.Errorf("pending transaction mismatch: have %d, want %d", pool.pending[account].Len(), 3)
+	}
+	if pool.queue[account].Len() != 3 {
+		t.Errorf("queued transaction mismatch: have %d, want %d", pool.queue[account].Len(), 3)
+	}
+	if pool.all.Count() != 6 {
+		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
+	}
+	// Reduce the balance of the account, and check that invalidated transactions are dropped
+	testAddBalance(pool, account, big.NewInt(-650))
 	<-pool.requestReset(nil, nil)
 
-	pending, queued := pool.Stats()
+	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
+		t.Errorf("funded pending transaction missing: %v", tx0)
+	}
+	if _, ok := pool.pending[account].txs.items[tx1.Nonce()]; !ok {
+		t.Errorf("funded pending transaction missing: %v", tx0)
+	}
+	if _, ok := pool.pending[account].txs.items[tx2.Nonce()]; ok {
+		t.Errorf("out-of-fund pending transaction present: %v", tx1)
+	}
+	if _, ok := pool.queue[account].txs.items[tx10.Nonce()]; !ok {
+		t.Errorf("funded queued transaction missing: %v", tx10)
+	}
+	if _, ok := pool.queue[account].txs.items[tx11.Nonce()]; !ok {
+		t.Errorf("funded queued transaction missing: %v", tx10)
+	}
+	if _, ok := pool.queue[account].txs.items[tx12.Nonce()]; ok {
+		t.Errorf("out-of-fund queued transaction present: %v", tx11)
+	}
+	if pool.all.Count() != 4 {
+		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
+	}
+	// Reduce the block gas limit, check that invalidated transactions are dropped
+	pool.chain.(*testBlockChain).gasLimit.Store(100)
+	<-pool.requestReset(nil, nil)
 
-	if pending != 0 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
+	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
+		t.Errorf("funded pending transaction missing: %v", tx0)
 	}
-	if queued != 0 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+	if _, ok := pool.pending[account].txs.items[tx1.Nonce()]; ok {
+		t.Errorf("over-gased pending transaction present: %v", tx1)
 	}
-	if err := validatePoolInternals(pool); err != nil {
-		t.Fatalf("pool internal state corrupted: %v", err)
+	if _, ok := pool.queue[account].txs.items[tx10.Nonce()]; !ok {
+		t.Errorf("funded queued transaction missing: %v", tx10)
 	}
-
-	select {
-	case mempoolClear := <-mempoolClearedCh:
-		if mempoolClear.NewHead != nil {
-			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("Mempool cleared event not received")
-	case err := <-mempoolClearedSub.Err():
-		t.Fatalf("Mempool cleared subscription error: %v", err)
+	if _, ok := pool.queue[account].txs.items[tx11.Nonce()]; ok {
+		t.Errorf("over-gased queued transaction present: %v", tx11)
+	}
+	if pool.all.Count() != 2 {
+		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 2)
 	}
 }
 
 // Tests that if a transaction is dropped from the current pending pool (e.g. out
 // of fund), all consecutive (still valid, but not executable) transactions are
 // postponed back into the future queue to prevent broadcasting them.
-func TestPostponing(t *testing.T) {
+func TestPostponingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the postponing with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -798,46 +579,76 @@ func TestPostponing(t *testing.T) {
 	if pool.all.Count() != len(txs) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
 	}
-
-	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
-	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
-	defer mempoolClearedSub.Unsubscribe()
-
+	<-pool.requestReset(nil, nil)
+	if pending := pool.pending[accs[0]].Len() + pool.pending[accs[1]].Len(); pending != len(txs) {
+		t.Errorf("pending transaction mismatch: have %d, want %d", pending, len(txs))
+	}
+	if len(pool.queue) != 0 {
+		t.Errorf("queued accounts mismatch: have %d, want %d", len(pool.queue), 0)
+	}
+	if pool.all.Count() != len(txs) {
+		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
+	}
+	// Reduce the balance of the account, and check that transactions are reorganised
+	for _, addr := range accs {
+		testAddBalance(pool, addr, big.NewInt(-1))
+	}
 	<-pool.requestReset(nil, nil)
 
-	pending, queued := pool.Stats()
-
-	if pending != 0 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
+	// The first account's first transaction remains valid, check that subsequent
+	// ones are either filtered out, or queued up for later.
+	if _, ok := pool.pending[accs[0]].txs.items[txs[0].Nonce()]; !ok {
+		t.Errorf("tx %d: valid and funded transaction missing from pending pool: %v", 0, txs[0])
 	}
-	if queued != 0 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+	if _, ok := pool.queue[accs[0]].txs.items[txs[0].Nonce()]; ok {
+		t.Errorf("tx %d: valid and funded transaction present in future queue: %v", 0, txs[0])
 	}
-
-	if err := validatePoolInternals(pool); err != nil {
-		t.Fatalf("pool internal state corrupted: %v", err)
-	}
-
-	select {
-	case mempoolClear := <-mempoolClearedCh:
-		if mempoolClear.NewHead != nil {
-			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+	for i, tx := range txs[1:100] {
+		if i%2 == 1 {
+			if _, ok := pool.pending[accs[0]].txs.items[tx.Nonce()]; ok {
+				t.Errorf("tx %d: valid but future transaction present in pending pool: %v", i+1, tx)
+			}
+			if _, ok := pool.queue[accs[0]].txs.items[tx.Nonce()]; !ok {
+				t.Errorf("tx %d: valid but future transaction missing from future queue: %v", i+1, tx)
+			}
+		} else {
+			if _, ok := pool.pending[accs[0]].txs.items[tx.Nonce()]; ok {
+				t.Errorf("tx %d: out-of-fund transaction present in pending pool: %v", i+1, tx)
+			}
+			if _, ok := pool.queue[accs[0]].txs.items[tx.Nonce()]; ok {
+				t.Errorf("tx %d: out-of-fund transaction present in future queue: %v", i+1, tx)
+			}
 		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("Mempool cleared event not received")
-	case err := <-mempoolClearedSub.Err():
-		t.Fatalf("Mempool cleared subscription error: %v", err)
+	}
+	// The second account's first transaction got invalid, check that all transactions
+	// are either filtered out, or queued up for later.
+	if pool.pending[accs[1]] != nil {
+		t.Errorf("invalidated account still has pending transactions")
+	}
+	for i, tx := range txs[100:] {
+		if i%2 == 1 {
+			if _, ok := pool.queue[accs[1]].txs.items[tx.Nonce()]; !ok {
+				t.Errorf("tx %d: valid but future transaction missing from future queue: %v", 100+i, tx)
+			}
+		} else {
+			if _, ok := pool.queue[accs[1]].txs.items[tx.Nonce()]; ok {
+				t.Errorf("tx %d: out-of-fund transaction present in future queue: %v", 100+i, tx)
+			}
+		}
+	}
+	if pool.all.Count() != len(txs)/2 {
+		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs)/2)
 	}
 }
 
 // Tests that if the transaction pool has both executable and non-executable
 // transactions from an origin account, filling the nonce gap moves all queued
 // ones into the pending pool.
-func TestGapFilling(t *testing.T) {
+func TestGapFillingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create a test account and fund it
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -887,11 +698,11 @@ func TestGapFilling(t *testing.T) {
 
 // Tests that if the transaction count belonging to a single account goes above
 // some threshold, the higher transactions are dropped to prevent DOS attacks.
-func TestQueueAccountLimiting(t *testing.T) {
+func TestQueueAccountLimitingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create a test account and fund it
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -920,21 +731,110 @@ func TestQueueAccountLimiting(t *testing.T) {
 	}
 }
 
+// Tests that if the transaction count belonging to multiple accounts go above
+// some threshold, the higher transactions are dropped to prevent DOS attacks.
+//
+// This logic should not hold for local transactions, unless the local tracking
+// mechanism is disabled.
+func TestQueueGlobalLimitingNoAuctioneer(t *testing.T) {
+	testQueueGlobalLimiting(t, false)
+}
+func TestQueueGlobalLimitingNoLocalsNoAuctioneer(t *testing.T) {
+	testQueueGlobalLimiting(t, true)
+}
+
+func testQueueGlobalLimiting(t *testing.T, nolocals bool) {
+	t.Parallel()
+
+	// Create the pool to test the limit enforcement with
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
+
+	config := testTxPoolConfig
+	config.NoLocals = nolocals
+	config.GlobalQueue = config.AccountQueue*3 - 1 // reduce the queue limits to shorten test time (-1 to make it non divisible)
+
+	pool := New(config, blockchain, false)
+	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
+	defer pool.Close()
+
+	// Create a number of test accounts and fund them (last one will be the local)
+	keys := make([]*ecdsa.PrivateKey, 5)
+	for i := 0; i < len(keys); i++ {
+		keys[i], _ = crypto.GenerateKey()
+		testAddBalance(pool, crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1000000))
+	}
+	local := keys[len(keys)-1]
+
+	// Generate and queue a batch of transactions
+	nonces := make(map[common.Address]uint64)
+
+	txs := make(types.Transactions, 0, 3*config.GlobalQueue)
+	for len(txs) < cap(txs) {
+		key := keys[rand.Intn(len(keys)-1)] // skip adding transactions with the local account
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+
+		txs = append(txs, transaction(nonces[addr]+1, 100000, key))
+		nonces[addr]++
+	}
+	// Import the batch and verify that limits have been enforced
+	pool.addRemotesSync(txs)
+
+	queued := 0
+	for addr, list := range pool.queue {
+		if list.Len() > int(config.AccountQueue) {
+			t.Errorf("addr %x: queued accounts overflown allowance: %d > %d", addr, list.Len(), config.AccountQueue)
+		}
+		queued += list.Len()
+	}
+	if queued > int(config.GlobalQueue) {
+		t.Fatalf("total transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
+	}
+	// Generate a batch of transactions from the local account and import them
+	txs = txs[:0]
+	for i := uint64(0); i < 3*config.GlobalQueue; i++ {
+		txs = append(txs, transaction(i+1, 100000, local))
+	}
+	pool.addLocals(txs)
+
+	// If locals are disabled, the previous eviction algorithm should apply here too
+	if nolocals {
+		queued := 0
+		for addr, list := range pool.queue {
+			if list.Len() > int(config.AccountQueue) {
+				t.Errorf("addr %x: queued accounts overflown allowance: %d > %d", addr, list.Len(), config.AccountQueue)
+			}
+			queued += list.Len()
+		}
+		if queued > int(config.GlobalQueue) {
+			t.Fatalf("total transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
+		}
+	} else {
+		// Local exemptions are enabled, make sure the local account owned the queue
+		if len(pool.queue) != 1 {
+			t.Errorf("multiple accounts in queue: have %v, want %v", len(pool.queue), 1)
+		}
+		// Also ensure no local transactions are ever dropped, even if above global limits
+		if queued := pool.queue[crypto.PubkeyToAddress(local.PublicKey)].Len(); uint64(queued) != 3*config.GlobalQueue {
+			t.Fatalf("local account queued transaction count mismatch: have %v, want %v", queued, 3*config.GlobalQueue)
+		}
+	}
+}
+
 // Tests that if an account remains idle for a prolonged amount of time, any
 // non-executable transactions queued up are dropped to prevent wasting resources
 // on shuffling them around.
 //
 // This logic should not hold for local transactions, unless the local tracking
 // mechanism is disabled.
-func TestQueueTimeLimiting(t *testing.T) {
-	testQueueTimeLimiting(t, false)
+func TestQueueTimeLimitingNoAuctioneer(t *testing.T) {
+	testQueueTimeLimitingNoAuctioneer(t, false)
+}
+func TestQueueTimeLimitingNoLocalsNoAuctioneer(t *testing.T) {
+	testQueueTimeLimitingNoAuctioneer(t, true)
 }
 
-func TestQueueTimeLimitingNoLocals(t *testing.T) {
-	testQueueTimeLimiting(t, true)
-}
-
-func testQueueTimeLimiting(t *testing.T, nolocals bool) {
+func testQueueTimeLimitingNoAuctioneer(t *testing.T, nolocals bool) {
 	// Reduce the eviction interval to a testable amount
 	defer func(old time.Duration) { evictionInterval = old }(evictionInterval)
 	evictionInterval = time.Millisecond * 100
@@ -947,7 +847,7 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 	config.Lifetime = time.Second
 	config.NoLocals = nolocals
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1014,11 +914,6 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 	// remove current transactions and increase nonce to prepare for a reset and cleanup
 	statedb.SetNonce(crypto.PubkeyToAddress(remote.PublicKey), 2)
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 2)
-
-	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
-	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
-	defer mempoolClearedSub.Unsubscribe()
-
 	<-pool.requestReset(nil, nil)
 
 	// make sure queue, pending are cleared
@@ -1033,26 +928,64 @@ func testQueueTimeLimiting(t *testing.T, nolocals bool) {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 
-	select {
-	case mempoolClear := <-mempoolClearedCh:
-		if mempoolClear.NewHead != nil {
-			t.Fatalf("Expected mempool cleared head to be nil: %v", mempoolClear.NewHead)
+	// Queue gapped transactions
+	if err := pool.addLocal(pricedTransaction(4, 100000, big.NewInt(1), local)); err != nil {
+		t.Fatalf("failed to add remote transaction: %v", err)
+	}
+	if err := pool.addRemoteSync(pricedTransaction(4, 100000, big.NewInt(1), remote)); err != nil {
+		t.Fatalf("failed to add remote transaction: %v", err)
+	}
+	time.Sleep(5 * evictionInterval) // A half lifetime pass
+
+	// Queue executable transactions, the life cycle should be restarted.
+	if err := pool.addLocal(pricedTransaction(2, 100000, big.NewInt(1), local)); err != nil {
+		t.Fatalf("failed to add remote transaction: %v", err)
+	}
+	if err := pool.addRemoteSync(pricedTransaction(2, 100000, big.NewInt(1), remote)); err != nil {
+		t.Fatalf("failed to add remote transaction: %v", err)
+	}
+	time.Sleep(6 * evictionInterval)
+
+	// All gapped transactions shouldn't be kicked out
+	pending, queued = pool.Stats()
+	if pending != 2 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 2)
+	}
+	if queued != 2 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 2)
+	}
+	if err := validatePoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+
+	// The whole life time pass after last promotion, kick out stale transactions
+	time.Sleep(2 * config.Lifetime)
+	pending, queued = pool.Stats()
+	if pending != 2 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 2)
+	}
+	if nolocals {
+		if queued != 0 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
 		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("Mempool cleared event not received")
-	case err := <-mempoolClearedSub.Err():
-		t.Fatalf("Mempool cleared subscription error: %v", err)
+	} else {
+		if queued != 1 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
+		}
+	}
+	if err := validatePoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 }
 
 // Tests that even if the transaction count belonging to a single account goes
 // above some threshold, as long as the transactions are executable, they are
 // accepted.
-func TestPendingLimiting(t *testing.T) {
+func TestPendingLimitingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create a test account and fund it
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -1089,7 +1022,7 @@ func TestPendingLimiting(t *testing.T) {
 // Tests that if the transaction count belonging to multiple accounts go above
 // some hard threshold, the higher transactions are dropped to prevent DOS
 // attacks.
-func TestPendingGlobalLimiting(t *testing.T) {
+func TestPendingGlobalLimitingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
@@ -1099,7 +1032,7 @@ func TestPendingGlobalLimiting(t *testing.T) {
 	config := testTxPoolConfig
 	config.GlobalSlots = config.AccountSlots * 10
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1138,11 +1071,11 @@ func TestPendingGlobalLimiting(t *testing.T) {
 // Test the limit on transaction size is enforced correctly.
 // This test verifies every transaction having allowed size
 // is added to the pool, and longer transactions are rejected.
-func TestAllowedTxSize(t *testing.T) {
+func TestAllowedTxSizeNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create a test account and fund it
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -1191,7 +1124,7 @@ func TestAllowedTxSize(t *testing.T) {
 }
 
 // Tests that if transactions start being capped, transactions are also removed from 'all'
-func TestCapClearsFromAll(t *testing.T) {
+func TestCapClearsFromAllNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
@@ -1203,7 +1136,7 @@ func TestCapClearsFromAll(t *testing.T) {
 	config.AccountQueue = 2
 	config.GlobalSlots = 8
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1226,7 +1159,7 @@ func TestCapClearsFromAll(t *testing.T) {
 // Tests that if the transaction count belonging to multiple accounts go above
 // some hard threshold, if they are under the minimum guaranteed slot count then
 // the transactions are still kept.
-func TestPendingMinimumAllowance(t *testing.T) {
+func TestPendingMinimumAllowanceNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
@@ -1236,7 +1169,7 @@ func TestPendingMinimumAllowance(t *testing.T) {
 	config := testTxPoolConfig
 	config.GlobalSlots = 1
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1275,14 +1208,14 @@ func TestPendingMinimumAllowance(t *testing.T) {
 // from the pending pool to the queue.
 //
 // Note, local transactions are never allowed to be dropped.
-func TestRepricing(t *testing.T) {
+func TestRepricingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1395,7 +1328,7 @@ func TestRepricing(t *testing.T) {
 	}
 }
 
-func TestMinGasPriceEnforced(t *testing.T) {
+func TestMinGasPriceEnforcedNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
@@ -1404,7 +1337,7 @@ func TestMinGasPriceEnforced(t *testing.T) {
 
 	txPoolConfig := DefaultConfig
 	txPoolConfig.NoLocals = true
-	pool := New(txPoolConfig, blockchain, true)
+	pool := New(txPoolConfig, blockchain, false)
 	pool.Init(txPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1444,11 +1377,11 @@ func TestMinGasPriceEnforced(t *testing.T) {
 // gapped transactions back from the pending pool to the queue.
 //
 // Note, local transactions are never allowed to be dropped.
-func TestRepricingDynamicFee(t *testing.T) {
+func TestRepricingDynamicFeeNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	pool, _ := setupPoolWithConfig(eip1559Config, true)
+	pool, _ := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 
 	// Keep track of transaction events to ensure all executables get announced
@@ -1568,14 +1501,14 @@ func TestRepricingDynamicFee(t *testing.T) {
 
 // Tests that setting the transaction pool gas price to a higher value does not
 // remove local transactions (legacy & dynamic fee).
-func TestRepricingKeepsLocals(t *testing.T) {
+func TestRepricingKeepsLocalsNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(eip1559Config, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1642,7 +1575,7 @@ func TestRepricingKeepsLocals(t *testing.T) {
 // pending transactions are moved into the queue.
 //
 // Note, local transactions are never allowed to be dropped.
-func TestUnderpricing(t *testing.T) {
+func TestUnderpricingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
@@ -1653,7 +1586,7 @@ func TestUnderpricing(t *testing.T) {
 	config.GlobalSlots = 2
 	config.GlobalQueue = 2
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1757,7 +1690,7 @@ func TestUnderpricing(t *testing.T) {
 // Tests that more expensive transactions push out cheap ones from the pool, but
 // without producing instability by creating gaps that start jumping transactions
 // back and forth between queued/pending.
-func TestStableUnderpricing(t *testing.T) {
+func TestStableUnderpricingNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
@@ -1768,7 +1701,7 @@ func TestStableUnderpricing(t *testing.T) {
 	config.GlobalSlots = 128
 	config.GlobalQueue = 0
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -1827,10 +1760,10 @@ func TestStableUnderpricing(t *testing.T) {
 // expensive ones and any gapped pending transactions are moved into the queue.
 //
 // Note, local transactions are never allowed to be dropped.
-func TestUnderpricingDynamicFee(t *testing.T) {
+func TestUnderpricingDynamicFeeNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, _ := setupPoolWithConfig(eip1559Config, true)
+	pool, _ := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 
 	pool.config.GlobalSlots = 2
@@ -1934,10 +1867,10 @@ func TestUnderpricingDynamicFee(t *testing.T) {
 
 // Tests whether highest fee cap transaction is retained after a batch of high effective
 // tip transactions are added and vice versa
-func TestDualHeapEviction(t *testing.T) {
+func TestDualHeapEvictionNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
-	pool, _ := setupPoolWithConfig(eip1559Config, true)
+	pool, _ := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 
 	pool.config.GlobalSlots = 10
@@ -1990,14 +1923,14 @@ func TestDualHeapEviction(t *testing.T) {
 }
 
 // Tests that the pool rejects duplicate transactions.
-func TestDeduplication(t *testing.T) {
+func TestDeduplicationNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -2057,14 +1990,14 @@ func TestDeduplication(t *testing.T) {
 
 // Tests that the pool rejects replacement transactions that don't meet the minimum
 // price bump required.
-func TestReplacement(t *testing.T) {
+func TestReplacementNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -2138,11 +2071,11 @@ func TestReplacement(t *testing.T) {
 
 // Tests that the pool rejects replacement dynamic fee transactions that don't
 // meet the minimum price bump required.
-func TestReplacementDynamicFee(t *testing.T) {
+func TestReplacementDynamicFeeNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	pool, key := setupPoolWithConfig(eip1559Config, true)
+	pool, key := setupPoolWithConfig(eip1559Config, false)
 	defer pool.Close()
 	testAddBalance(pool, crypto.PubkeyToAddress(key.PublicKey), big.NewInt(1000000000))
 
@@ -2248,10 +2181,10 @@ func TestReplacementDynamicFee(t *testing.T) {
 
 // Tests that local transactions are journaled to disk, but remote transactions
 // get discarded between restarts.
-func TestJournaling(t *testing.T)         { testJournaling(t, false) }
-func TestJournalingNoLocals(t *testing.T) { testJournaling(t, true) }
+func TestJournalingNoAuctioneer(t *testing.T)         { testJournalingNoAuctioneer(t, false) }
+func TestJournalingNoLocalsNoAuctioneer(t *testing.T) { testJournalingNoAuctioneer(t, true) }
 
-func testJournaling(t *testing.T, nolocals bool) {
+func testJournalingNoAuctioneer(t *testing.T, nolocals bool) {
 	t.Parallel()
 
 	// Create a temporary file for the journal
@@ -2275,7 +2208,7 @@ func testJournaling(t *testing.T, nolocals bool) {
 	config.Journal = journal
 	config.Rejournal = time.Second
 
-	pool := New(config, blockchain, true)
+	pool := New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 
 	// Create two test accounts to ensure remotes expire but locals do not
@@ -2313,7 +2246,7 @@ func testJournaling(t *testing.T, nolocals bool) {
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 1)
 	blockchain = newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool = New(config, blockchain, true)
+	pool = New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 
 	pending, queued = pool.Stats()
@@ -2334,56 +2267,44 @@ func testJournaling(t *testing.T, nolocals bool) {
 	}
 	// Bump the nonce temporarily and ensure the newly invalidated transaction is removed
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 2)
-
-	mempoolClearedCh := make(chan core.NewMempoolCleared, 1)
-	mempoolClearedSub := pool.SubscribeMempoolClearance(mempoolClearedCh)
-	defer mempoolClearedSub.Unsubscribe()
-
 	<-pool.requestReset(nil, nil)
 	time.Sleep(2 * config.Rejournal)
 	pool.Close()
 
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 1)
 	blockchain = newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
-	pool = New(config, blockchain, true)
+	pool = New(config, blockchain, false)
 	pool.Init(config.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 
-	// tx mempool is cleared out completely after a reset
 	pending, queued = pool.Stats()
 	if pending != 0 {
 		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 0)
 	}
-	if queued != 0 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+	if nolocals {
+		if queued != 0 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+		}
+	} else {
+		if queued != 1 {
+			t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
+		}
 	}
 	if err := validatePoolInternals(pool); err != nil {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
-
-	select {
-	case mempoolClear := <-mempoolClearedCh:
-		if mempoolClear.NewHead != nil {
-			t.Fatalf("mempool clear event should not have a new head")
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatalf("mempool clear event not received")
-	case err := <-mempoolClearedSub.Err():
-		t.Fatalf("mempool clear event subscription error: %v", err)
-	}
-
 	pool.Close()
 }
 
 // TestStatusCheck tests that the pool can correctly retrieve the
 // pending status of individual transactions.
-func TestStatusCheck(t *testing.T) {
+func TestStatusCheckNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the status retrievals with
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	blockchain := newTestBlockChain(params.TestChainConfig, 1000000, statedb, new(event.Feed))
 
-	pool := New(testTxPoolConfig, blockchain, true)
+	pool := New(testTxPoolConfig, blockchain, false)
 	pool.Init(testTxPoolConfig.PriceLimit, blockchain.CurrentBlock(), makeAddressReserver())
 	defer pool.Close()
 
@@ -2430,7 +2351,7 @@ func TestStatusCheck(t *testing.T) {
 }
 
 // Test the transaction slots consumption is computed correctly
-func TestSlotCount(t *testing.T) {
+func TestSlotCountNoAuctioneer(t *testing.T) {
 	t.Parallel()
 
 	key, _ := crypto.GenerateKey()
@@ -2449,13 +2370,19 @@ func TestSlotCount(t *testing.T) {
 
 // Benchmarks the speed of validating the contents of the pending queue of the
 // transaction pool.
-func BenchmarkPendingDemotion100(b *testing.B)   { benchmarkPendingDemotion(b, 100) }
-func BenchmarkPendingDemotion1000(b *testing.B)  { benchmarkPendingDemotion(b, 1000) }
-func BenchmarkPendingDemotion10000(b *testing.B) { benchmarkPendingDemotion(b, 10000) }
+func BenchmarkPendingDemotion100NoAuctioneer(b *testing.B) {
+	benchmarkPendingDemotionNoAuctioneer(b, 100)
+}
+func BenchmarkPendingDemotion1000NoAuctioneer(b *testing.B) {
+	benchmarkPendingDemotionNoAuctioneer(b, 1000)
+}
+func BenchmarkPendingDemotion10000NoAuctioneer(b *testing.B) {
+	benchmarkPendingDemotionNoAuctioneer(b, 10000)
+}
 
-func benchmarkPendingDemotion(b *testing.B, size int) {
+func benchmarkPendingDemotionNoAuctioneer(b *testing.B, size int) {
 	// Add a batch of transactions to a pool one by one
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -2474,13 +2401,19 @@ func benchmarkPendingDemotion(b *testing.B, size int) {
 
 // Benchmarks the speed of scheduling the contents of the future queue of the
 // transaction pool.
-func BenchmarkFuturePromotion100(b *testing.B)   { benchmarkFuturePromotion(b, 100) }
-func BenchmarkFuturePromotion1000(b *testing.B)  { benchmarkFuturePromotion(b, 1000) }
-func BenchmarkFuturePromotion10000(b *testing.B) { benchmarkFuturePromotion(b, 10000) }
+func BenchmarkFuturePromotion100NoAuctioneer(b *testing.B) {
+	benchmarkFuturePromotionNoAuctioneer(b, 100)
+}
+func BenchmarkFuturePromotion1000NoAuctioneer(b *testing.B) {
+	benchmarkFuturePromotionNoAuctioneer(b, 1000)
+}
+func BenchmarkFuturePromotion10000NoAuctioneer(b *testing.B) {
+	benchmarkFuturePromotionNoAuctioneer(b, 10000)
+}
 
-func benchmarkFuturePromotion(b *testing.B, size int) {
+func benchmarkFuturePromotionNoAuctioneer(b *testing.B, size int) {
 	// Add a batch of transactions to a pool one by one
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -2498,17 +2431,29 @@ func benchmarkFuturePromotion(b *testing.B, size int) {
 }
 
 // Benchmarks the speed of batched transaction insertion.
-func BenchmarkBatchInsert100(b *testing.B)   { benchmarkBatchInsert(b, 100, false) }
-func BenchmarkBatchInsert1000(b *testing.B)  { benchmarkBatchInsert(b, 1000, false) }
-func BenchmarkBatchInsert10000(b *testing.B) { benchmarkBatchInsert(b, 10000, false) }
+func BenchmarkBatchInsert100NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 100, false)
+}
+func BenchmarkBatchInsert1000NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 1000, false)
+}
+func BenchmarkBatchInsert10000NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 10000, false)
+}
 
-func BenchmarkBatchLocalInsert100(b *testing.B)   { benchmarkBatchInsert(b, 100, true) }
-func BenchmarkBatchLocalInsert1000(b *testing.B)  { benchmarkBatchInsert(b, 1000, true) }
-func BenchmarkBatchLocalInsert10000(b *testing.B) { benchmarkBatchInsert(b, 10000, true) }
+func BenchmarkBatchLocalInsert100NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 100, true)
+}
+func BenchmarkBatchLocalInsert1000NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 1000, true)
+}
+func BenchmarkBatchLocalInsert10000NoAuctioneer(b *testing.B) {
+	benchmarkBatchInsertNoAuctioneer(b, 10000, true)
+}
 
-func benchmarkBatchInsert(b *testing.B, size int, local bool) {
+func benchmarkBatchInsertNoAuctioneer(b *testing.B, size int, local bool) {
 	// Generate a batch of transactions to enqueue into the pool
-	pool, key := setupPool(true)
+	pool, key := setupPool(false)
 	defer pool.Close()
 
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -2532,7 +2477,7 @@ func benchmarkBatchInsert(b *testing.B, size int, local bool) {
 	}
 }
 
-func BenchmarkInsertRemoteWithAllLocals(b *testing.B) {
+func BenchmarkInsertRemoteWithAllLocalsNoAuctioneer(b *testing.B) {
 	// Allocate keys for testing
 	key, _ := crypto.GenerateKey()
 	account := crypto.PubkeyToAddress(key.PublicKey)
@@ -2552,7 +2497,7 @@ func BenchmarkInsertRemoteWithAllLocals(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		pool, _ := setupPool(true)
+		pool, _ := setupPool(false)
 		testAddBalance(pool, account, big.NewInt(100000000))
 		for _, local := range locals {
 			pool.addLocal(local)
@@ -2568,9 +2513,9 @@ func BenchmarkInsertRemoteWithAllLocals(b *testing.B) {
 }
 
 // Benchmarks the speed of batch transaction insertion in case of multiple accounts.
-func BenchmarkMultiAccountBatchInsert(b *testing.B) {
+func BenchmarkMultiAccountBatchInsertNoAuctioneer(b *testing.B) {
 	// Generate a batch of transactions to enqueue into the pool
-	pool, _ := setupPool(true)
+	pool, _ := setupPool(false)
 	defer pool.Close()
 	b.ReportAllocs()
 	batches := make(types.Transactions, b.N)
