@@ -58,6 +58,9 @@ type ExecutionServiceServerV1 struct {
 	nextFeeRecipient common.Address // Fee recipient for the next block
 
 	currentOptimisticSequencerBlock atomic.Pointer[[]byte]
+
+	executeBlockStreamConnected atomic.Bool
+	bundleStreamConnected       atomic.Bool
 }
 
 var (
@@ -246,6 +249,12 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 }
 
 func (s *ExecutionServiceServerV1) ExecuteOptimisticBlockStream(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
+	if !s.executeBlockStreamConnected.CompareAndSwap(false, true) {
+		return status.Error(codes.PermissionDenied, "Execute optimistic block stream already connected")
+	}
+
+	defer s.executeBlockStreamConnected.Store(false)
+
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := s.eth.TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()
