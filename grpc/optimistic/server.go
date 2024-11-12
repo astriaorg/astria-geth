@@ -35,6 +35,9 @@ type OptimisticServiceV1Alpha1 struct {
 	sharedServiceContainer *shared.SharedServiceContainer
 
 	currentOptimisticSequencerBlock atomic.Pointer[[]byte]
+
+	executeOptimisticBlockStreamConnected atomic.Bool
+	bundleStreamConnected                 atomic.Bool
 }
 
 var (
@@ -55,6 +58,13 @@ func NewOptimisticServiceV1Alpha(sharedServiceContainer *shared.SharedServiceCon
 }
 
 func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStreamRequest, stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
+	if !o.bundleStreamConnected.CompareAndSwap(false, true) {
+		return status.Error(codes.PermissionDenied, "Bundle stream has already been connected to")
+	}
+
+	// when the stream is closed, we need to set the bundleStreamConnected to false
+	defer o.bundleStreamConnected.Store(false)
+
 	pendingTxEventCh := make(chan core.NewTxsEvent)
 	pendingTxEvent := o.Eth().TxPool().SubscribeTransactions(pendingTxEventCh, false)
 	defer pendingTxEvent.Unsubscribe()
@@ -102,6 +112,13 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 }
 
 func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
+	if !o.executeOptimisticBlockStreamConnected.CompareAndSwap(false, true) {
+		return status.Error(codes.PermissionDenied, "Execute optimsitic block stream has already been connected to")
+	}
+
+	// when the stream is closed, we need to set the bundleStreamConnected to false
+	defer o.executeOptimisticBlockStreamConnected.Store(false)
+
 	mempoolClearingEventCh := make(chan core.NewMempoolCleared)
 	mempoolClearingEvent := o.Eth().TxPool().SubscribeMempoolClearance(mempoolClearingEventCh)
 	defer mempoolClearingEvent.Unsubscribe()
