@@ -257,6 +257,10 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 	softBlock := s.bc.CurrentSafeBlock()
 	s.commitmentUpdateLock.Unlock()
 
+	s.blockExecutionLock.Lock()
+	nextFeeRecipient := s.nextFeeRecipient
+	s.blockExecutionLock.Unlock()
+
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
@@ -276,10 +280,6 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 
 		txsToProcess = append(txsToProcess, unmarshalledTx)
 	}
-
-	s.blockExecutionLock.Lock()
-	nextFeeRecipient := s.nextFeeRecipient
-	s.blockExecutionLock.Unlock()
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
