@@ -195,8 +195,6 @@ type Config struct {
 	GRPCHost string `toml:",omitempty"`
 	// GRPCPort is the TCP port number on which to start the gRPC server.
 	GRPCPort int `toml:",omitempty"`
-	// GRPCUds is the Unix domain socket path on which to start the gRPC server.
-	GRPCUds string `toml:",omitempty"`
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
@@ -275,35 +273,30 @@ func (c *Config) HTTPEndpoint() string {
 	return net.JoinHostPort(c.HTTPHost, fmt.Sprintf("%d", c.HTTPPort))
 }
 
-// GRPCTcpEndpoint resolves a gRPC TCP endpoint based on the configured host interface
+// GRPCEndpoint resolves a gRPC TCP endpoint based on the configured host interface
 // and port parameters.
-func (c *Config) GRPCTcpEndpoint() string {
+func (c *Config) GRPCEndpoint() string {
 	if c.GRPCHost == "" {
 		return ""
 	}
 	return fmt.Sprintf("%s:%d", c.GRPCHost, c.GRPCPort)
 }
 
-// GRPCUdsEndpoint resolves a gRPC Unix domain socket endpoint based on the configured path.
-func (c *Config) GRPCUdsEndpoint() string {
-	return c.GRPCUds
-}
-
-// DefaultHTTPEndpoint returns the HTTP tcpEndpoint used by default.
+// DefaultHTTPEndpoint returns the HTTP endpoint used by default.
 func DefaultHTTPEndpoint() string {
 	config := &Config{HTTPHost: DefaultHTTPHost, HTTPPort: DefaultHTTPPort, AuthPort: DefaultAuthPort}
 	return config.HTTPEndpoint()
 }
 
-// DefaultGRPCEndpoint returns the gRPC tcpEndpoint used by default.
+// DefaultGRPCEndpoint returns the gRPC endpoint used by default.
 // NOTE - implemented this to be consistent with DefaultHTTPEndpoint, but
 // neither are ever used
 func DefaultGRPCEndpoint() string {
 	config := &Config{GRPCHost: DefaultGRPCHost, GRPCPort: DefaultGRPCPort}
-	return config.GRPCTcpEndpoint()
+	return config.GRPCEndpoint()
 }
 
-// WSEndpoint resolves a websocket tcpEndpoint based on the configured host interface
+// WSEndpoint resolves a websocket endpoint based on the configured host interface
 // and port parameters.
 func (c *Config) WSEndpoint() string {
 	if c.WSHost == "" {
@@ -312,7 +305,7 @@ func (c *Config) WSEndpoint() string {
 	return net.JoinHostPort(c.WSHost, fmt.Sprintf("%d", c.WSPort))
 }
 
-// DefaultWSEndpoint returns the websocket tcpEndpoint used by default.
+// DefaultWSEndpoint returns the websocket endpoint used by default.
 func DefaultWSEndpoint() string {
 	config := &Config{WSHost: DefaultWSHost, WSPort: DefaultWSPort}
 	return config.WSEndpoint()

@@ -3,7 +3,6 @@ package node
 import (
 	optimisticGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/bundle/v1alpha1/bundlev1alpha1grpc"
 	"net"
-	"os"
 	"sync"
 
 	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
@@ -16,8 +15,7 @@ import (
 type GRPCServerHandler struct {
 	mu sync.Mutex
 
-	tcpEndpoint                string
-	udsEndpoint                string
+	endpoint                   string
 	execServer                 *grpc.Server
 	optimisticServer           *grpc.Server
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
@@ -31,11 +29,10 @@ type GRPCServerHandler struct {
 func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, optimisticExecServ optimisticGrpc.OptimisticExecutionServiceServer, streamBundleServ optimisticGrpc.BundleServiceServer, cfg *Config) error {
 	execServer, optimisticServer := grpc.NewServer(), grpc.NewServer()
 
-	log.Info("gRPC server enabled", "tcpEndpoint", cfg.GRPCTcpEndpoint(), "udsEndpoint", cfg.GRPCUdsEndpoint())
+	log.Info("gRPC server enabled", "endpoint", cfg.GRPCEndpoint())
 
 	serverHandler := &GRPCServerHandler{
-		tcpEndpoint:                cfg.GRPCTcpEndpoint(),
-		udsEndpoint:                cfg.GRPCUdsEndpoint(),
+		endpoint:                   cfg.GRPCEndpoint(),
 		execServer:                 execServer,
 		optimisticServer:           optimisticServer,
 		executionServiceServerV1a2: &execServ,
@@ -56,31 +53,19 @@ func (handler *GRPCServerHandler) Start() error {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
 
-	if handler.tcpEndpoint == "" {
-		return nil
-	}
-	if handler.udsEndpoint == "" {
+	if handler.endpoint == "" {
 		return nil
 	}
 
 	// Start the gRPC server
-	tcpLis, err := net.Listen("tcp", handler.tcpEndpoint)
-	if err != nil {
-		return err
-	}
-
-	// Remove any existing socket file
-	if err := os.RemoveAll(handler.udsEndpoint); err != nil {
-		return err
-	}
-	udsLis, err := net.Listen("unix", handler.udsEndpoint)
+	tcpLis, err := net.Listen("tcp", handler.endpoint)
 	if err != nil {
 		return err
 	}
 
 	go handler.execServer.Serve(tcpLis)
-	go handler.optimisticServer.Serve(udsLis)
-	log.Info("gRPC server started", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
+	go handler.optimisticServer.Serve(tcpLis)
+	log.Info("gRPC server started", "endpoint", handler.endpoint)
 	return nil
 }
 
@@ -91,6 +76,6 @@ func (handler *GRPCServerHandler) Stop() error {
 
 	handler.execServer.GracefulStop()
 	handler.optimisticServer.GracefulStop()
-	log.Info("gRPC server stopped", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
+	log.Info("gRPC server stopped", "endpoint", handler.endpoint)
 	return nil
 }

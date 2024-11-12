@@ -769,12 +769,6 @@ var (
 		Value:    node.DefaultGRPCPort,
 		Category: flags.APICategory,
 	}
-	GRPCUdsFlag = &cli.StringFlag{
-		Name:     "grpc.uds",
-		Usage:    "gRPC server UDS socket",
-		Value:    node.DefaultGRPCUdsSocket,
-		Category: flags.APICategory,
-	}
 
 	// Network Settings
 	MaxPeersFlag = &cli.IntFlag{
@@ -1222,9 +1216,6 @@ func setGRPC(ctx *cli.Context, cfg *node.Config) {
 		}
 		if ctx.IsSet(GRPCPortFlag.Name) {
 			cfg.GRPCPort = ctx.Int(GRPCPortFlag.Name)
-		}
-		if ctx.IsSet(GRPCUdsFlag.Name) {
-			cfg.GRPCUds = ctx.String(GRPCUdsFlag.Name)
 		}
 	}
 }
