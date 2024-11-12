@@ -17,7 +17,6 @@ type GRPCServerHandler struct {
 
 	endpoint                   string
 	execServer                 *grpc.Server
-	optimisticServer           *grpc.Server
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
 	optimisticExecServ         *optimisticGrpc.OptimisticExecutionServiceServer
 	streamBundleServ           *optimisticGrpc.BundleServiceServer
@@ -27,22 +26,21 @@ type GRPCServerHandler struct {
 // It registers the execution service server.
 // It registers the gRPC server with the node so it can be stopped on shutdown.
 func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, optimisticExecServ optimisticGrpc.OptimisticExecutionServiceServer, streamBundleServ optimisticGrpc.BundleServiceServer, cfg *Config) error {
-	execServer, optimisticServer := grpc.NewServer(), grpc.NewServer()
+	execServer := grpc.NewServer()
 
 	log.Info("gRPC server enabled", "endpoint", cfg.GRPCEndpoint())
 
 	serverHandler := &GRPCServerHandler{
 		endpoint:                   cfg.GRPCEndpoint(),
 		execServer:                 execServer,
-		optimisticServer:           optimisticServer,
 		executionServiceServerV1a2: &execServ,
 		optimisticExecServ:         &optimisticExecServ,
 		streamBundleServ:           &streamBundleServ,
 	}
 
 	astriaGrpc.RegisterExecutionServiceServer(execServer, execServ)
-	optimisticGrpc.RegisterOptimisticExecutionServiceServer(optimisticServer, optimisticExecServ)
-	optimisticGrpc.RegisterBundleServiceServer(optimisticServer, streamBundleServ)
+	optimisticGrpc.RegisterOptimisticExecutionServiceServer(execServer, optimisticExecServ)
+	optimisticGrpc.RegisterBundleServiceServer(execServer, streamBundleServ)
 
 	node.RegisterGRPCServer(serverHandler)
 	return nil
@@ -64,7 +62,6 @@ func (handler *GRPCServerHandler) Start() error {
 	}
 
 	go handler.execServer.Serve(tcpLis)
-	go handler.optimisticServer.Serve(tcpLis)
 	log.Info("gRPC server started", "endpoint", handler.endpoint)
 	return nil
 }
@@ -75,7 +72,6 @@ func (handler *GRPCServerHandler) Stop() error {
 	defer handler.mu.Unlock()
 
 	handler.execServer.GracefulStop()
-	handler.optimisticServer.GracefulStop()
 	log.Info("gRPC server stopped", "endpoint", handler.endpoint)
 	return nil
 }
