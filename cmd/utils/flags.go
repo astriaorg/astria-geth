@@ -1446,6 +1446,12 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	SetDataDir(ctx, cfg)
 	setSmartCard(ctx, cfg)
 
+	if ctx.Bool(AuctioneerEnabledFlag.Name) {
+		cfg.EnableAuctioneer = true
+	} else {
+		cfg.EnableAuctioneer = false
+	}
+
 	if ctx.IsSet(JWTSecretFlag.Name) {
 		cfg.JWTSecret = ctx.String(JWTSecretFlag.Name)
 	}
