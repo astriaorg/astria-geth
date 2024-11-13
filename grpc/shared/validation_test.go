@@ -1,6 +1,10 @@
 package shared
 
 import (
+	bundlev1alpha1 "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
+	"bytes"
+	"crypto/ecdsa"
+	"github.com/golang/protobuf/proto"
 	"math/big"
 	"testing"
 
@@ -14,6 +18,15 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
+
+func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
+	return pricedTransaction(nonce, gaslimit, big.NewInt(1), key)
+}
+
+func pricedTransaction(nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) *types.Transaction {
+	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, big.NewInt(100), gaslimit, gasprice, nil), types.HomesteadSigner{}, key)
+	return tx
+}
 
 func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
 	lo := i.Uint64()
@@ -58,21 +71,102 @@ func generateBech32MAddress() string {
 	return bech32m
 }
 
-func TestSequenceTxValidation(t *testing.T) {
+func TestUnmarshallAuctionResultTxs(t *testing.T) {
+	tx1 := transaction(0, 1000, TestKey)
+	validMarshalledTx1, err := tx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	tx2 := transaction(1, 1000, TestKey)
+	validMarshalledTx2, err := tx2.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	tx3 := transaction(2, 1000, TestKey)
+	validMarshalledTx3, err := tx3.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	tests := []struct {
+		description    string
+		auctionResult  *bundlev1alpha1.AuctionResult
+		prevBlockHash  []byte
+		expectedOutput types.Transactions
+		// just check if error contains the string since error contains other details
+		wantErr string
+	}{
+		{
+			description: "previous block hash mismatch",
+			auctionResult: &bundlev1alpha1.AuctionResult{
+				// TODO - add signature and public key validation
+				Signature: make([]byte, 0),
+				PublicKey: make([]byte, 0),
+				Allocation: &bundlev1alpha1.Bundle{
+					Fee:                    100,
+					Transactions:           [][]byte{[]byte("unmarshallable tx")},
+					BaseSequencerBlockHash: []byte("sequencer block hash"),
+					PrevRollupBlockHash:    []byte("prev rollup block hash"),
+				},
+			},
+			prevBlockHash:  []byte("not prev rollup block hash"),
+			expectedOutput: types.Transactions{},
+			wantErr:        "prev block hash do not match in allocation",
+		},
+		{
+			description: "unmarshallable sequencer tx",
+			auctionResult: &bundlev1alpha1.AuctionResult{
+				Signature: make([]byte, 0),
+				PublicKey: make([]byte, 0),
+				Allocation: &bundlev1alpha1.Bundle{
+					Fee:                    100,
+					Transactions:           [][]byte{[]byte("unmarshallable tx")},
+					BaseSequencerBlockHash: []byte("sequencer block hash"),
+					PrevRollupBlockHash:    []byte("prev rollup block hash"),
+				},
+			},
+			prevBlockHash:  []byte("prev rollup block hash"),
+			expectedOutput: types.Transactions{},
+			wantErr:        "failed to unmarshall allocation transaction",
+		},
+		{
+			description: "valid auction result",
+			auctionResult: &bundlev1alpha1.AuctionResult{
+				Signature: make([]byte, 0),
+				PublicKey: make([]byte, 0),
+				Allocation: &bundlev1alpha1.Bundle{
+					Fee:                    100,
+					Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+					BaseSequencerBlockHash: []byte("sequencer block hash"),
+					PrevRollupBlockHash:    []byte("prev rollup block hash"),
+				},
+			},
+			prevBlockHash:  []byte("prev rollup block hash"),
+			expectedOutput: types.Transactions{tx1, tx2, tx3},
+			wantErr:        "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			finalTxs, err := unmarshallAuctionResultTxs(test.auctionResult, test.prevBlockHash)
+			if test.wantErr == "" && err == nil {
+				for _, tx := range test.expectedOutput {
+					foundTx := false
+					for _, finalTx := range finalTxs {
+						if bytes.Equal(finalTx.Hash().Bytes(), tx.Hash().Bytes()) {
+							foundTx = true
+						}
+					}
+
+					require.True(t, foundTx, "expected tx not found in final txs")
+				}
+				return
+			}
+			require.False(t, test.wantErr == "" && err != nil, "expected error, got nil")
+			require.Contains(t, err.Error(), test.wantErr)
+		})
+	}
+}
+
+func TestValidateAndUnmarshallDepositTx(t *testing.T) {
 	ethservice, serviceV1Alpha1 := SetupSharedService(t, 10)
-
-	blobTx, err := testBlobTx().MarshalBinary()
-	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
-
-	depositTx, err := testDepositTx().MarshalBinary()
-	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
-
-	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
-	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), TestKey)
-	require.Nil(t, err, "failed to sign tx: %v", err)
-
-	validMarshalledTx, err := tx.MarshalBinary()
-	require.Nil(t, err, "failed to marshal valid tx: %v", err)
 
 	chainDestinationKey, err := crypto.GenerateKey()
 	require.Nil(t, err, "failed to generate chain destination key: %v", err)
@@ -92,8 +186,107 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	tests := []struct {
 		description string
-		sequencerTx *sequencerblockv1.RollupData
+		sequencerTx *sequencerblockv1.Deposit
 		// just check if error contains the string since error contains other details
+		wantErr string
+	}{
+		{
+			description: "deposit tx with an unknown bridge address",
+			sequencerTx: &sequencerblockv1.Deposit{
+				BridgeAddress: &primitivev1.Address{
+					Bech32M: generateBech32MAddress(),
+				},
+				Asset:                   bridgeAssetDenom,
+				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
+			},
+			wantErr: "unknown bridge address",
+		},
+		{
+			description: "deposit tx with a disallowed asset id",
+			sequencerTx: &sequencerblockv1.Deposit{
+				BridgeAddress: &primitivev1.Address{
+					Bech32M: bridgeAddress,
+				},
+				Asset:                   invalidBridgeAssetDenom,
+				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
+			},
+			wantErr: "disallowed asset",
+		},
+		{
+			description: "deposit tx with a height and asset below the bridge start height",
+			sequencerTx: &sequencerblockv1.Deposit{
+				BridgeAddress: &primitivev1.Address{
+					Bech32M: invalidHeightBridgeAddressBech32m,
+				},
+				Asset:                   invalidHeightBridgeAssetDenom,
+				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
+			},
+			wantErr: "not allowed before height",
+		},
+		{
+			description: "valid deposit tx",
+			sequencerTx: &sequencerblockv1.Deposit{
+				BridgeAddress: &primitivev1.Address{
+					Bech32M: bridgeAddress,
+				},
+				Asset:                   bridgeAssetDenom,
+				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+				DestinationChainAddress: chainDestinationAddress.String(),
+				SourceTransactionId: &primitivev1.TransactionId{
+					Inner: "test_tx_hash",
+				},
+				SourceActionIndex: 0,
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			_, err := validateAndUnmarshalDepositTx(test.sequencerTx, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets())
+			if test.wantErr == "" && err == nil {
+				return
+			}
+			require.False(t, test.wantErr == "" && err != nil, "expected error, got nil")
+			require.Contains(t, err.Error(), test.wantErr)
+		})
+	}
+}
+
+func TestValidateAndUnmarshallSequenceAction(t *testing.T) {
+	blobTx, err := testBlobTx().MarshalBinary()
+	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
+
+	depositTx, err := testDepositTx().MarshalBinary()
+	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
+
+	tx1 := transaction(0, 1000, TestKey)
+	validMarshalledTx, err := tx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	tests := []struct {
+		description string
+		sequencerTx *sequencerblockv1.RollupData
+		// just check if error contains the string since errors can contains other details
 		wantErr string
 	}{
 		{
@@ -124,74 +317,6 @@ func TestSequenceTxValidation(t *testing.T) {
 			wantErr: "deposit tx not allowed in sequenced data",
 		},
 		{
-			description: "deposit tx with an unknown bridge address",
-			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: generateBech32MAddress(),
-				},
-				Asset:                   bridgeAssetDenom,
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-				SourceTransactionId: &primitivev1.TransactionId{
-					Inner: "test_tx_hash",
-				},
-				SourceActionIndex: 0,
-			}}},
-			wantErr: "unknown bridge address",
-		},
-		{
-			description: "deposit tx with a disallowed asset id",
-			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: bridgeAddress,
-				},
-				Asset:                   invalidBridgeAssetDenom,
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-				SourceTransactionId: &primitivev1.TransactionId{
-					Inner: "test_tx_hash",
-				},
-				SourceActionIndex: 0,
-			}}},
-			wantErr: "disallowed asset",
-		},
-		{
-			description: "deposit tx with a height and asset below the bridge start height",
-			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: invalidHeightBridgeAddressBech32m,
-				},
-				Asset:                   invalidHeightBridgeAssetDenom,
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-				SourceTransactionId: &primitivev1.TransactionId{
-					Inner: "test_tx_hash",
-				},
-				SourceActionIndex: 0,
-			}}},
-			wantErr: "not allowed before height",
-		},
-		{
-			description: "valid deposit tx",
-			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: bridgeAddress,
-				},
-				Asset:                   bridgeAssetDenom,
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-				SourceTransactionId: &primitivev1.TransactionId{
-					Inner: "test_tx_hash",
-				},
-				SourceActionIndex: 0,
-			}}},
-			wantErr: "",
-		},
-		{
 			description: "valid sequencer tx",
 			sequencerTx: &sequencerblockv1.RollupData{
 				Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: validMarshalledTx},
@@ -202,7 +327,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := ValidateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets())
+			_, err := validateAndUnmarshallSequenceAction(test.sequencerTx)
 			if test.wantErr == "" && err == nil {
 				return
 			}
@@ -210,4 +335,89 @@ func TestSequenceTxValidation(t *testing.T) {
 			require.Contains(t, err.Error(), test.wantErr)
 		})
 	}
+}
+
+func TestUnbundleRollupData(t *testing.T) {
+	ethservice, serviceV1Alpha1 := SetupSharedService(t, 10)
+
+	baseSequencerBlockHash := []byte("sequencer block hash")
+	prevRollupBlockHash := []byte("prev rollup block hash")
+
+	// txs in
+	tx1 := transaction(0, 1000, TestKey)
+	tx2 := transaction(1, 1000, TestKey)
+	tx3 := transaction(2, 1000, TestKey)
+	tx4 := transaction(3, 1000, TestKey)
+	tx5 := transaction(4, 1000, TestKey)
+
+	validMarshalledTx1, err := tx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx2, err := tx2.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx3, err := tx3.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx4, err := tx4.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx5, err := tx5.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	auctionResult := &bundlev1alpha1.AuctionResult{
+		Signature: make([]byte, 0),
+		PublicKey: make([]byte, 0),
+		Allocation: &bundlev1alpha1.Bundle{
+			Fee:                    100,
+			Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+			BaseSequencerBlockHash: baseSequencerBlockHash,
+			PrevRollupBlockHash:    prevRollupBlockHash,
+		},
+	}
+	marshalledAuctionResult, err := proto.Marshal(auctionResult)
+	require.NoError(t, err, "failed to marshal auction result: %v", err)
+	auctionResultSequenceData := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: marshalledAuctionResult,
+		},
+	}
+	seqData1 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx4,
+		},
+	}
+	seqData2 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx5,
+		},
+	}
+
+	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	chainDestinationKey, err := crypto.GenerateKey()
+	require.Nil(t, err, "failed to generate chain destination key: %v", err)
+	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
+
+	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+		BridgeAddress: &primitivev1.Address{
+			Bech32M: bridgeAddress,
+		},
+		Asset:                   bridgeAssetDenom,
+		Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+		RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+		DestinationChainAddress: chainDestinationAddress.String(),
+		SourceTransactionId: &primitivev1.TransactionId{
+			Inner: "test_tx_hash",
+		},
+		SourceActionIndex: 0,
+	}}}
+
+	finalTxs := []*sequencerblockv1.RollupData{seqData1, seqData2, auctionResultSequenceData, depositTx}
+
+	txsToProcess, err := UnbundleRollupData(finalTxs, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), prevRollupBlockHash)
+	require.NoError(t, err, "failed to unbundle rollup data: %v", err)
+
+	require.Equal(t, txsToProcess.Len(), 6, "expected 6 txs to process")
+
+	// auction result txs should be the first 3
+	require.True(t, bytes.Equal(txsToProcess[0].Hash().Bytes(), tx1.Hash().Bytes()), "expected tx1 to be first")
+	require.True(t, bytes.Equal(txsToProcess[1].Hash().Bytes(), tx2.Hash().Bytes()), "expected tx2 to be second")
+	require.True(t, bytes.Equal(txsToProcess[2].Hash().Bytes(), tx3.Hash().Bytes()), "expected tx3 to be third")
 }
