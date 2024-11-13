@@ -4,6 +4,7 @@ import (
 	bundlev1alpha1 "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"github.com/golang/protobuf/proto"
 	"math/big"
 	"testing"
@@ -84,6 +85,25 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 	validMarshalledTx3, err := tx3.MarshalBinary()
 	require.NoError(t, err, "failed to marshal valid tx: %v", err)
 
+	pubkey, privkey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err, "failed to generate public and private key")
+
+	validAllocation := &bundlev1alpha1.Bundle{
+		Fee:                    100,
+		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+		BaseSequencerBlockHash: []byte("sequencer block hash"),
+		PrevRollupBlockHash:    []byte("prev rollup block hash"),
+	}
+
+	marshalledAllocation, err := proto.Marshal(validAllocation)
+	require.NoError(t, err, "failed to marshal allocation: %v", err)
+
+	signedAllocation, err := privkey.Sign(nil, marshalledAllocation, &ed25519.Options{
+		Hash:    0,
+		Context: "",
+	})
+	require.NoError(t, err, "failed to sign allocation: %v", err)
+
 	tests := []struct {
 		description    string
 		auctionResult  *bundlev1alpha1.AuctionResult
@@ -110,10 +130,10 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 			wantErr:        "prev block hash do not match in allocation",
 		},
 		{
-			description: "unmarshallable sequencer tx",
+			description: "invalid signature",
 			auctionResult: &bundlev1alpha1.AuctionResult{
-				Signature: make([]byte, 0),
-				PublicKey: make([]byte, 0),
+				Signature: []byte("invalid signature"),
+				PublicKey: pubkey,
 				Allocation: &bundlev1alpha1.Bundle{
 					Fee:                    100,
 					Transactions:           [][]byte{[]byte("unmarshallable tx")},
@@ -123,19 +143,14 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 			},
 			prevBlockHash:  []byte("prev rollup block hash"),
 			expectedOutput: types.Transactions{},
-			wantErr:        "failed to unmarshall allocation transaction",
+			wantErr:        "failed to verify signature",
 		},
 		{
 			description: "valid auction result",
 			auctionResult: &bundlev1alpha1.AuctionResult{
-				Signature: make([]byte, 0),
-				PublicKey: make([]byte, 0),
-				Allocation: &bundlev1alpha1.Bundle{
-					Fee:                    100,
-					Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
-					BaseSequencerBlockHash: []byte("sequencer block hash"),
-					PrevRollupBlockHash:    []byte("prev rollup block hash"),
-				},
+				Signature:  signedAllocation,
+				PublicKey:  pubkey,
+				Allocation: validAllocation,
 			},
 			prevBlockHash:  []byte("prev rollup block hash"),
 			expectedOutput: types.Transactions{tx1, tx2, tx3},
@@ -361,16 +376,30 @@ func TestUnbundleRollupData(t *testing.T) {
 	validMarshalledTx5, err := tx5.MarshalBinary()
 	require.NoError(t, err, "failed to marshal valid tx: %v", err)
 
-	auctionResult := &bundlev1alpha1.AuctionResult{
-		Signature: make([]byte, 0),
-		PublicKey: make([]byte, 0),
-		Allocation: &bundlev1alpha1.Bundle{
-			Fee:                    100,
-			Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
-			BaseSequencerBlockHash: baseSequencerBlockHash,
-			PrevRollupBlockHash:    prevRollupBlockHash,
-		},
+	pubKey, privKey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err, "failed to generate ed25519 key")
+
+	allocation := &bundlev1alpha1.Bundle{
+		Fee:                    100,
+		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+		BaseSequencerBlockHash: baseSequencerBlockHash,
+		PrevRollupBlockHash:    prevRollupBlockHash,
 	}
+
+	marshalledAllocation, err := proto.Marshal(allocation)
+	require.NoError(t, err, "failed to marshal allocation: %v", err)
+	signedAllocation, err := privKey.Sign(nil, marshalledAllocation, &ed25519.Options{
+		Hash:    0,
+		Context: "",
+	})
+	require.NoError(t, err, "failed to sign allocation: %v", err)
+
+	auctionResult := &bundlev1alpha1.AuctionResult{
+		Signature:  signedAllocation,
+		PublicKey:  pubKey,
+		Allocation: allocation,
+	}
+
 	marshalledAuctionResult, err := proto.Marshal(auctionResult)
 	require.NoError(t, err, "failed to marshal auction result: %v", err)
 	auctionResultSequenceData := &sequencerblockv1.RollupData{
