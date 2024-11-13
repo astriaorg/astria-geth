@@ -170,14 +170,10 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// the height that this block will be at
 	height := s.Bc().CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess := types.Transactions{}
-	for _, tx := range req.Transactions {
-		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, s.BridgeAddresses(), s.BridgeAllowedAssets())
-		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
-			continue
-		}
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+	txsToProcess, err := shared.UnbundleRollupData(req.Transactions, height, s.BridgeAddresses(), s.BridgeAllowedAssets(), prevHeadHash.Bytes())
+	if err != nil {
+		log.Error("failed to unbundle rollup data", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not unbundle rollup data")
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by

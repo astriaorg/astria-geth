@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/grpc/shared"
 	"github.com/ethereum/go-ethereum/log"
@@ -191,21 +190,10 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	// the height that this block will be at
 	height := o.Bc().CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess := types.Transactions{}
-	for _, tx := range req.Transactions {
-		unmarshalledTx, err := shared.ValidateAndUnmarshalSequencerTx(height, tx, o.BridgeAddresses(), o.BridgeAllowedAssets())
-		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
-			continue
-		}
-
-		err = o.Eth().TxPool().ValidateTx(unmarshalledTx)
-		if err != nil {
-			log.Debug("failed to validate tx, ignoring", "tx", tx, "err", err)
-			continue
-		}
-
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+	txsToProcess, err := shared.UnbundleRollupData(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes())
+	if err != nil {
+		log.Error("failed to unbundle rollup data", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "Could not unbundle rollup data")
 	}
 
 	// Build a payload to add to the chain
