@@ -5,6 +5,7 @@ import (
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -120,7 +121,15 @@ func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, pre
 		return nil, errors.New("prev block hash do not match in allocation")
 	}
 
-	// TODO - validate the signature and public key
+	message, err := proto.Marshal(auctionResult.GetAllocation())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal allocation")
+	}
+	publicKey := ed25519.PublicKey(auctionResult.GetPublicKey())
+	signature := auctionResult.GetSignature()
+	if !ed25519.Verify(publicKey, message, signature) {
+		return nil, errors.New("failed to verify signature")
+	}
 
 	// unmarshall the transactions in the bundle
 	for _, allocationTx := range allocation.GetTransactions() {
