@@ -6,17 +6,17 @@ set fallback
 
 # build a local geth binary
 build:
-    make geth
+    cd .. && make geth
 
 # initialize a local geth node
 init:
-    ./build/bin/geth --db.engine pebble \
+    ../build/bin/geth --db.engine pebble \
     --state.scheme=path \
     init geth-genesis-local.json
 
 # start a local geth node
 run:
-    ./build/bin/geth \
+    ../build/bin/geth \
     --http \
     --http.addr=0.0.0.0 \
     --http.port=8545 \
