@@ -129,6 +129,22 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 			wantErr:        "prev block hash do not match in allocation",
 		},
 		{
+			description: "public key doesn't match",
+			auctionResult: &bundlev1alpha1.AuctionResult{
+				Signature: []byte("invalid signature"),
+				PublicKey: []byte("invalid public key"),
+				Allocation: &bundlev1alpha1.Bundle{
+					Fee:                    100,
+					Transactions:           [][]byte{[]byte("unmarshallable tx")},
+					BaseSequencerBlockHash: []byte("sequencer block hash"),
+					PrevRollupBlockHash:    []byte("prev rollup block hash"),
+				},
+			},
+			prevBlockHash:  []byte("prev rollup block hash"),
+			expectedOutput: types.Transactions{},
+			wantErr:        "public key in auction result does not match trusted builder public key",
+		},
+		{
 			description: "invalid signature",
 			auctionResult: &bundlev1alpha1.AuctionResult{
 				Signature: []byte("invalid signature"),
@@ -444,4 +460,248 @@ func TestUnbundleRollupData(t *testing.T) {
 	require.True(t, bytes.Equal(txsToProcess[0].Hash().Bytes(), tx1.Hash().Bytes()), "expected tx1 to be first")
 	require.True(t, bytes.Equal(txsToProcess[1].Hash().Bytes(), tx2.Hash().Bytes()), "expected tx2 to be second")
 	require.True(t, bytes.Equal(txsToProcess[2].Hash().Bytes(), tx3.Hash().Bytes()), "expected tx3 to be third")
+	require.True(t, bytes.Equal(txsToProcess[3].Hash().Bytes(), tx4.Hash().Bytes()), "expected tx4 to be fourth")
+	require.True(t, bytes.Equal(txsToProcess[4].Hash().Bytes(), tx5.Hash().Bytes()), "expected tx5 to be fifth")
+}
+
+func TestUnbundleRollupDataWithDuplicateAuctionResults(t *testing.T) {
+	ethservice, serviceV1Alpha1, trustedBuilderPrivKey := SetupSharedService(t, 10)
+
+	baseSequencerBlockHash := []byte("sequencer block hash")
+	prevRollupBlockHash := []byte("prev rollup block hash")
+
+	// txs in
+	tx1 := transaction(0, 1000, TestKey)
+	tx2 := transaction(1, 1000, TestKey)
+	tx3 := transaction(2, 1000, TestKey)
+	tx4 := transaction(3, 1000, TestKey)
+	tx5 := transaction(4, 1000, TestKey)
+
+	validMarshalledTx1, err := tx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx2, err := tx2.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx3, err := tx3.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx4, err := tx4.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx5, err := tx5.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	allocation := &bundlev1alpha1.Bundle{
+		Fee:                    100,
+		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+		BaseSequencerBlockHash: baseSequencerBlockHash,
+		PrevRollupBlockHash:    prevRollupBlockHash,
+	}
+
+	marshalledAllocation, err := proto.Marshal(allocation)
+	require.NoError(t, err, "failed to marshal allocation: %v", err)
+	signedAllocation, err := trustedBuilderPrivKey.Sign(nil, marshalledAllocation, &ed25519.Options{
+		Hash:    0,
+		Context: "",
+	})
+	require.NoError(t, err, "failed to sign allocation: %v", err)
+
+	auctionResult := &bundlev1alpha1.AuctionResult{
+		Signature:  signedAllocation,
+		PublicKey:  serviceV1Alpha1.TrustedBuilderPublicKey(),
+		Allocation: allocation,
+	}
+
+	marshalledAuctionResult, err := proto.Marshal(auctionResult)
+	require.NoError(t, err, "failed to marshal auction result: %v", err)
+	auctionResultSequenceData := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: marshalledAuctionResult,
+		},
+	}
+	// this auction result should be ignored
+	auctionResultSequenceData2 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: marshalledAuctionResult,
+		},
+	}
+	seqData1 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx4,
+		},
+	}
+	seqData2 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx5,
+		},
+	}
+
+	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	chainDestinationKey, err := crypto.GenerateKey()
+	require.Nil(t, err, "failed to generate chain destination key: %v", err)
+	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
+
+	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+		BridgeAddress: &primitivev1.Address{
+			Bech32M: bridgeAddress,
+		},
+		Asset:                   bridgeAssetDenom,
+		Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+		RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+		DestinationChainAddress: chainDestinationAddress.String(),
+		SourceTransactionId: &primitivev1.TransactionId{
+			Inner: "test_tx_hash",
+		},
+		SourceActionIndex: 0,
+	}}}
+
+	finalTxs := []*sequencerblockv1.RollupData{seqData1, seqData2, auctionResultSequenceData, auctionResultSequenceData2, depositTx}
+
+	txsToProcess := UnbundleRollupDataTransactions(finalTxs, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), prevRollupBlockHash, serviceV1Alpha1.TrustedBuilderPublicKey())
+
+	require.Equal(t, txsToProcess.Len(), 6, "expected 6 txs to process")
+
+	// auction result txs should be the first 3
+	require.True(t, bytes.Equal(txsToProcess[0].Hash().Bytes(), tx1.Hash().Bytes()), "expected tx1 to be first")
+	require.True(t, bytes.Equal(txsToProcess[1].Hash().Bytes(), tx2.Hash().Bytes()), "expected tx2 to be second")
+	require.True(t, bytes.Equal(txsToProcess[2].Hash().Bytes(), tx3.Hash().Bytes()), "expected tx3 to be third")
+	require.True(t, bytes.Equal(txsToProcess[3].Hash().Bytes(), tx4.Hash().Bytes()), "expected tx4 to be fourth")
+	require.True(t, bytes.Equal(txsToProcess[4].Hash().Bytes(), tx5.Hash().Bytes()), "expected tx5 to be fifth")
+}
+
+func TestUnbundleRollupDataWithDuplicateInvalidAuctionResults(t *testing.T) {
+	ethservice, serviceV1Alpha1, trustedBuilderPrivKey := SetupSharedService(t, 10)
+
+	baseSequencerBlockHash := []byte("sequencer block hash")
+	prevRollupBlockHash := []byte("prev rollup block hash")
+
+	_, invalidTrustedBuilderprivkey, err := ed25519.GenerateKey(nil)
+	require.Nil(t, err, "failed to generate invalid trusted builder key: %v", err)
+
+	// txs in
+	tx1 := transaction(0, 1000, TestKey)
+	tx2 := transaction(1, 1000, TestKey)
+	tx3 := transaction(2, 1000, TestKey)
+	tx4 := transaction(3, 1000, TestKey)
+	tx5 := transaction(4, 1000, TestKey)
+
+	validMarshalledTx1, err := tx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx2, err := tx2.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx3, err := tx3.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx4, err := tx4.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	validMarshalledTx5, err := tx5.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	// transactions that the attacker is trying to get into the top of block
+	invalidTx1 := transaction(5, 1000, TestKey)
+	invalidMarshalledTx1, err := invalidTx1.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+	invalidTx2 := transaction(6, 1000, TestKey)
+	invalidMarshalledTx2, err := invalidTx2.MarshalBinary()
+	require.NoError(t, err, "failed to marshal valid tx: %v", err)
+
+	allocation := &bundlev1alpha1.Bundle{
+		Fee:                    100,
+		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
+		BaseSequencerBlockHash: baseSequencerBlockHash,
+		PrevRollupBlockHash:    prevRollupBlockHash,
+	}
+
+	marshalledAllocation, err := proto.Marshal(allocation)
+	require.NoError(t, err, "failed to marshal allocation: %v", err)
+	signedAllocation, err := trustedBuilderPrivKey.Sign(nil, marshalledAllocation, &ed25519.Options{
+		Hash:    0,
+		Context: "",
+	})
+	require.NoError(t, err, "failed to sign allocation: %v", err)
+
+	invalidAllocation := &bundlev1alpha1.Bundle{
+		Fee:                    100,
+		Transactions:           [][]byte{invalidMarshalledTx1, invalidMarshalledTx2},
+		BaseSequencerBlockHash: baseSequencerBlockHash,
+		PrevRollupBlockHash:    prevRollupBlockHash,
+	}
+	marshalledInvalidAllocation, err := proto.Marshal(invalidAllocation)
+	require.NoError(t, err, "failed to marshal invalid allocation: %v", err)
+
+	signedInvalidAllocation, err := invalidTrustedBuilderprivkey.Sign(nil, marshalledInvalidAllocation, &ed25519.Options{
+		Hash:    0,
+		Context: "",
+	})
+	require.NoError(t, err, "failed to sign allocation: %v", err)
+
+	auctionResult := &bundlev1alpha1.AuctionResult{
+		Signature:  signedAllocation,
+		PublicKey:  serviceV1Alpha1.TrustedBuilderPublicKey(),
+		Allocation: allocation,
+	}
+
+	marshalledAuctionResult, err := proto.Marshal(auctionResult)
+	require.NoError(t, err, "failed to marshal auction result: %v", err)
+
+	invalidAuctionResult := &bundlev1alpha1.AuctionResult{
+		Signature: signedInvalidAllocation,
+		// trying to spoof the actual trusted builder key
+		PublicKey:  serviceV1Alpha1.TrustedBuilderPublicKey(),
+		Allocation: invalidAllocation,
+	}
+	marshalledInvalidAuctionResult, err := proto.Marshal(invalidAuctionResult)
+	require.NoError(t, err, "failed to marshal invalid auction result: %v", err)
+
+	auctionResultSequenceData := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: marshalledAuctionResult,
+		},
+	}
+	// this auction result should be ignored
+	invalidAuctionResultSequenceData := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: marshalledInvalidAuctionResult,
+		},
+	}
+	seqData1 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx4,
+		},
+	}
+	seqData2 := &sequencerblockv1.RollupData{
+		Value: &sequencerblockv1.RollupData_SequencedData{
+			SequencedData: validMarshalledTx5,
+		},
+	}
+
+	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	chainDestinationKey, err := crypto.GenerateKey()
+	require.Nil(t, err, "failed to generate chain destination key: %v", err)
+	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
+
+	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+		BridgeAddress: &primitivev1.Address{
+			Bech32M: bridgeAddress,
+		},
+		Asset:                   bridgeAssetDenom,
+		Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+		RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
+		DestinationChainAddress: chainDestinationAddress.String(),
+		SourceTransactionId: &primitivev1.TransactionId{
+			Inner: "test_tx_hash",
+		},
+		SourceActionIndex: 0,
+	}}}
+
+	finalTxs := []*sequencerblockv1.RollupData{seqData1, seqData2, auctionResultSequenceData, invalidAuctionResultSequenceData, depositTx}
+
+	txsToProcess := UnbundleRollupDataTransactions(finalTxs, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), prevRollupBlockHash, serviceV1Alpha1.TrustedBuilderPublicKey())
+
+	require.Equal(t, txsToProcess.Len(), 6, "expected 6 txs to process")
+
+	// auction result txs should be the first 3
+	require.True(t, bytes.Equal(txsToProcess[0].Hash().Bytes(), tx1.Hash().Bytes()), "expected tx1 to be first")
+	require.True(t, bytes.Equal(txsToProcess[1].Hash().Bytes(), tx2.Hash().Bytes()), "expected tx2 to be second")
+	require.True(t, bytes.Equal(txsToProcess[2].Hash().Bytes(), tx3.Hash().Bytes()), "expected tx3 to be third")
+	require.True(t, bytes.Equal(txsToProcess[3].Hash().Bytes(), tx4.Hash().Bytes()), "expected tx4 to be fourth")
+	require.True(t, bytes.Equal(txsToProcess[4].Hash().Bytes(), tx5.Hash().Bytes()), "expected tx5 to be fifth")
 }
