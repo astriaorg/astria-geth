@@ -73,6 +73,8 @@ func generateBech32MAddress() string {
 }
 
 func TestUnmarshallAuctionResultTxs(t *testing.T) {
+	_, serviceV1Alpha1, trustedBuilderPrivKey := SetupSharedService(t, 10)
+
 	tx1 := transaction(0, 1000, TestKey)
 	validMarshalledTx1, err := tx1.MarshalBinary()
 	require.NoError(t, err, "failed to marshal valid tx: %v", err)
@@ -85,9 +87,6 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 	validMarshalledTx3, err := tx3.MarshalBinary()
 	require.NoError(t, err, "failed to marshal valid tx: %v", err)
 
-	pubkey, privkey, err := ed25519.GenerateKey(nil)
-	require.NoError(t, err, "failed to generate public and private key")
-
 	validAllocation := &bundlev1alpha1.Bundle{
 		Fee:                    100,
 		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
@@ -98,7 +97,7 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 	marshalledAllocation, err := proto.Marshal(validAllocation)
 	require.NoError(t, err, "failed to marshal allocation: %v", err)
 
-	signedAllocation, err := privkey.Sign(nil, marshalledAllocation, &ed25519.Options{
+	signedAllocation, err := trustedBuilderPrivKey.Sign(nil, marshalledAllocation, &ed25519.Options{
 		Hash:    0,
 		Context: "",
 	})
@@ -133,7 +132,7 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 			description: "invalid signature",
 			auctionResult: &bundlev1alpha1.AuctionResult{
 				Signature: []byte("invalid signature"),
-				PublicKey: pubkey,
+				PublicKey: serviceV1Alpha1.TrustedBuilderPublicKey(),
 				Allocation: &bundlev1alpha1.Bundle{
 					Fee:                    100,
 					Transactions:           [][]byte{[]byte("unmarshallable tx")},
@@ -149,7 +148,7 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 			description: "valid auction result",
 			auctionResult: &bundlev1alpha1.AuctionResult{
 				Signature:  signedAllocation,
-				PublicKey:  pubkey,
+				PublicKey:  serviceV1Alpha1.TrustedBuilderPublicKey(),
 				Allocation: validAllocation,
 			},
 			prevBlockHash:  []byte("prev rollup block hash"),
@@ -160,7 +159,7 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			finalTxs, err := unmarshallAuctionResultTxs(test.auctionResult, test.prevBlockHash)
+			finalTxs, err := unmarshallAuctionResultTxs(test.auctionResult, test.prevBlockHash, serviceV1Alpha1.TrustedBuilderPublicKey())
 			if test.wantErr == "" && err == nil {
 				for _, tx := range test.expectedOutput {
 					foundTx := false
@@ -181,7 +180,7 @@ func TestUnmarshallAuctionResultTxs(t *testing.T) {
 }
 
 func TestValidateAndUnmarshallDepositTx(t *testing.T) {
-	ethservice, serviceV1Alpha1 := SetupSharedService(t, 10)
+	ethservice, serviceV1Alpha1, _ := SetupSharedService(t, 10)
 
 	chainDestinationKey, err := crypto.GenerateKey()
 	require.Nil(t, err, "failed to generate chain destination key: %v", err)
@@ -353,7 +352,7 @@ func TestValidateAndUnmarshallSequenceAction(t *testing.T) {
 }
 
 func TestUnbundleRollupData(t *testing.T) {
-	ethservice, serviceV1Alpha1 := SetupSharedService(t, 10)
+	ethservice, serviceV1Alpha1, trustedBuilderPrivKey := SetupSharedService(t, 10)
 
 	baseSequencerBlockHash := []byte("sequencer block hash")
 	prevRollupBlockHash := []byte("prev rollup block hash")
@@ -376,9 +375,6 @@ func TestUnbundleRollupData(t *testing.T) {
 	validMarshalledTx5, err := tx5.MarshalBinary()
 	require.NoError(t, err, "failed to marshal valid tx: %v", err)
 
-	pubKey, privKey, err := ed25519.GenerateKey(nil)
-	require.NoError(t, err, "failed to generate ed25519 key")
-
 	allocation := &bundlev1alpha1.Bundle{
 		Fee:                    100,
 		Transactions:           [][]byte{validMarshalledTx1, validMarshalledTx2, validMarshalledTx3},
@@ -388,7 +384,7 @@ func TestUnbundleRollupData(t *testing.T) {
 
 	marshalledAllocation, err := proto.Marshal(allocation)
 	require.NoError(t, err, "failed to marshal allocation: %v", err)
-	signedAllocation, err := privKey.Sign(nil, marshalledAllocation, &ed25519.Options{
+	signedAllocation, err := trustedBuilderPrivKey.Sign(nil, marshalledAllocation, &ed25519.Options{
 		Hash:    0,
 		Context: "",
 	})
@@ -396,7 +392,7 @@ func TestUnbundleRollupData(t *testing.T) {
 
 	auctionResult := &bundlev1alpha1.AuctionResult{
 		Signature:  signedAllocation,
-		PublicKey:  pubKey,
+		PublicKey:  serviceV1Alpha1.TrustedBuilderPublicKey(),
 		Allocation: allocation,
 	}
 
@@ -440,8 +436,7 @@ func TestUnbundleRollupData(t *testing.T) {
 
 	finalTxs := []*sequencerblockv1.RollupData{seqData1, seqData2, auctionResultSequenceData, depositTx}
 
-	txsToProcess, err := UnbundleRollupData(finalTxs, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), prevRollupBlockHash)
-	require.NoError(t, err, "failed to unbundle rollup data: %v", err)
+	txsToProcess := UnbundleRollupDataTransactions(finalTxs, 2, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), prevRollupBlockHash, serviceV1Alpha1.TrustedBuilderPublicKey())
 
 	require.Equal(t, txsToProcess.Len(), 6, "expected 6 txs to process")
 
