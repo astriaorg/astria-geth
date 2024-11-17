@@ -3,6 +3,7 @@ package shared
 import (
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"math/big"
 	"testing"
 	"time"
@@ -36,7 +37,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
+func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey, ed25519.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -55,11 +56,18 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		panic(err)
 	}
 
+	trustedBuilderPubkey, trustedBuilderPrivkey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		panic(err)
+	}
+
 	config.AstriaRollupName = "astria"
 	config.AstriaSequencerAddressPrefix = "astria"
 	config.AstriaSequencerInitialHeight = 10
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
+
+	config.AstriaTrustedBuilderPublicKey = string(trustedBuilderPubkey)
 
 	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
 	if err != nil {
@@ -114,7 +122,7 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		config.TerminalTotalDifficulty = totalDifficulty
 	}
 
-	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey
+	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey, trustedBuilderPrivkey
 }
 
 // startEthService creates a full node instance for testing.

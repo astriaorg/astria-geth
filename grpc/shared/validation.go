@@ -113,7 +113,7 @@ func validateAndUnmarshallSequenceAction(tx *sequencerblockv1.RollupData) (*type
 	return ethTx, nil
 }
 
-func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, prevBlockHash []byte) (types.Transactions, error) {
+func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, prevBlockHash []byte, trustedBuilderPubKey ed25519.PublicKey) (types.Transactions, error) {
 	processedTxs := types.Transactions{}
 	allocation := auctionResult.GetAllocation()
 
@@ -125,7 +125,12 @@ func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, pre
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal allocation")
 	}
+
 	publicKey := ed25519.PublicKey(auctionResult.GetPublicKey())
+	if !trustedBuilderPubKey.Equal(publicKey) {
+		return nil, errors.New("public key in auction result does not match trusted builder public key")
+	}
+
 	signature := auctionResult.GetSignature()
 	if !ed25519.Verify(publicKey, message, signature) {
 		return nil, errors.New("failed to verify signature")
@@ -145,9 +150,9 @@ func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, pre
 
 }
 
-// `UnbundleRollupData` takes in a list of rollup data transactions and returns a list of Ethereum transactions.
-func UnbundleRollupData(txs []*sequencerblockv1.RollupData, height uint64, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte) (types.Transactions, error) {
+// `UnbundleRollupDataTransactions` takes in a list of rollup data transactions and returns a list of Ethereum transactions.
+func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height uint64, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
+	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, trustedBuilderPubKey ed25519.PublicKey) types.Transactions {
 	processedTxs := types.Transactions{}
 	auctionResultTxs := types.Transactions{}
 	// we just return the auction result here and do not unmarshall the transactions in the bundle if we find it
@@ -156,7 +161,8 @@ func UnbundleRollupData(txs []*sequencerblockv1.RollupData, height uint64, bridg
 		if deposit := tx.GetDeposit(); deposit != nil {
 			depositTx, err := validateAndUnmarshalDepositTx(deposit, height, bridgeAddresses, bridgeAllowedAssets)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to validate and unmarshal deposit tx")
+				log.Error("failed to validate and unmarshal deposit tx", "error", err)
+				continue
 			}
 
 			processedTxs = append(processedTxs, depositTx)
@@ -164,12 +170,14 @@ func UnbundleRollupData(txs []*sequencerblockv1.RollupData, height uint64, bridg
 			sequenceData := tx.GetSequencedData()
 			// check if sequence data is of type AuctionResult
 			if auctionResult == nil {
+				// TODO - check if we can avoid a temp value
 				tempAuctionResult := &bundlev1alpha1.AuctionResult{}
 				err := proto.Unmarshal(sequenceData, tempAuctionResult)
 				if err == nil {
-					unmarshalledAuctionResultTxs, err := unmarshallAuctionResultTxs(tempAuctionResult, prevBlockHash)
+					unmarshalledAuctionResultTxs, err := unmarshallAuctionResultTxs(tempAuctionResult, prevBlockHash, trustedBuilderPubKey)
 					if err != nil {
-						return nil, errors.Wrap(err, "failed to unmarshall auction result transactions")
+						log.Error("failed to unmarshall auction result transactions", "error", err)
+						continue
 					}
 
 					auctionResult = tempAuctionResult
@@ -177,14 +185,16 @@ func UnbundleRollupData(txs []*sequencerblockv1.RollupData, height uint64, bridg
 				} else {
 					ethtx, err := validateAndUnmarshallSequenceAction(tx)
 					if err != nil {
-						return nil, errors.Wrap(err, "failed to unmarshall sequence action")
+						log.Error("failed to unmarshall sequence action", "error", err)
+						continue
 					}
 					processedTxs = append(processedTxs, ethtx)
 				}
 			} else {
 				ethtx, err := validateAndUnmarshallSequenceAction(tx)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to unmarshall sequence action")
+					log.Error("failed to unmarshall sequence action", "error", err)
+					continue
 				}
 				processedTxs = append(processedTxs, ethtx)
 			}
@@ -194,5 +204,5 @@ func UnbundleRollupData(txs []*sequencerblockv1.RollupData, height uint64, bridg
 	// prepend auctionResultTxs to processedTxs
 	processedTxs = append(auctionResultTxs, processedTxs...)
 
-	return processedTxs, nil
+	return processedTxs
 }

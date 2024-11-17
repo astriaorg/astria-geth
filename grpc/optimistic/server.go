@@ -5,6 +5,7 @@ import (
 	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -190,11 +191,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	// the height that this block will be at
 	height := o.Bc().CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess, err := shared.UnbundleRollupData(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes())
-	if err != nil {
-		log.Error("failed to unbundle rollup data", "err", err)
-		return nil, status.Error(codes.InvalidArgument, "Could not unbundle rollup data")
-	}
+	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes(), o.TrustedBuilderPublicKey())
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -294,4 +291,8 @@ func (s *OptimisticServiceV1Alpha1) BridgeAllowedAssets() map[string]struct{} {
 
 func (s *OptimisticServiceV1Alpha1) SyncMethodsCalled() bool {
 	return s.sharedServiceContainer.SyncMethodsCalled()
+}
+
+func (s *OptimisticServiceV1Alpha1) TrustedBuilderPublicKey() ed25519.PublicKey {
+	return s.sharedServiceContainer.TrustedBuilderPublicKey()
 }

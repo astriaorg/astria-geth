@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,8 @@ type SharedServiceContainer struct {
 
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
+
+	trustedBuilderPublicKey ed25519.PublicKey
 
 	// TODO: bharath - we could make this an atomic pointer???
 	nextFeeRecipient common.Address // Fee recipient for the next block
@@ -96,12 +99,23 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 			}
 		}
 	}
+
+	// TODO - is it desirable to not fail if the trusted builder public key is not set?
+	if bc.Config().AstriaTrustedBuilderPublicKey == "" {
+		return nil, errors.New("trusted builder public key not set")
+	}
+	// validate if its an ed25519 public key
+	if len(bc.Config().AstriaTrustedBuilderPublicKey) != ed25519.PublicKeySize {
+		return nil, errors.New("trusted builder public key is not a valid ed25519 public key")
+	}
+
 	sharedServiceContainer := &SharedServiceContainer{
-		eth:                 eth,
-		bc:                  bc,
-		bridgeAddresses:     bridgeAddresses,
-		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
+		eth:                     eth,
+		bc:                      bc,
+		bridgeAddresses:         bridgeAddresses,
+		bridgeAllowedAssets:     bridgeAllowedAssets,
+		nextFeeRecipient:        nextFeeRecipient,
+		trustedBuilderPublicKey: ed25519.PublicKey(bc.Config().AstriaTrustedBuilderPublicKey),
 	}
 
 	return sharedServiceContainer, nil
@@ -158,4 +172,8 @@ func (s *SharedServiceContainer) BridgeAddresses() map[string]*params.AstriaBrid
 
 func (s *SharedServiceContainer) BridgeAllowedAssets() map[string]struct{} {
 	return s.bridgeAllowedAssets
+}
+
+func (s *SharedServiceContainer) TrustedBuilderPublicKey() ed25519.PublicKey {
+	return s.trustedBuilderPublicKey
 }

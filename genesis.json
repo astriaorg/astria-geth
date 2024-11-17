@@ -18,6 +18,7 @@
         "astriaRollupName": "astria",
         "astriaOverrideGenesisExtraData": true,
         "astriaSequencerInitialHeight": 2,
+        "astriaTrustedBuilderPubKey": "",
         "astriaSequencerAddressPrefix": "astria",
         "astriaCelestiaInitialHeight": 2,
         "astriaCelestiaHeightVariance": 10,
