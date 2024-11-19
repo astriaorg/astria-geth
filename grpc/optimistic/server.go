@@ -218,6 +218,14 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 		},
 	}
 
+	if publicKey, ok := o.Bc().Config().AstriaTrustedBuilderPublicKeys[res.Number+1]; ok {
+		if len(publicKey) != ed25519.PublicKeySize {
+			log.Error("trusted builder public key is not a valid ed25519 public", "block", res.Number+1, "publicKey", publicKey)
+		}
+
+		o.SetTrustedBuilderPublicKey(ed25519.PublicKey(publicKey))
+	}
+
 	log.Info("ExecuteOptimisticBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
 	executeOptimisticBlockSuccessCount.Inc(1)
 
@@ -278,4 +286,8 @@ func (s *OptimisticServiceV1Alpha1) SyncMethodsCalled() bool {
 
 func (s *OptimisticServiceV1Alpha1) TrustedBuilderPublicKey() ed25519.PublicKey {
 	return s.sharedServiceContainer.TrustedBuilderPublicKey()
+}
+
+func (s *OptimisticServiceV1Alpha1) SetTrustedBuilderPublicKey(trustedBuilderPublicKey ed25519.PublicKey) {
+	s.sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
 }
