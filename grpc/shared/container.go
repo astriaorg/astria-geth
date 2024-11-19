@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"sync"
+	"sync/atomic"
 )
 
 type SharedServiceContainer struct {
@@ -25,7 +26,7 @@ type SharedServiceContainer struct {
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
 
-	trustedBuilderPublicKey ed25519.PublicKey
+	trustedBuilderPublicKey atomic.Pointer[ed25519.PublicKey]
 
 	// TODO: bharath - we could make this an atomic pointer???
 	nextFeeRecipient common.Address // Fee recipient for the next block
@@ -87,11 +88,11 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 	// To decrease compute cost, we identify the next fee recipient at the start
 	// and update it as we execute blocks.
 	nextFeeRecipient := common.Address{}
+	nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
 	if bc.Config().AstriaFeeCollectors == nil {
 		log.Warn("fee asset collectors not set, assets will be burned")
 	} else {
 		maxHeightCollectorMatch := uint32(0)
-		nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
 		for height, collector := range bc.Config().AstriaFeeCollectors {
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
@@ -100,23 +101,32 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 		}
 	}
 
-	// TODO - is it desirable to not fail if the trusted builder public key is not set?
-	if bc.Config().AstriaTrustedBuilderPublicKey == "" {
-		return nil, errors.New("trusted builder public key not set")
-	}
-	// validate if its an ed25519 public key
-	if len(bc.Config().AstriaTrustedBuilderPublicKey) != ed25519.PublicKeySize {
-		return nil, errors.New("trusted builder public key is not a valid ed25519 public key")
+	trustedBuilderBlockMap := bc.Config().AstriaTrustedBuilderPublicKeys
+	trustedBuilderPublicKey := ed25519.PublicKey{}
+	if trustedBuilderBlockMap == nil {
+		return nil, errors.New("trusted builder public keys not set")
+	} else {
+		maxHeightCollectorMatch := uint32(0)
+		for height, publicKey := range trustedBuilderBlockMap {
+			if height <= nextBlock && height > maxHeightCollectorMatch {
+				maxHeightCollectorMatch = height
+				if len(publicKey) != ed25519.PublicKeySize {
+					return nil, errors.New("trusted builder public key is not a valid ed25519 public key")
+				}
+				trustedBuilderPublicKey = ed25519.PublicKey(publicKey)
+			}
+		}
 	}
 
 	sharedServiceContainer := &SharedServiceContainer{
-		eth:                     eth,
-		bc:                      bc,
-		bridgeAddresses:         bridgeAddresses,
-		bridgeAllowedAssets:     bridgeAllowedAssets,
-		nextFeeRecipient:        nextFeeRecipient,
-		trustedBuilderPublicKey: ed25519.PublicKey(bc.Config().AstriaTrustedBuilderPublicKey),
+		eth:                 eth,
+		bc:                  bc,
+		bridgeAddresses:     bridgeAddresses,
+		bridgeAllowedAssets: bridgeAllowedAssets,
+		nextFeeRecipient:    nextFeeRecipient,
 	}
+
+	sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
 
 	return sharedServiceContainer, nil
 }
@@ -175,5 +185,9 @@ func (s *SharedServiceContainer) BridgeAllowedAssets() map[string]struct{} {
 }
 
 func (s *SharedServiceContainer) TrustedBuilderPublicKey() ed25519.PublicKey {
-	return s.trustedBuilderPublicKey
+	return *s.trustedBuilderPublicKey.Load()
+}
+
+func (s *SharedServiceContainer) SetTrustedBuilderPublicKey(newPublicKey ed25519.PublicKey) {
+	s.trustedBuilderPublicKey.Store(&newPublicKey)
 }

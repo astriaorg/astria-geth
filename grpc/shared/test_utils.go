@@ -67,7 +67,8 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
 
-	config.AstriaTrustedBuilderPublicKey = string(trustedBuilderPubkey)
+	config.AstriaTrustedBuilderPublicKeys = make(map[uint32]string)
+	config.AstriaTrustedBuilderPublicKeys[1] = string(trustedBuilderPubkey)
 
 	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
 	if err != nil {
