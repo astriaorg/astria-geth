@@ -143,6 +143,13 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 		}
 		return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
 	}
+	if number == rpc.OptimisticBlockNumber {
+		header := b.eth.blockchain.CurrentOptimisticBlock()
+		if header == nil {
+			return nil, errors.New("optimistic block not found")
+		}
+		return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
+	}
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }
 
