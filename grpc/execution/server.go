@@ -181,7 +181,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
 		Parent:                prevHeadHash,
-		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
+		Timestamp:             uint64(req.GetTimestamp().AsTime().UnixNano()),
 		Random:                common.Hash{},
 		FeeRecipient:          s.NextFeeRecipient(),
 		OverrideTransactions:  types.Transactions{},

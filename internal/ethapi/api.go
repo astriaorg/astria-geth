@@ -834,6 +834,7 @@ func (s *BlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.Hash) m
 //   - When blockNr is -2 the chain latest block is returned.
 //   - When blockNr is -3 the chain finalized block is returned.
 //   - When blockNr is -4 the chain safe block is returned.
+//   - When blockNr is -5 the chain optimistic block is returned.
 //   - When fullTx is true all transactions in the block are returned, otherwise
 //     only the transaction hash is returned.
 func (s *BlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
