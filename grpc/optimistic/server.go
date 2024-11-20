@@ -5,7 +5,6 @@ import (
 	optimsticPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/bundle/v1alpha1"
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	"context"
-	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -179,10 +178,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	executionStart := time.Now()
 	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
-	o.CommitmentUpdateLock().Lock()
-	// get the soft block
 	softBlock := o.Bc().CurrentSafeBlock()
-	o.CommitmentUpdateLock().Unlock()
 
 	o.BlockExecutionLock().Lock()
 	nextFeeRecipient := o.NextFeeRecipient()
@@ -191,7 +187,9 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	// the height that this block will be at
 	height := o.Bc().CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes(), o.TrustedBuilderPublicKey())
+	addressPrefix := o.Bc().Config().AstriaSequencerAddressPrefix
+
+	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes(), o.TrustedBuilderPublicKey(), addressPrefix)
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -233,14 +231,6 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(block.Time()),
 		},
-	}
-
-	if publicKey, ok := o.Bc().Config().AstriaTrustedBuilderPublicKeys[res.Number+1]; ok {
-		if len(publicKey) != ed25519.PublicKeySize {
-			log.Error("trusted builder public key is not a valid ed25519 public", "block", res.Number+1, "publicKey", publicKey)
-		}
-
-		o.SetTrustedBuilderPublicKey(ed25519.PublicKey(publicKey))
 	}
 
 	log.Info("ExecuteOptimisticBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
@@ -301,10 +291,6 @@ func (s *OptimisticServiceV1Alpha1) SyncMethodsCalled() bool {
 	return s.sharedServiceContainer.SyncMethodsCalled()
 }
 
-func (s *OptimisticServiceV1Alpha1) TrustedBuilderPublicKey() ed25519.PublicKey {
+func (s *OptimisticServiceV1Alpha1) TrustedBuilderPublicKey() string {
 	return s.sharedServiceContainer.TrustedBuilderPublicKey()
-}
-
-func (s *OptimisticServiceV1Alpha1) SetTrustedBuilderPublicKey(trustedBuilderPublicKey ed25519.PublicKey) {
-	s.sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
 }

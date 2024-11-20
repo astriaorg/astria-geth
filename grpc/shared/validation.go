@@ -113,31 +113,35 @@ func validateAndUnmarshallSequenceAction(tx *sequencerblockv1.RollupData) (*type
 	return ethTx, nil
 }
 
-func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, prevBlockHash []byte, trustedBuilderPubKey ed25519.PublicKey) (types.Transactions, error) {
+func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHash []byte, trustedBuilderBech32Address string, addressPrefix string) (types.Transactions, error) {
 	processedTxs := types.Transactions{}
-	allocation := auctionResult.GetAllocation()
+	payload := allocation.GetPayload()
 
-	if !bytes.Equal(allocation.PrevRollupBlockHash, prevBlockHash) {
+	if !bytes.Equal(payload.PrevRollupBlockHash, prevBlockHash) {
 		return nil, errors.New("prev block hash do not match in allocation")
 	}
 
-	message, err := proto.Marshal(auctionResult.GetAllocation())
+	publicKey := ed25519.PublicKey(allocation.GetPublicKey())
+	bech32Address, err := EncodeFromPublicKey(addressPrefix, publicKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to encode public key to bech32m address: %s", publicKey)
+	}
+	if trustedBuilderBech32Address != bech32Address {
+		return nil, errors.Errorf("public key in allocation does not match trusted builder public key. expected: %s, got: %s", trustedBuilderBech32Address, bech32Address)
+	}
+
+	message, err := proto.Marshal(allocation.GetPayload())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal allocation")
 	}
 
-	publicKey := ed25519.PublicKey(auctionResult.GetPublicKey())
-	if !trustedBuilderPubKey.Equal(publicKey) {
-		return nil, errors.New("public key in auction result does not match trusted builder public key")
-	}
-
-	signature := auctionResult.GetSignature()
+	signature := allocation.GetSignature()
 	if !ed25519.Verify(publicKey, message, signature) {
 		return nil, errors.New("failed to verify signature")
 	}
 
 	// unmarshall the transactions in the bundle
-	for _, allocationTx := range allocation.GetTransactions() {
+	for _, allocationTx := range payload.GetTransactions() {
 		ethtx := new(types.Transaction)
 		err := ethtx.UnmarshalBinary(allocationTx)
 		if err != nil {
@@ -151,12 +155,13 @@ func unmarshallAuctionResultTxs(auctionResult *bundlev1alpha1.AuctionResult, pre
 }
 
 // `UnbundleRollupDataTransactions` takes in a list of rollup data transactions and returns a list of Ethereum transactions.
+// TODO - this function has become too big. we should start breaking it down
 func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height uint64, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, trustedBuilderPubKey ed25519.PublicKey) types.Transactions {
+	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, trustedBuilderBech32Address string, addressPrefix string) types.Transactions {
 	processedTxs := types.Transactions{}
-	auctionResultTxs := types.Transactions{}
-	// we just return the auction result here and do not unmarshall the transactions in the bundle if we find it
-	var auctionResult *bundlev1alpha1.AuctionResult
+	allocationTxs := types.Transactions{}
+	// we just return the allocation here and do not unmarshall the transactions in the bundle if we find it
+	var allocation *bundlev1alpha1.Allocation
 	for _, tx := range txs {
 		if deposit := tx.GetDeposit(); deposit != nil {
 			depositTx, err := validateAndUnmarshalDepositTx(deposit, height, bridgeAddresses, bridgeAllowedAssets)
@@ -168,20 +173,20 @@ func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height u
 			processedTxs = append(processedTxs, depositTx)
 		} else {
 			sequenceData := tx.GetSequencedData()
-			// check if sequence data is of type AuctionResult
-			if auctionResult == nil {
+			// check if sequence data is of type Allocation
+			if allocation == nil {
 				// TODO - check if we can avoid a temp value
-				tempAuctionResult := &bundlev1alpha1.AuctionResult{}
-				err := proto.Unmarshal(sequenceData, tempAuctionResult)
+				tempAllocation := &bundlev1alpha1.Allocation{}
+				err := proto.Unmarshal(sequenceData, tempAllocation)
 				if err == nil {
-					unmarshalledAuctionResultTxs, err := unmarshallAuctionResultTxs(tempAuctionResult, prevBlockHash, trustedBuilderPubKey)
+					unmarshalledAllocationTxs, err := unmarshallAllocationTxs(tempAllocation, prevBlockHash, trustedBuilderBech32Address, addressPrefix)
 					if err != nil {
-						log.Error("failed to unmarshall auction result transactions", "error", err)
+						log.Error("failed to unmarshall allocation transactions", "error", err)
 						continue
 					}
 
-					auctionResult = tempAuctionResult
-					auctionResultTxs = unmarshalledAuctionResultTxs
+					allocation = tempAllocation
+					allocationTxs = unmarshalledAllocationTxs
 				} else {
 					ethtx, err := validateAndUnmarshallSequenceAction(tx)
 					if err != nil {
@@ -201,8 +206,8 @@ func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height u
 		}
 	}
 
-	// prepend auctionResultTxs to processedTxs
-	processedTxs = append(auctionResultTxs, processedTxs...)
+	// prepend allocation txs to processedTxs
+	processedTxs = append(allocationTxs, processedTxs...)
 
 	return processedTxs
 }

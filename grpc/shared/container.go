@@ -1,14 +1,13 @@
 package shared
 
 import (
-	"crypto/ed25519"
-	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
 	"sync"
 	"sync/atomic"
 )
@@ -26,7 +25,8 @@ type SharedServiceContainer struct {
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
 
-	trustedBuilderPublicKey atomic.Pointer[ed25519.PublicKey]
+	// trusted builder public key is a bech32m address
+	trustedBuilderPublicKey atomic.Pointer[string]
 
 	// TODO: bharath - we could make this an atomic pointer???
 	nextFeeRecipient common.Address // Fee recipient for the next block
@@ -101,19 +101,19 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 		}
 	}
 
-	trustedBuilderBlockMap := bc.Config().AstriaTrustedBuilderPublicKeys
-	trustedBuilderPublicKey := ed25519.PublicKey{}
+	trustedBuilderBlockMap := bc.Config().AstriaTrustedBuilderAddresses
+	trustedBuilderPublicKey := ""
 	if trustedBuilderBlockMap == nil {
 		return nil, errors.New("trusted builder public keys not set")
 	} else {
 		maxHeightCollectorMatch := uint32(0)
-		for height, publicKey := range trustedBuilderBlockMap {
+		for height, address := range trustedBuilderBlockMap {
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
-				if len(publicKey) != ed25519.PublicKeySize {
-					return nil, errors.New("trusted builder public key is not a valid ed25519 public key")
+				if err := ValidateBech32mAddress(address, bc.Config().AstriaSequencerAddressPrefix); err != nil {
+					return nil, errors.Wrapf(err, "trusted builder address %s at height %d is invalid", address, height)
 				}
-				trustedBuilderPublicKey = ed25519.PublicKey(publicKey)
+				trustedBuilderPublicKey = address
 			}
 		}
 	}
@@ -184,10 +184,10 @@ func (s *SharedServiceContainer) BridgeAllowedAssets() map[string]struct{} {
 	return s.bridgeAllowedAssets
 }
 
-func (s *SharedServiceContainer) TrustedBuilderPublicKey() ed25519.PublicKey {
+func (s *SharedServiceContainer) TrustedBuilderPublicKey() string {
 	return *s.trustedBuilderPublicKey.Load()
 }
 
-func (s *SharedServiceContainer) SetTrustedBuilderPublicKey(newPublicKey ed25519.PublicKey) {
-	s.trustedBuilderPublicKey.Store(&newPublicKey)
+func (s *SharedServiceContainer) SetTrustedBuilderPublicKey(newAddress string) {
+	s.trustedBuilderPublicKey.Store(&newAddress)
 }

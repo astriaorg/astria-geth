@@ -24,7 +24,7 @@ import (
 )
 
 func TestOptimisticServiceServerV1Alpha1_ExecuteOptimisticBlock(t *testing.T) {
-	ethService, _, _ := shared.SetupSharedService(t, 10)
+	ethService, _, _, _ := shared.SetupSharedService(t, 10)
 
 	tests := []struct {
 		description                          string
@@ -66,7 +66,7 @@ func TestOptimisticServiceServerV1Alpha1_ExecuteOptimisticBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			ethservice, sharedService, _ := shared.SetupSharedService(t, 10)
+			ethservice, sharedService, _, _ := shared.SetupSharedService(t, 10)
 
 			// reset the blockchain with each test
 			optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
@@ -194,7 +194,7 @@ func TestOptimisticServiceServerV1Alpha1_ExecuteOptimisticBlock(t *testing.T) {
 }
 
 func TestNewOptimisticServiceServerV1Alpha_StreamBundles(t *testing.T) {
-	ethservice, sharedService, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedService, _, _ := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
 	executionServiceV1 := execution.SetupExecutionService(t, sharedService)
@@ -358,7 +358,7 @@ func TestNewOptimisticServiceServerV1Alpha_StreamBundles(t *testing.T) {
 }
 
 func TestOptimisticServiceServerV1_StreamExecuteOptimisticBlock(t *testing.T) {
-	ethservice, sharedService, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedService, _, _ := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
 	executionServiceV1 := execution.SetupExecutionService(t, sharedService)
