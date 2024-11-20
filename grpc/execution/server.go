@@ -252,10 +252,8 @@ func (s *ExecutionServiceServerV1) ExecuteOptimisticBlock(ctx context.Context, r
 	executionStart := time.Now()
 	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
-	s.commitmentUpdateLock.Lock()
 	// get the soft block
 	softBlock := s.bc.CurrentSafeBlock()
-	s.commitmentUpdateLock.Unlock()
 
 	s.blockExecutionLock.Lock()
 	nextFeeRecipient := s.nextFeeRecipient
