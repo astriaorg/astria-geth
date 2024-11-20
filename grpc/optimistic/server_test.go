@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
+func TestOptimisticServiceServerV1Alpha1_ExecuteOptimisticBlock(t *testing.T) {
 	ethService, _, _ := shared.SetupSharedService(t, 10)
 
 	tests := []struct {
@@ -193,7 +193,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 	}
 }
 
-func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
+func TestNewOptimisticServiceServerV1Alpha_StreamBundles(t *testing.T) {
 	ethservice, sharedService, _ := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
@@ -357,7 +357,7 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.T) {
+func TestOptimisticServiceServerV1_StreamExecuteOptimisticBlock(t *testing.T) {
 	ethservice, sharedService, _ := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)

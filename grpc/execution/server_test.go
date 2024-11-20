@@ -21,11 +21,11 @@ import (
 	"testing"
 )
 
-func TestExecutionService_GetGenesisInfo(t *testing.T) {
+func TestExecutionServiceV1_GetGenesisInfo(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := serviceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
 
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
@@ -33,14 +33,14 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
 	require.Equal(t, genesisInfo.GetSequencerGenesisBlockHeight(), ethservice.BlockChain().Config().AstriaSequencerInitialHeight, "SequencerInitialHeight is not correct")
 	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaCelestiaHeightVariance, "CelestiaHeightVariance is not correct")
-	require.True(t, serviceV1Alpha1.sharedServiceContainer.GenesisInfoCalled(), "GetGenesisInfo should be called")
+	require.True(t, serviceV1.sharedServiceContainer.GenesisInfoCalled(), "GetGenesisInfo should be called")
 }
 
-func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
+func TestExecutionServiceServerV1_GetCommitmentState(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
 
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
@@ -60,12 +60,12 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 	require.Equal(t, uint64(commitmentState.Firm.Number), firmBlock.Number.Uint64(), "Firm Block Number do not match")
 	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaCelestiaInitialHeight, "BaseCelestiaHeight is not correct")
 
-	require.True(t, serviceV1Alpha1.sharedServiceContainer.CommitmentStateCalled(), "GetCommitmentState should be called")
+	require.True(t, serviceV1.sharedServiceContainer.CommitmentStateCalled(), "GetCommitmentState should be called")
 }
 
-func TestExecutionService_GetBlock(t *testing.T) {
+func TestExecutionServiceV1_GetBlock(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	tests := []struct {
 		description        string
@@ -97,7 +97,7 @@ func TestExecutionService_GetBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			blockInfo, err := serviceV1Alpha1.GetBlock(context.Background(), tt.getBlockRequst)
+			blockInfo, err := serviceV1.GetBlock(context.Background(), tt.getBlockRequst)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "GetBlock should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "GetBlock failed")
@@ -123,9 +123,9 @@ func TestExecutionService_GetBlock(t *testing.T) {
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
+func TestExecutionServiceServerV1_BatchGetBlocks(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	tests := []struct {
 		description          string
@@ -175,7 +175,7 @@ func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			batchBlocksRes, err := serviceV1Alpha1.BatchGetBlocks(context.Background(), tt.batchGetBlockRequest)
+			batchBlocksRes, err := serviceV1.BatchGetBlocks(context.Background(), tt.batchGetBlockRequest)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "BatchGetBlocks should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "BatchGetBlocks failed")
@@ -195,7 +195,7 @@ func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
+func TestExecutionServiceServerV1_ExecuteBlock(t *testing.T) {
 	ethservice, _, _ := shared.SetupSharedService(t, 10)
 
 	tests := []struct {
@@ -249,18 +249,18 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
 			ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-			serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+			serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
 			var genesisInfo *astriaPb.GenesisInfo
 			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
 			if tt.callGenesisInfoAndGetCommitmentState {
 				// call getGenesisInfo and getCommitmentState before calling executeBlock
-				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+				genesisInfo, err = serviceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 				require.Nil(t, err, "GetGenesisInfo failed")
 				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
-				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateBeforeExecuteBlock, err = serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed")
 				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
 			}
@@ -319,7 +319,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				Transactions: marshalledTxs,
 			}
 
-			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
+			executeBlockRes, err := serviceV1.ExecuteBlock(context.Background(), executeBlockReq)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "ExecuteBlock should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
@@ -331,7 +331,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
 				// check if commitment state is not updated
-				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateAfterExecuteBlock, err := serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed")
 
 				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
@@ -341,17 +341,17 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
+func TestExecutionServiceServerV1_ExecuteBlockAndUpdateCommitment(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	// call genesis info
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := serviceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
 	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
 	// call get commitment state
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
@@ -416,7 +416,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		Transactions: marshalledTxs,
 	}
 
-	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
+	executeBlockRes, err := serviceV1.ExecuteBlock(context.Background(), executeBlockReq)
 	require.Nil(t, err, "ExecuteBlock failed")
 
 	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
@@ -444,7 +444,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		},
 	}
 
-	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
+	updateCommitmentStateRes, err := serviceV1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
 	require.Nil(t, err, "UpdateCommitmentState failed")
 	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
 	require.Equal(t, updateCommitmentStateRes, updateCommitmentStateReq.CommitmentState, "CommitmentState response should match request")
@@ -478,17 +478,17 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 }
 
 // Check that invalid transactions are not added into a block and are removed from the mempool
-func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInvalidTransactions(t *testing.T) {
+func TestExecutionServiceServerV1_ExecuteBlockAndUpdateCommitmentWithInvalidTransactions(t *testing.T) {
 	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
-	serviceV1Alpha1 := SetupExecutionService(t, sharedServiceContainer)
+	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	// call genesis info
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := serviceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
 	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
 	// call get commitment state
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
@@ -541,7 +541,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 		Transactions: marshalledTxs,
 	}
 
-	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
+	executeBlockRes, err := serviceV1.ExecuteBlock(context.Background(), executeBlockReq)
 	require.Nil(t, err, "ExecuteBlock failed")
 
 	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
@@ -569,7 +569,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInval
 		},
 	}
 
-	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
+	updateCommitmentStateRes, err := serviceV1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
 	require.Nil(t, err, "UpdateCommitmentState failed")
 	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
 	require.Equal(t, updateCommitmentStateRes, updateCommitmentStateReq.CommitmentState, "CommitmentState response should match request")
