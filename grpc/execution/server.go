@@ -62,11 +62,11 @@ var (
 )
 
 func NewExecutionServiceServerV1(sharedServiceContainer *shared.SharedServiceContainer) *ExecutionServiceServerV1 {
-	execServiceServerV1Alpha2 := &ExecutionServiceServerV1{
+	execServiceServerV1 := &ExecutionServiceServerV1{
 		sharedServiceContainer: sharedServiceContainer,
 	}
 
-	return execServiceServerV1Alpha2
+	return execServiceServerV1
 }
 
 func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {

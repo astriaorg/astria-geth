@@ -70,18 +70,18 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 
 			// reset the blockchain with each test
 			optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
-			executionServiceV1Alpha1 := execution.SetupExecutionService(t, sharedService)
+			executionServiceV1 := execution.SetupExecutionService(t, sharedService)
 
 			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
 			var genesisInfo *astriaPb.GenesisInfo
 			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
 			if tt.callGenesisInfoAndGetCommitmentState {
 				// call getGenesisInfo and getCommitmentState before calling executeBlock
-				genesisInfo, err = executionServiceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+				genesisInfo, err = executionServiceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 				require.Nil(t, err, "GetGenesisInfo failed")
 				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
-				commitmentStateBeforeExecuteBlock, err = executionServiceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateBeforeExecuteBlock, err = executionServiceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed")
 				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
 			}
@@ -158,7 +158,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteOptimisticBlock(t *testing.T) {
 				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
 
 				// check if commitment state is not updated
-				commitmentStateAfterExecuteBlock, err := executionServiceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				commitmentStateAfterExecuteBlock, err := executionServiceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 				require.Nil(t, err, "GetCommitmentState failed")
 
 				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
@@ -197,15 +197,15 @@ func TestNewExecutionServiceServerV1Alpha2_StreamBundles(t *testing.T) {
 	ethservice, sharedService := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
-	executionServiceV1Alpha1 := execution.SetupExecutionService(t, sharedService)
+	executionServiceV1 := execution.SetupExecutionService(t, sharedService)
 
 	// call genesis info
-	genesisInfo, err := executionServiceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := executionServiceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
 	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
 	// call get commitment state
-	commitmentState, err := executionServiceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := executionServiceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
@@ -361,15 +361,15 @@ func TestExecutionServiceServerV1Alpha2_StreamExecuteOptimisticBlock(t *testing.
 	ethservice, sharedService := shared.SetupSharedService(t, 10)
 
 	optimisticServiceV1Alpha1 := SetupOptimisticService(t, sharedService)
-	executionServiceV1Alpha1 := execution.SetupExecutionService(t, sharedService)
+	executionServiceV1 := execution.SetupExecutionService(t, sharedService)
 
 	// call genesis info
-	genesisInfo, err := executionServiceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+	genesisInfo, err := executionServiceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
 	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
 
 	// call get commitment state
-	commitmentState, err := executionServiceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+	commitmentState, err := executionServiceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
 	require.NotNil(t, commitmentState, "CommitmentState is nil")
 
