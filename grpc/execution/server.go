@@ -6,7 +6,6 @@ package execution
 
 import (
 	"context"
-	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
 	"github.com/ethereum/go-ethereum/eth"
@@ -171,7 +170,9 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// the height that this block will be at
 	height := s.Bc().CurrentBlock().Number.Uint64() + 1
 
-	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, s.BridgeAddresses(), s.BridgeAllowedAssets(), prevHeadHash.Bytes(), s.TrustedBuilderPublicKey())
+	addressPrefix := s.Bc().Config().AstriaSequencerAddressPrefix
+
+	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, s.BridgeAddresses(), s.BridgeAllowedAssets(), prevHeadHash.Bytes(), s.TrustedBuilderPublicKey(), addressPrefix)
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
 	// the Miner when building a payload.
@@ -219,6 +220,14 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	if next, ok := s.Bc().Config().AstriaFeeCollectors[res.Number+1]; ok {
 		s.SetNextFeeRecipient(next)
+	}
+
+	if address, ok := s.Bc().Config().AstriaTrustedBuilderAddresses[res.Number+1]; ok {
+		if err := shared.ValidateBech32mAddress(address, addressPrefix); err != nil {
+			log.Error("trusted builder address is not a valid bech32 address", "block", res.Number+1, "address", address)
+		}
+
+		s.SetTrustedBuilderPublicKey(address)
 	}
 
 	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
@@ -432,6 +441,10 @@ func (s *ExecutionServiceServerV1) SyncMethodsCalled() bool {
 	return s.sharedServiceContainer.SyncMethodsCalled()
 }
 
-func (s *ExecutionServiceServerV1) TrustedBuilderPublicKey() ed25519.PublicKey {
+func (s *ExecutionServiceServerV1) TrustedBuilderPublicKey() string {
 	return s.sharedServiceContainer.TrustedBuilderPublicKey()
+}
+
+func (s *ExecutionServiceServerV1) SetTrustedBuilderPublicKey(trustedBuilderPublicKey string) {
+	s.sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
 }

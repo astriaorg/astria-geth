@@ -37,7 +37,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey, ed25519.PrivateKey) {
+func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey, ed25519.PrivateKey, ed25519.PublicKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -56,19 +56,23 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		panic(err)
 	}
 
-	trustedBuilderPubkey, trustedBuilderPrivkey, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
-
 	config.AstriaRollupName = "astria"
 	config.AstriaSequencerAddressPrefix = "astria"
 	config.AstriaSequencerInitialHeight = 10
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
 
-	config.AstriaTrustedBuilderPublicKeys = make(map[uint32]string)
-	config.AstriaTrustedBuilderPublicKeys[1] = string(trustedBuilderPubkey)
+	trustedBuilderPubkey, trustedBuilderPrivkey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		panic(err)
+	}
+	trustedBuilderAddress, err := EncodeFromPublicKey(config.AstriaSequencerAddressPrefix, trustedBuilderPubkey)
+	if err != nil {
+		panic(err)
+	}
+
+	config.AstriaTrustedBuilderAddresses = make(map[uint32]string)
+	config.AstriaTrustedBuilderAddresses[1] = trustedBuilderAddress
 
 	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
 	if err != nil {
@@ -123,7 +127,7 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		config.TerminalTotalDifficulty = totalDifficulty
 	}
 
-	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey, trustedBuilderPrivkey
+	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey, trustedBuilderPrivkey, trustedBuilderPubkey
 }
 
 // startEthService creates a full node instance for testing.

@@ -22,7 +22,7 @@ import (
 )
 
 func TestExecutionServiceV1_GetGenesisInfo(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	genesisInfo, err := serviceV1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
@@ -37,7 +37,7 @@ func TestExecutionServiceV1_GetGenesisInfo(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1_GetCommitmentState(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	commitmentState, err := serviceV1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
@@ -64,7 +64,7 @@ func TestExecutionServiceServerV1_GetCommitmentState(t *testing.T) {
 }
 
 func TestExecutionServiceV1_GetBlock(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	tests := []struct {
@@ -124,7 +124,7 @@ func TestExecutionServiceV1_GetBlock(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1_BatchGetBlocks(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	tests := []struct {
@@ -196,7 +196,7 @@ func TestExecutionServiceServerV1_BatchGetBlocks(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1_ExecuteBlock(t *testing.T) {
-	ethservice, _, _ := shared.SetupSharedService(t, 10)
+	ethservice, _, _, _ := shared.SetupSharedService(t, 10)
 
 	tests := []struct {
 		description                          string
@@ -248,7 +248,7 @@ func TestExecutionServiceServerV1_ExecuteBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
-			ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+			ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 			serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
@@ -342,7 +342,7 @@ func TestExecutionServiceServerV1_ExecuteBlock(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1_ExecuteBlockAndUpdateCommitment(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	// call genesis info
@@ -479,7 +479,7 @@ func TestExecutionServiceServerV1_ExecuteBlockAndUpdateCommitment(t *testing.T) 
 
 // Check that invalid transactions are not added into a block and are removed from the mempool
 func TestExecutionServiceServerV1_ExecuteBlockAndUpdateCommitmentWithInvalidTransactions(t *testing.T) {
-	ethservice, sharedServiceContainer, _ := shared.SetupSharedService(t, 10)
+	ethservice, sharedServiceContainer, _, _ := shared.SetupSharedService(t, 10)
 	serviceV1 := SetupExecutionService(t, sharedServiceContainer)
 
 	// call genesis info
