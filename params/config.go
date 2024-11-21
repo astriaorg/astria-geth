@@ -388,7 +388,7 @@ type ChainConfig struct {
 	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
 	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
 	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
-	AstriaAuctioneerAddresses      map[uint32]string           `json:"astriaAuctionerAddresses,omitempty"`
+	AstriaAuctioneerAddresses      map[uint32]string           `json:"astriaAuctioneerAddresses,omitempty"`
 }
 
 func (c *ChainConfig) AstriaExtraData() []byte {
