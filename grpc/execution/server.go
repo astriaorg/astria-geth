@@ -172,7 +172,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	addressPrefix := s.Bc().Config().AstriaSequencerAddressPrefix
 
-	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, s.BridgeAddresses(), s.BridgeAllowedAssets(), prevHeadHash.Bytes(), s.TrustedBuilderPublicKey(), addressPrefix)
+	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, s.BridgeAddresses(), s.BridgeAllowedAssets(), prevHeadHash.Bytes(), s.AuctioneerAddress(), addressPrefix)
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
 	// the Miner when building a payload.
@@ -222,12 +222,12 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		s.SetNextFeeRecipient(next)
 	}
 
-	if address, ok := s.Bc().Config().AstriaTrustedBuilderAddresses[res.Number+1]; ok {
+	if address, ok := s.Bc().Config().AstriaAuctioneerAddresses[res.Number+1]; ok {
 		if err := shared.ValidateBech32mAddress(address, addressPrefix); err != nil {
-			log.Error("trusted builder address is not a valid bech32 address", "block", res.Number+1, "address", address)
+			log.Error("auctioneer address is not a valid bech32 address", "block", res.Number+1, "address", address)
 		}
 
-		s.SetTrustedBuilderPublicKey(address)
+		s.SetAuctioneerAddress(address)
 	}
 
 	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
@@ -441,10 +441,10 @@ func (s *ExecutionServiceServerV1) SyncMethodsCalled() bool {
 	return s.sharedServiceContainer.SyncMethodsCalled()
 }
 
-func (s *ExecutionServiceServerV1) TrustedBuilderPublicKey() string {
-	return s.sharedServiceContainer.TrustedBuilderPublicKey()
+func (s *ExecutionServiceServerV1) AuctioneerAddress() string {
+	return s.sharedServiceContainer.AuctioneerAddress()
 }
 
-func (s *ExecutionServiceServerV1) SetTrustedBuilderPublicKey(trustedBuilderPublicKey string) {
-	s.sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
+func (s *ExecutionServiceServerV1) SetAuctioneerAddress(auctioneerAddress string) {
+	s.sharedServiceContainer.SetAuctioneerAddress(auctioneerAddress)
 }

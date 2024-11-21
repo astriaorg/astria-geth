@@ -25,8 +25,8 @@ type SharedServiceContainer struct {
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
 
-	// trusted builder public key is a bech32m address
-	trustedBuilderPublicKey atomic.Pointer[string]
+	// auctioneer address is a bech32m address
+	auctioneerAddress atomic.Pointer[string]
 
 	// TODO: bharath - we could make this an atomic pointer???
 	nextFeeRecipient common.Address // Fee recipient for the next block
@@ -101,19 +101,19 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 		}
 	}
 
-	trustedBuilderBlockMap := bc.Config().AstriaTrustedBuilderAddresses
-	trustedBuilderPublicKey := ""
-	if trustedBuilderBlockMap == nil {
-		return nil, errors.New("trusted builder public keys not set")
+	auctioneerAddressesBlockMap := bc.Config().AstriaAuctioneerAddresses
+	auctioneerAddress := ""
+	if auctioneerAddressesBlockMap == nil {
+		return nil, errors.New("auctioneer addresses not set")
 	} else {
 		maxHeightCollectorMatch := uint32(0)
-		for height, address := range trustedBuilderBlockMap {
+		for height, address := range auctioneerAddressesBlockMap {
 			if height <= nextBlock && height > maxHeightCollectorMatch {
 				maxHeightCollectorMatch = height
 				if err := ValidateBech32mAddress(address, bc.Config().AstriaSequencerAddressPrefix); err != nil {
-					return nil, errors.Wrapf(err, "trusted builder address %s at height %d is invalid", address, height)
+					return nil, errors.Wrapf(err, "auctioneer address %s at height %d is invalid", address, height)
 				}
-				trustedBuilderPublicKey = address
+				auctioneerAddress = address
 			}
 		}
 	}
@@ -126,7 +126,7 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 		nextFeeRecipient:    nextFeeRecipient,
 	}
 
-	sharedServiceContainer.SetTrustedBuilderPublicKey(trustedBuilderPublicKey)
+	sharedServiceContainer.SetAuctioneerAddress(auctioneerAddress)
 
 	return sharedServiceContainer, nil
 }
@@ -184,10 +184,10 @@ func (s *SharedServiceContainer) BridgeAllowedAssets() map[string]struct{} {
 	return s.bridgeAllowedAssets
 }
 
-func (s *SharedServiceContainer) TrustedBuilderPublicKey() string {
-	return *s.trustedBuilderPublicKey.Load()
+func (s *SharedServiceContainer) AuctioneerAddress() string {
+	return *s.auctioneerAddress.Load()
 }
 
-func (s *SharedServiceContainer) SetTrustedBuilderPublicKey(newAddress string) {
-	s.trustedBuilderPublicKey.Store(&newAddress)
+func (s *SharedServiceContainer) SetAuctioneerAddress(newAddress string) {
+	s.auctioneerAddress.Store(&newAddress)
 }

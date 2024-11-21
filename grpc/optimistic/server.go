@@ -189,7 +189,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	addressPrefix := o.Bc().Config().AstriaSequencerAddressPrefix
 
-	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes(), o.TrustedBuilderPublicKey(), addressPrefix)
+	txsToProcess := shared.UnbundleRollupDataTransactions(req.Transactions, height, o.BridgeAddresses(), o.BridgeAllowedAssets(), softBlock.Hash().Bytes(), o.AuctioneerAddress(), addressPrefix)
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -291,6 +291,6 @@ func (s *OptimisticServiceV1Alpha1) SyncMethodsCalled() bool {
 	return s.sharedServiceContainer.SyncMethodsCalled()
 }
 
-func (s *OptimisticServiceV1Alpha1) TrustedBuilderPublicKey() string {
-	return s.sharedServiceContainer.TrustedBuilderPublicKey()
+func (s *OptimisticServiceV1Alpha1) AuctioneerAddress() string {
+	return s.sharedServiceContainer.AuctioneerAddress()
 }
