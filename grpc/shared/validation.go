@@ -113,7 +113,7 @@ func validateAndUnmarshallSequenceAction(tx *sequencerblockv1.RollupData) (*type
 	return ethTx, nil
 }
 
-func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHash []byte, trustedBuilderBech32Address string, addressPrefix string) (types.Transactions, error) {
+func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHash []byte, auctioneerBech32Address string, addressPrefix string) (types.Transactions, error) {
 	processedTxs := types.Transactions{}
 	payload := allocation.GetPayload()
 
@@ -126,8 +126,8 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to encode public key to bech32m address: %s", publicKey)
 	}
-	if trustedBuilderBech32Address != bech32Address {
-		return nil, errors.Errorf("public key in allocation does not match trusted builder public key. expected: %s, got: %s", trustedBuilderBech32Address, bech32Address)
+	if auctioneerBech32Address != bech32Address {
+		return nil, errors.Errorf("address in allocation does not match auctioneer address. expected: %s, got: %s", auctioneerBech32Address, bech32Address)
 	}
 
 	message, err := proto.Marshal(allocation.GetPayload())
@@ -157,7 +157,7 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 // `UnbundleRollupDataTransactions` takes in a list of rollup data transactions and returns a list of Ethereum transactions.
 // TODO - this function has become too big. we should start breaking it down
 func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height uint64, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, trustedBuilderBech32Address string, addressPrefix string) types.Transactions {
+	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, auctioneerBech32Address string, addressPrefix string) types.Transactions {
 	processedTxs := types.Transactions{}
 	allocationTxs := types.Transactions{}
 	// we just return the allocation here and do not unmarshall the transactions in the bundle if we find it
@@ -179,7 +179,7 @@ func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height u
 				tempAllocation := &bundlev1alpha1.Allocation{}
 				err := proto.Unmarshal(sequenceData, tempAllocation)
 				if err == nil {
-					unmarshalledAllocationTxs, err := unmarshallAllocationTxs(tempAllocation, prevBlockHash, trustedBuilderBech32Address, addressPrefix)
+					unmarshalledAllocationTxs, err := unmarshallAllocationTxs(tempAllocation, prevBlockHash, auctioneerBech32Address, addressPrefix)
 					if err != nil {
 						log.Error("failed to unmarshall allocation transactions", "error", err)
 						continue

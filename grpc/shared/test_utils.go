@@ -62,17 +62,17 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	config.AstriaCelestiaInitialHeight = 10
 	config.AstriaCelestiaHeightVariance = 10
 
-	trustedBuilderPubkey, trustedBuilderPrivkey, err := ed25519.GenerateKey(nil)
+	auctioneerPubKey, auctioneerPrivKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		panic(err)
 	}
-	trustedBuilderAddress, err := EncodeFromPublicKey(config.AstriaSequencerAddressPrefix, trustedBuilderPubkey)
+	auctioneerAddress, err := EncodeFromPublicKey(config.AstriaSequencerAddressPrefix, auctioneerPubKey)
 	if err != nil {
 		panic(err)
 	}
 
-	config.AstriaTrustedBuilderAddresses = make(map[uint32]string)
-	config.AstriaTrustedBuilderAddresses[1] = trustedBuilderAddress
+	config.AstriaAuctioneerAddresses = make(map[uint32]string)
+	config.AstriaAuctioneerAddresses[1] = auctioneerAddress
 
 	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
 	if err != nil {
@@ -127,7 +127,7 @@ func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		config.TerminalTotalDifficulty = totalDifficulty
 	}
 
-	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey, trustedBuilderPrivkey, trustedBuilderPubkey
+	return genesis, blocks, bech32mBridgeAddress, feeCollectorKey, auctioneerPrivKey, auctioneerPubKey
 }
 
 // startEthService creates a full node instance for testing.

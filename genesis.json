@@ -40,7 +40,7 @@
                 }
             }
         ],
-        "astriaTrustedBuilderPublicKeys": {
+        "astriaAuctioneerAddresses": {
             "1": ""
         },
         "astriaFeeCollectors": {
