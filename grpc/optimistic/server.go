@@ -120,7 +120,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 		// execute the optimistic block and wait for the mempool clearing event
 		optimisticBlock, err := o.ExecuteOptimisticBlock(stream.Context(), baseBlock)
 		if err != nil {
-			return status.Error(codes.Internal, "failed to execute optimistic block")
+			return status.Errorf(codes.Internal, "failed to execute optimistic block: %v", err)
 		}
 		optimisticBlockHash := common.BytesToHash(optimisticBlock.Hash)
 
@@ -186,7 +186,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	payload, err := o.Eth().Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
-		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
+		return nil, status.Errorf(codes.InvalidArgument, "Could not build block with provided txs: %v", err)
 	}
 
 	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)

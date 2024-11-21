@@ -181,7 +181,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
 		Parent:                prevHeadHash,
-		Timestamp:             uint64(req.GetTimestamp().AsTime().UnixNano()),
+		Timestamp:             uint64(req.GetTimestamp().GetSeconds()),
 		Random:                common.Hash{},
 		FeeRecipient:          s.NextFeeRecipient(),
 		OverrideTransactions:  types.Transactions{},
@@ -190,7 +190,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	payload, err := s.Eth().Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
-		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
+		return nil, status.Errorf(codes.InvalidArgument, "Could not build block with provided txs: %v", err)
 	}
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
