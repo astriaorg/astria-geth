@@ -57,6 +57,7 @@ func NewOptimisticServiceV1Alpha(sharedServiceContainer *shared.SharedServiceCon
 }
 
 func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStreamRequest, stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
+	log.Debug("GetBundleStream called")
 	if !o.bundleStreamConnected.CompareAndSwap(false, true) {
 		return status.Error(codes.PermissionDenied, "Bundle stream has already been connected to")
 	}
@@ -111,6 +112,7 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 }
 
 func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimisticGrpc.OptimisticExecutionService_ExecuteOptimisticBlockStreamServer) error {
+	log.Debug("ExecuteOptimisticBlockStream called")
 	if !o.executeOptimisticBlockStreamConnected.CompareAndSwap(false, true) {
 		return status.Error(codes.PermissionDenied, "Execute optimsitic block stream has already been connected to")
 	}
