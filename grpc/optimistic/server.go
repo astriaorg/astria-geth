@@ -140,10 +140,13 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
 			})
 		case <-time.After(500 * time.Millisecond):
+			log.Error("timed out waiting for mempool to clear after optimistic block execution")
 			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
 		case err := <-mempoolClearingEvent.Err():
+			log.Error("error waiting for mempool clearing event", "err", err)
 			return status.Errorf(codes.Internal, "error waiting for mempool clearing event: %v", err)
 		case err := <-stream.Context().Done():
+			log.Error("ExecuteOptimisticBlockStream stream closed with error", "err", err)
 			return status.Errorf(codes.Internal, "stream closed with error: %v", err)
 		}
 	}
