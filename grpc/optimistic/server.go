@@ -156,6 +156,8 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
 		case err := <-mempoolClearingEvent.Err():
 			return status.Errorf(codes.Internal, "error waiting for mempool clearing event: %v", err)
+		case err := <-stream.Context().Done():
+			return status.Errorf(codes.Internal, "stream closed with error: %v", err)
 		}
 	}
 }
