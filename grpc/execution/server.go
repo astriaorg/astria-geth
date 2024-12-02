@@ -246,7 +246,7 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
-func (s *ExecutionServiceServerV1) GetBundleStream(stream optimisticGrpc.BundleService_GetBundleStreamServer) error {
+func (s *ExecutionServiceServerV1) GetBundleStream(stream optimisticGrpc.BundleService_GetBundleStreamServer) error {:
 	pendingTxEventCh := make(chan core.NewTxsEvent)
 	pendingTxEvent := s.eth.TxPool().SubscribeTransactions(pendingTxEventCh, false)
 	defer pendingTxEvent.Unsubscribe()
