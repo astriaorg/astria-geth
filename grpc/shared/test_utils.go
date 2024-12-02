@@ -1,4 +1,4 @@
-package execution
+package shared
 
 import (
 	"crypto/ecdsa"
@@ -24,18 +24,18 @@ import (
 )
 
 var (
-	// testKey is a private key to use for funding a tester account.
-	testKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	// TestKey is a private key to use for funding a tester account.
+	TestKey, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 
 	// testAddr is the Ethereum address of the tester account.
-	testAddr = crypto.PubkeyToAddress(testKey.PublicKey)
+	TestAddr = crypto.PubkeyToAddress(TestKey.PublicKey)
 
-	testToAddress = common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a")
+	TestToAddress = common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a")
 
 	testBalance = big.NewInt(2e18)
 )
 
-func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
+func GenerateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -88,7 +88,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	genesis := &core.Genesis{
 		Config: &config,
 		Alloc: core.GenesisAlloc{
-			testAddr: {Balance: testBalance},
+			TestAddr: {Balance: testBalance},
 		},
 		ExtraData:  []byte("test genesis"),
 		Timestamp:  9000,
@@ -99,7 +99,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
 		g.SetExtra([]byte("test"))
-		tx, _ := types.SignTx(types.NewTransaction(testNonce, testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(&config), testKey)
+		tx, _ := types.SignTx(types.NewTransaction(testNonce, TestToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil), types.LatestSigner(&config), TestKey)
 		g.AddTx(tx)
 		testNonce++
 	}
@@ -117,39 +117,15 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 }
 
 // startEthService creates a full node instance for testing.
-func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
+func StartEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	n, err := node.New(&node.Config{})
 	require.Nil(t, err, "can't create node")
 	mcfg := miner.DefaultConfig
-	mcfg.PendingFeeRecipient = testAddr
+	mcfg.PendingFeeRecipient = TestAddr
 	ethcfg := &ethconfig.Config{Genesis: genesis, SyncMode: downloader.FullSync, TrieTimeout: time.Minute, TrieDirtyCache: 256, TrieCleanCache: 256, Miner: mcfg}
 	ethservice, err := eth.New(n, ethcfg)
 	require.Nil(t, err, "can't create eth service")
 
 	ethservice.SetSynced()
 	return ethservice
-}
-
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1) {
-	t.Helper()
-	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
-	ethservice := startEthService(t, genesis)
-
-	serviceV1Alpha1, err := NewExecutionServiceServerV1(ethservice)
-	require.Nil(t, err, "can't create execution service")
-
-	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
-	require.Equal(t, feeCollector, serviceV1Alpha1.nextFeeRecipient, "nextFeeRecipient not set correctly")
-
-	bridgeAsset := genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom
-	_, ok := serviceV1Alpha1.bridgeAllowedAssets[bridgeAsset]
-	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
-
-	_, ok = serviceV1Alpha1.bridgeAddresses[bridgeAddress]
-	require.True(t, ok, "bridgeAddress not set correctly")
-
-	_, err = ethservice.BlockChain().InsertChain(blocks)
-	require.Nil(t, err, "can't insert blocks")
-
-	return ethservice, serviceV1Alpha1
 }

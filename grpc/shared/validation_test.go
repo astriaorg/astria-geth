@@ -1,4 +1,4 @@
-package execution
+package shared
 
 import (
 	"math/big"
@@ -15,10 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
+	lo := i.Uint64()
+	hi := new(big.Int).Rsh(i, 64).Uint64()
+	return &primitivev1.Uint128{Lo: lo, Hi: hi}
+}
+
 func testBlobTx() *types.Transaction {
 	return types.NewTx(&types.BlobTx{
 		Nonce: 1,
-		To:    testAddr,
+		To:    TestAddr,
 		Value: uint256.NewInt(1000),
 		Gas:   1000,
 		Data:  []byte("data"),
@@ -27,7 +33,7 @@ func testBlobTx() *types.Transaction {
 
 func testDepositTx() *types.Transaction {
 	return types.NewTx(&types.DepositTx{
-		From:  testAddr,
+		From:  TestAddr,
 		Value: big.NewInt(1000),
 		Gas:   1000,
 	})
@@ -53,7 +59,7 @@ func generateBech32MAddress() string {
 }
 
 func TestSequenceTxValidation(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := SetupSharedService(t, 10)
 
 	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
@@ -62,7 +68,7 @@ func TestSequenceTxValidation(t *testing.T) {
 	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
-	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), TestKey)
 	require.Nil(t, err, "failed to sign tx: %v", err)
 
 	validMarshalledTx, err := tx.MarshalBinary()
@@ -77,7 +83,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
-	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
+	serviceV1Alpha1.BridgeAddresses()[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
 		AssetDenom:  invalidHeightBridgeAssetDenom,
 		StartHeight: 100,
 	}
@@ -196,7 +202,11 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
+<<<<<<< HEAD:grpc/execution/validation_test.go
 			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
+=======
+			_, err := ValidateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.BridgeAddresses(), serviceV1Alpha1.BridgeAllowedAssets(), common.Address{})
+>>>>>>> 21f5aa7f7 (separate out execution api services and optimistic execution api services):grpc/shared/validation_test.go
 			if test.wantErr == "" && err == nil {
 				return
 			}

@@ -1,6 +1,7 @@
 package node
 
 import (
+	optimisticGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/bundle/v1alpha1/bundlev1alpha1grpc"
 	"net"
 	"os"
 	"sync"
@@ -17,26 +18,34 @@ type GRPCServerHandler struct {
 
 	tcpEndpoint                string
 	udsEndpoint                string
-	server                     *grpc.Server
+	execServer                 *grpc.Server
+	optimisticServer           *grpc.Server
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
+	optimisticExecServ         *optimisticGrpc.OptimisticExecutionServiceServer
+	streamBundleServ           *optimisticGrpc.BundleServiceServer
 }
 
 // NewServer creates a new gRPC server.
 // It registers the execution service server.
 // It registers the gRPC server with the node so it can be stopped on shutdown.
-func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, cfg *Config) error {
-	server := grpc.NewServer()
+func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, optimisticExecServ optimisticGrpc.OptimisticExecutionServiceServer, streamBundleServ optimisticGrpc.BundleServiceServer, cfg *Config) error {
+	execServer, optimisticServer := grpc.NewServer(), grpc.NewServer()
 
 	log.Info("gRPC server enabled", "tcpEndpoint", cfg.GRPCTcpEndpoint(), "udsEndpoint", cfg.GRPCUdsEndpoint())
 
 	serverHandler := &GRPCServerHandler{
 		tcpEndpoint:                cfg.GRPCTcpEndpoint(),
 		udsEndpoint:                cfg.GRPCUdsEndpoint(),
-		server:                     server,
+		execServer:                 execServer,
+		optimisticServer:           optimisticServer,
 		executionServiceServerV1a2: &execServ,
+		optimisticExecServ:         &optimisticExecServ,
+		streamBundleServ:           &streamBundleServ,
 	}
 
-	astriaGrpc.RegisterExecutionServiceServer(server, execServ)
+	astriaGrpc.RegisterExecutionServiceServer(execServer, execServ)
+	optimisticGrpc.RegisterOptimisticExecutionServiceServer(optimisticServer, optimisticExecServ)
+	optimisticGrpc.RegisterBundleServiceServer(optimisticServer, streamBundleServ)
 
 	node.RegisterGRPCServer(serverHandler)
 	return nil
@@ -69,8 +78,8 @@ func (handler *GRPCServerHandler) Start() error {
 		return err
 	}
 
-	go handler.server.Serve(tcpLis)
-	go handler.server.Serve(udsLis)
+	go handler.execServer.Serve(tcpLis)
+	go handler.optimisticServer.Serve(udsLis)
 	log.Info("gRPC server started", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
 	return nil
 }
@@ -80,7 +89,8 @@ func (handler *GRPCServerHandler) Stop() error {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
 
-	handler.server.GracefulStop()
+	handler.execServer.GracefulStop()
+	handler.optimisticServer.GracefulStop()
 	log.Info("gRPC server stopped", "tcpEndpoint", handler.tcpEndpoint, "udsEndpoint", handler.udsEndpoint)
 	return nil
 }
