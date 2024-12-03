@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
@@ -14,9 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
 	"math/big"
 )
+
+func WrapError(err error, msg string) error {
+	return fmt.Errorf("%s: %w", msg, err)
+}
 
 func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	lo := big.NewInt(0).SetUint64(u128.Lo)
@@ -124,20 +128,20 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 	publicKey := ed25519.PublicKey(allocation.GetPublicKey())
 	bech32Address, err := EncodeFromPublicKey(addressPrefix, publicKey)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encode public key to bech32m address: %s", publicKey)
+		return nil, WrapError(err, fmt.Sprintf("failed to encode public key to bech32m address: %s", publicKey))
 	}
 	if auctioneerBech32Address != bech32Address {
-		return nil, errors.Errorf("address in allocation does not match auctioneer address. expected: %s, got: %s", auctioneerBech32Address, bech32Address)
+		return nil, fmt.Errorf("address in allocation does not match auctioneer address. expected: %s, got: %s", auctioneerBech32Address, bech32Address)
 	}
 
 	message, err := proto.Marshal(allocation.GetPayload())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal allocation")
+		return nil, WrapError(err, "failed to marshal allocation")
 	}
 
 	signature := allocation.GetSignature()
 	if !ed25519.Verify(publicKey, message, signature) {
-		return nil, errors.New("failed to verify signature")
+		return nil, fmt.Errorf("failed to verify signature")
 	}
 
 	// unmarshall the transactions in the bundle
@@ -145,7 +149,7 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 		ethtx := new(types.Transaction)
 		err := ethtx.UnmarshalBinary(allocationTx)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshall allocation transaction")
+			return nil, WrapError(err, "failed to unmarshall allocation transaction")
 		}
 		processedTxs = append(processedTxs, ethtx)
 	}

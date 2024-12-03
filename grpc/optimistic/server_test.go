@@ -334,7 +334,7 @@ func TestNewOptimisticServiceServerV1Alpha_StreamBundles(t *testing.T) {
 
 	select {
 	case err := <-errorCh:
-		require.ErrorContains(t, err, "error waiting for pending transactions")
+		require.ErrorContains(t, err, "tx pool subscription closed")
 	}
 
 	require.Len(t, mockServerSideStreaming.sentResponses, 5, "Number of responses should match the number of requests")

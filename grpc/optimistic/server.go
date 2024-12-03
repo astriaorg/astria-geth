@@ -6,7 +6,6 @@ import (
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
 	"context"
 	"errors"
-	"fmt"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
@@ -77,7 +76,7 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 				marshalledTxs := [][]byte{}
 				marshalledTx, err := pendingTx.MarshalBinary()
 				if err != nil {
-					return status.Errorf(codes.Internal, "error marshalling tx: %v", err)
+					return status.Errorf(codes.Internal, shared.WrapError(err, "error marshalling tx").Error())
 				}
 				marshalledTxs = append(marshalledTxs, marshalledTx)
 
@@ -89,13 +88,18 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 				err = stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
 				if err != nil {
 					log.Error("error sending bundle over stream", "err", err)
-					return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
+					return status.Error(codes.Internal, shared.WrapError(err, "error sending bundle over stream").Error())
 				}
 			}
 
 		case err := <-pendingTxEvent.Err():
-			log.Error("error waiting for pending transactions", "err", err)
-			return status.Errorf(codes.Internal, "error waiting for pending transactions: %v", err)
+			if err != nil {
+				log.Error("error waiting for pending transactions", "err", err)
+				return status.Error(codes.Internal, shared.WrapError(err, "error waiting for pending transactions").Error())
+			} else {
+				// TODO - what is the right error code here?
+				return status.Error(codes.Internal, "tx pool subscription closed")
+			}
 
 		case <-stream.Context().Done():
 			return stream.Context().Err()
@@ -125,7 +129,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 		// execute the optimistic block and wait for the mempool clearing event
 		optimisticBlock, err := o.ExecuteOptimisticBlock(stream.Context(), baseBlock)
 		if err != nil {
-			return status.Errorf(codes.Internal, "failed to execute optimistic block: %v", err)
+			return status.Errorf(codes.Internal, shared.WrapError(err, "failed to execute optimistic block").Error())
 		}
 		optimisticBlockHash := common.BytesToHash(optimisticBlock.Hash)
 
@@ -144,8 +148,13 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 			log.Error("timed out waiting for mempool to clear after optimistic block execution")
 			return status.Error(codes.DeadlineExceeded, "timed out waiting for mempool to clear after optimistic block execution")
 		case err := <-mempoolClearingEvent.Err():
-			log.Error("error waiting for mempool clearing event", "err", err)
-			return status.Errorf(codes.Internal, "error waiting for mempool clearing event: %v", err)
+			if err != nil {
+				log.Error("error waiting for mempool clearing event", "err", err)
+				return status.Errorf(codes.Internal, shared.WrapError(err, "error waiting for mempool clearing event").Error())
+			} else {
+				// TODO - what is the right error code here?
+				return status.Error(codes.Internal, "mempool clearance subscription closed")
+			}
 		case <-stream.Context().Done():
 			return stream.Context().Err()
 		}
@@ -159,7 +168,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	if err := validateStaticExecuteOptimisticBlockRequest(req); err != nil {
 		log.Error("ExecuteOptimisticBlock called with invalid BaseBlock", "err", err)
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("BaseBlock is invalid: %s", err.Error()))
+		return nil, status.Error(codes.InvalidArgument, shared.WrapError(err, "invalid BaseBlock").Error())
 	}
 
 	if !o.SyncMethodsCalled() {
@@ -193,13 +202,13 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	payload, err := o.Eth().Miner().BuildPayload(payloadAttributes)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
-		return nil, status.Errorf(codes.InvalidArgument, "Could not build block with provided txs: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, shared.WrapError(err, "failed to build payload").Error())
 	}
 
 	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
-		return nil, status.Error(codes.Internal, "failed to execute block")
+		return nil, status.Error(codes.Internal, shared.WrapError(err, "failed to convert executable data to block").Error())
 	}
 
 	// this will insert the optimistic block into the chain and persist it's state without
@@ -207,7 +216,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	err = o.Bc().InsertBlockWithoutSetHead(block)
 	if err != nil {
 		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", block.ParentHash(), "err", err)
-		return nil, status.Error(codes.Internal, "failed to insert block to chain")
+		return nil, status.Error(codes.Internal, shared.WrapError(err, "failed to insert block to chain").Error())
 	}
 
 	// we store a pointer to the optimistic block in the chain so that we can use it
