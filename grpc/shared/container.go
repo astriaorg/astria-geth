@@ -28,8 +28,7 @@ type SharedServiceContainer struct {
 	// auctioneer address is a bech32m address
 	auctioneerAddress atomic.Pointer[string]
 
-	// TODO: bharath - we could make this an atomic pointer???
-	nextFeeRecipient common.Address // Fee recipient for the next block
+	nextFeeRecipient atomic.Pointer[common.Address] // Fee recipient for the next block
 }
 
 func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, error) {
@@ -123,10 +122,10 @@ func NewSharedServiceContainer(eth *eth.Ethereum) (*SharedServiceContainer, erro
 		bc:                  bc,
 		bridgeAddresses:     bridgeAddresses,
 		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
 	}
 
 	sharedServiceContainer.SetAuctioneerAddress(auctioneerAddress)
+	sharedServiceContainer.SetNextFeeRecipient(nextFeeRecipient)
 
 	return sharedServiceContainer, nil
 }
@@ -168,12 +167,12 @@ func (s *SharedServiceContainer) BlockExecutionLock() *sync.Mutex {
 }
 
 func (s *SharedServiceContainer) NextFeeRecipient() common.Address {
-	return s.nextFeeRecipient
+	return *s.nextFeeRecipient.Load()
 }
 
 // assumes that the block execution lock is being held
 func (s *SharedServiceContainer) SetNextFeeRecipient(nextFeeRecipient common.Address) {
-	s.nextFeeRecipient = nextFeeRecipient
+	s.nextFeeRecipient.Store(&nextFeeRecipient)
 }
 
 func (s *SharedServiceContainer) BridgeAddresses() map[string]*params.AstriaBridgeAddressConfig {
