@@ -88,15 +88,16 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 
 				err = stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
 				if err != nil {
+					log.Error("error sending bundle over stream", "err", err)
 					return status.Errorf(codes.Internal, "error sending bundle over stream: %v", err)
 				}
 			}
 
 		case err := <-pendingTxEvent.Err():
+			log.Error("error waiting for pending transactions", "err", err)
 			return status.Errorf(codes.Internal, "error waiting for pending transactions: %v", err)
 
 		case <-stream.Context().Done():
-			log.Debug("GetBundleStream stream closed with error", "err", stream.Context().Err())
 			return stream.Context().Err()
 		}
 	}
@@ -145,9 +146,8 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 		case err := <-mempoolClearingEvent.Err():
 			log.Error("error waiting for mempool clearing event", "err", err)
 			return status.Errorf(codes.Internal, "error waiting for mempool clearing event: %v", err)
-		case err := <-stream.Context().Done():
-			log.Error("ExecuteOptimisticBlockStream stream closed with error", "err", err)
-			return status.Errorf(codes.Internal, "stream closed with error: %v", err)
+		case <-stream.Context().Done():
+			return stream.Context().Err()
 		}
 	}
 }
