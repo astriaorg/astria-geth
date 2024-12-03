@@ -172,9 +172,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	softBlock := o.Bc().CurrentSafeBlock()
 
-	o.BlockExecutionLock().Lock()
 	nextFeeRecipient := o.NextFeeRecipient()
-	o.BlockExecutionLock().Unlock()
 
 	// the height that this block will be at
 	height := o.Bc().CurrentBlock().Number.Uint64() + 1
@@ -214,6 +212,8 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 
 	// we store a pointer to the optimistic block in the chain so that we can use it
 	// to retrieve the state of the optimistic block
+	// this method also sends an event which indicates that a new optimistic block has been set
+	// the mempool clearing logic is triggered when this event is received
 	o.Bc().SetOptimistic(block)
 
 	res := &astriaPb.Block{
