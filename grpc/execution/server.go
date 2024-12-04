@@ -24,7 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
-	"github.com/ethereum/go-ethereum/params"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -45,11 +44,6 @@ type ExecutionServiceServerV1 struct {
 
 	genesisInfoCalled        bool
 	getCommitmentStateCalled bool
-
-	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
-	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
-
-	nextFeeRecipient common.Address // Fee recipient for the next block
 }
 
 var (
@@ -81,74 +75,35 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		return nil, errors.New("rollup name not set")
 	}
 
-	if bc.Config().AstriaSequencerInitialHeight == 0 {
+	fork := bc.Config().GetAstriaForks().GetForkAtHeight(bc.CurrentBlock().Number.Uint64())
+
+	if fork.Sequencer.ChainID == "" {
+		return nil, errors.New("sequencer chain ID not set")
+	}
+
+	if fork.Sequencer.StartHeight == 0 {
 		return nil, errors.New("sequencer initial height not set")
 	}
 
-	if bc.Config().AstriaCelestiaInitialHeight == 0 {
+	if fork.Celestia.ChainID == "" {
+		return nil, errors.New("celestia chain ID not set")
+	}
+
+	if fork.Celestia.StartHeight == 0 {
 		return nil, errors.New("celestia initial height not set")
 	}
 
-	if bc.Config().AstriaCelestiaHeightVariance == 0 {
+	if fork.Celestia.HeightVariance == 0 {
 		return nil, errors.New("celestia height variance not set")
 	}
 
-	bridgeAddresses := make(map[string]*params.AstriaBridgeAddressConfig)
-	bridgeAllowedAssets := make(map[string]struct{})
-	if bc.Config().AstriaBridgeAddressConfigs == nil {
-		log.Warn("bridge addresses not set")
-	} else {
-		nativeBridgeSeen := false
-		for _, cfg := range bc.Config().AstriaBridgeAddressConfigs {
-			err := cfg.Validate(bc.Config().AstriaSequencerAddressPrefix)
-			if err != nil {
-				return nil, fmt.Errorf("invalid bridge address config: %w", err)
-			}
-
-			if cfg.Erc20Asset == nil {
-				if nativeBridgeSeen {
-					return nil, errors.New("only one native bridge address is allowed")
-				}
-				nativeBridgeSeen = true
-			}
-
-			if cfg.Erc20Asset != nil && cfg.SenderAddress == (common.Address{}) {
-				return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
-			}
-
-			bridgeCfg := cfg
-			bridgeAddresses[cfg.BridgeAddress] = &bridgeCfg
-			bridgeAllowedAssets[cfg.AssetDenom] = struct{}{}
-			if cfg.Erc20Asset == nil {
-				log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
-			} else {
-				log.Info("bridge for ERC20 asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom, "contractAddress", cfg.Erc20Asset.ContractAddress)
-			}
-		}
-	}
-
-	// To decrease compute cost, we identify the next fee recipient at the start
-	// and update it as we execute blocks.
-	nextFeeRecipient := common.Address{}
-	if bc.Config().AstriaFeeCollectors == nil {
+	if fork.FeeCollector == (common.Address{}) {
 		log.Warn("fee asset collectors not set, assets will be burned")
-	} else {
-		maxHeightCollectorMatch := uint32(0)
-		nextBlock := uint32(bc.CurrentBlock().Number.Int64()) + 1
-		for height, collector := range bc.Config().AstriaFeeCollectors {
-			if height <= nextBlock && height > maxHeightCollectorMatch {
-				maxHeightCollectorMatch = height
-				nextFeeRecipient = collector
-			}
-		}
 	}
 
 	return &ExecutionServiceServerV1{
-		eth:                 eth,
-		bc:                  bc,
-		bridgeAddresses:     bridgeAddresses,
-		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
+		eth: eth,
+		bc:  bc,
 	}, nil
 }
 
@@ -159,10 +114,15 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
 	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
 
+	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentBlock().Number.Uint64())
+
 	res := &astriaPb.GenesisInfo{
-		RollupId:                    &rollupId,
-		SequencerGenesisBlockHeight: s.bc.Config().AstriaSequencerInitialHeight,
-		CelestiaBlockVariance:       s.bc.Config().AstriaCelestiaHeightVariance,
+		RollupId:                  &rollupId,
+		SequencerChainId:          fork.Sequencer.ChainID,
+		SequencerStartBlockHeight: fork.Sequencer.StartHeight,
+		SequencerStopBlockHeight:  fork.Sequencer.StopHeight,
+		CelestiaChainId:           fork.Celestia.ChainID,
+		CelestiaBlockVariance:     fork.Celestia.HeightVariance,
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)
@@ -242,12 +202,23 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	s.blockExecutionLock.Lock()
 	defer s.blockExecutionLock.Unlock()
+
 	// Deliberately called after lock, to more directly measure the time spent executing
 	executionStart := time.Now()
 	defer executeBlockTimer.UpdateSince(executionStart)
 
 	if !s.syncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
+	}
+
+	// the height that this block will be at
+	height := s.bc.CurrentBlock().Number.Uint64() + 1
+
+	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(height)
+
+	// this fork halts the chain
+	if fork.Halt {
+		return nil, status.Error(codes.FailedPrecondition, "Block cannot be created at halted fork")
 	}
 
 	// Validate block being created has valid previous hash
@@ -257,12 +228,9 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
-	// the height that this block will be at
-	height := s.bc.CurrentBlock().Number.Uint64() + 1
-
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, fork.BridgeAddresses, fork.BridgeAllowedAssets)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
@@ -279,7 +247,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		Parent:       prevHeadHash,
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
-		FeeRecipient: s.nextFeeRecipient,
+		FeeRecipient: s.bc.Config().GetAstriaForks().GetForkAtHeight(height).FeeCollector,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -312,10 +280,6 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		},
 	}
 
-	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
-		s.nextFeeRecipient = next
-	}
-
 	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
@@ -339,6 +303,11 @@ func (s *ExecutionServiceServerV1) GetCommitmentState(ctx context.Context, req *
 	}
 
 	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
+
+	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(uint64(softBlock.Number))
+	if fork.Height == uint64(softBlock.Number) && fork.Celestia.StartHeight > celestiaBlock {
+		celestiaBlock = fork.Celestia.StartHeight
+	}
 
 	res := &astriaPb.CommitmentState{
 		Soft:               softBlock,

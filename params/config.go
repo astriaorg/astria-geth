@@ -18,6 +18,7 @@ package params
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -378,35 +379,48 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool                        `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string                      `json:"astriaRollupName"`
-	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
-	AstriaSequencerAddressPrefix   string                      `json:"astriaSequencerAddressPrefix,omitempty"`
-	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
-	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
-	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
-	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
+	AstriaOverrideGenesisExtraData bool         `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaRollupName               string       `json:"astriaRollupName"`
+	AstriaForks                    *AstriaForks `json:"astriaForks,omitempty"`
 }
 
-func (c *ChainConfig) AstriaExtraData() []byte {
-	if c.AstriaExtraDataOverride != nil {
-		return c.AstriaExtraDataOverride
-	}
+type AstriaForkConfig struct {
+	Height            uint64                      `json:"height"`
+	Halt              bool                        `json:"halt,omitempty"`
+	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
+	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
+	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
+	EIP1559Params     *AstriaEIP1559Param         `json:"eip1559Params,omitempty"`
+	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
+	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
+	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+}
 
-	// create default extradata
-	extra, _ := rlp.EncodeToBytes([]interface{}{
-		c.AstriaRollupName,
-		c.AstriaSequencerInitialHeight,
-		c.AstriaCelestiaInitialHeight,
-		c.AstriaCelestiaHeightVariance,
-	})
-	if uint64(len(extra)) > MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
-		extra = nil
-	}
-	return extra
+type AstriaForkData struct {
+	Height              uint64
+	Halt                bool
+	SnapshotChecksum    string
+	ExtraDataOverride   hexutil.Bytes
+	FeeCollector        common.Address
+	EIP1559Params       AstriaEIP1559Param
+	Sequencer           AstriaSequencerConfig
+	Celestia            AstriaCelestiaConfig
+	BridgeAddresses     map[string]*AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
+	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
+}
+
+type AstriaSequencerConfig struct {
+	ChainID           string `json:"chainId"`
+	AddressPrefix     string `json:"addressPrefix,omitempty"`
+	StartHeight       uint32 `json:"startHeight"`
+	StopHeight        uint32 `json:"-"`
+	RollupStartHeight uint64 `json:"-"`
+}
+
+type AstriaCelestiaConfig struct {
+	ChainID        string `json:"chainId"`
+	StartHeight    uint64 `json:"startHeight"`
+	HeightVariance uint64 `json:"heightVariance"`
 }
 
 type AstriaEIP1559Param struct {
@@ -415,62 +429,210 @@ type AstriaEIP1559Param struct {
 	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
 }
 
-type AstriaEIP1559Params struct {
-	heights        map[uint64]AstriaEIP1559Param
-	orderedHeights []uint64
+func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
+	fork := c.GetAstriaForks().GetForkAtHeight(height)
+	if fork.ExtraDataOverride != nil {
+		return fork.ExtraDataOverride
+	}
+
+	// create default extradata
+	extra, _ := rlp.EncodeToBytes([]interface{}{
+		c.AstriaRollupName,
+		fork.Sequencer.StartHeight,
+		fork.Celestia.StartHeight,
+		fork.Celestia.HeightVariance,
+	})
+	if uint64(len(extra)) > MaximumExtraDataSize {
+		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
+		extra = nil
+	}
+	return extra
 }
 
-func NewAstriaEIP1559Params(heights map[uint64]AstriaEIP1559Param) *AstriaEIP1559Params {
-	orderedHeights := []uint64{}
-	for k := range heights {
-		orderedHeights = append(orderedHeights, k)
-	}
-	sort.Slice(orderedHeights, func(i, j int) bool { return orderedHeights[i] > orderedHeights[j] })
-
-	return &AstriaEIP1559Params{
-		heights:        heights,
-		orderedHeights: orderedHeights,
-	}
+type AstriaForks struct {
+	orderedForks []AstriaForkData
+	forkMap      map[string]AstriaForkConfig
 }
 
-func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return big.NewInt(0).SetUint64(c.heights[h].MinBaseFee)
+func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
+	if forks == nil {
+		return &AstriaForks{
+			orderedForks: []AstriaForkData{},
+			forkMap:      make(map[string]AstriaForkConfig),
+		}, nil
+	}
+
+	// Create sorted array of fork names and heights
+	type nameHeight struct {
+		name   string
+		height uint64
+	}
+	sortedNames := make([]nameHeight, 0, len(forks))
+	for name, fork := range forks {
+		sortedNames = append(sortedNames, nameHeight{name, fork.Height})
+	}
+	sort.Slice(sortedNames, func(i, j int) bool {
+		return sortedNames[i].height < sortedNames[j].height
+	})
+
+	nativeBridgeSeen := false
+	orderedForks := make([]AstriaForkData, len(sortedNames))
+
+	for i, nh := range sortedNames {
+		currentFork := forks[nh.name]
+
+		if i > 0 {
+			// Copy previous fork's configuration as the base
+			orderedForks[i] = orderedForks[i-1]
+		} else {
+			// set default values
+			orderedForks[i] = GetDefaultAstriaForkData()
+		}
+
+		// Set fork-specific fields
+		orderedForks[i].Height = currentFork.Height
+		orderedForks[i].Halt = currentFork.Halt
+		orderedForks[i].SnapshotChecksum = ""
+
+		// Override with any new values from current fork
+		if currentFork.SnapshotChecksum != "" {
+			orderedForks[i].SnapshotChecksum = currentFork.SnapshotChecksum
+		}
+
+		if currentFork.ExtraDataOverride != nil {
+			orderedForks[i].ExtraDataOverride = currentFork.ExtraDataOverride
+		}
+
+		if currentFork.FeeCollector != nil {
+			orderedForks[i].FeeCollector = *currentFork.FeeCollector
+		}
+
+		if currentFork.EIP1559Params != nil {
+			orderedForks[i].EIP1559Params = *currentFork.EIP1559Params
+		}
+
+		if currentFork.Sequencer != nil {
+			orderedForks[i].Sequencer = *currentFork.Sequencer
+			orderedForks[i].Sequencer.RollupStartHeight = currentFork.Height
+			// set stop height for previous fork if sequencer data is changed
+			if i > 0 {
+				orderedForks[i-1].Sequencer.StopHeight = orderedForks[i-1].Sequencer.StartHeight + uint32(currentFork.Height-orderedForks[i-1].Sequencer.RollupStartHeight)
+			}
+		}
+
+		if currentFork.Celestia != nil {
+			orderedForks[i].Celestia = *currentFork.Celestia
+		}
+
+		if len(currentFork.BridgeAddresses) > 0 {
+			for _, cfg := range currentFork.BridgeAddresses {
+				err := cfg.Validate(orderedForks[i].Sequencer.AddressPrefix)
+				if err != nil {
+					return nil, fmt.Errorf("invalid bridge address config: %w", err)
+				}
+
+				if cfg.Erc20Asset == nil {
+					if nativeBridgeSeen {
+						return nil, errors.New("only one native bridge address is allowed")
+					}
+					nativeBridgeSeen = true
+				}
+
+				if cfg.Erc20Asset != nil && cfg.SenderAddress == (common.Address{}) {
+					return nil, errors.New("astria bridge sender address must be set for bridged ERC20 assets")
+				}
+
+				bridgeCfg := cfg
+				orderedForks[i].BridgeAddresses[cfg.BridgeAddress] = &bridgeCfg
+				orderedForks[i].BridgeAllowedAssets[cfg.AssetDenom] = struct{}{}
+				if cfg.Erc20Asset == nil {
+					log.Info("bridge for sequencer native asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom)
+				} else {
+					log.Info("bridge for ERC20 asset initialized", "bridgeAddress", cfg.BridgeAddress, "assetDenom", cfg.AssetDenom, "contractAddress", cfg.Erc20Asset.ContractAddress)
+				}
+			}
 		}
 	}
-	return common.Big0
+
+	return &AstriaForks{
+		orderedForks: orderedForks,
+		forkMap:      forks,
+	}, nil
 }
 
-func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return c.heights[h].ElasticityMultiplier
-		}
+func GetDefaultAstriaForkData() AstriaForkData {
+	return AstriaForkData{
+		Height:       1,
+		FeeCollector: common.Address{},
+		EIP1559Params: AstriaEIP1559Param{
+			MinBaseFee:               0,
+			ElasticityMultiplier:     DefaultElasticityMultiplier,
+			BaseFeeChangeDenominator: DefaultBaseFeeChangeDenominator,
+		},
+		BridgeAddresses:     make(map[string]*AstriaBridgeAddressConfig),
+		BridgeAllowedAssets: make(map[string]struct{}),
 	}
-	return DefaultElasticityMultiplier
 }
 
-func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return c.heights[h].BaseFeeChangeDenominator
-		}
+func (c *AstriaForks) GetForkAtHeight(height uint64) AstriaForkData {
+	if len(c.orderedForks) == 0 {
+		return GetDefaultAstriaForkData()
 	}
-	return DefaultBaseFeeChangeDenominator
+
+	if height < c.orderedForks[0].Height {
+		return GetDefaultAstriaForkData()
+	}
+
+	idx := sort.Search(len(c.orderedForks), func(i int) bool {
+		return c.orderedForks[i].Height > height
+	}) - 1
+
+	if idx < 0 {
+		return GetDefaultAstriaForkData()
+	}
+
+	return c.orderedForks[idx]
 }
 
-func (c AstriaEIP1559Params) MarshalJSON() ([]byte, error) {
-	return json.Marshal(c.heights)
+func (c *AstriaForks) GetNextForkAtHeight(height uint64) *AstriaForkData {
+	idx := sort.Search(len(c.orderedForks), func(i int) bool {
+		return c.orderedForks[i].Height > height
+	})
+	if idx < 0 {
+		return nil
+	}
+	return &c.orderedForks[idx]
 }
 
-func (c *AstriaEIP1559Params) UnmarshalJSON(data []byte) error {
-	var heights map[uint64]AstriaEIP1559Param
-	if err := json.Unmarshal(data, &heights); err != nil {
+func (c *AstriaForks) MinBaseFeeAt(height uint64) *big.Int {
+	return big.NewInt(0).SetUint64(c.GetForkAtHeight(height).EIP1559Params.MinBaseFee)
+}
+
+func (c *AstriaForks) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.forkMap)
+}
+
+func (c *AstriaForks) UnmarshalJSON(data []byte) error {
+	var forkMap map[string]AstriaForkConfig
+	if err := json.Unmarshal(data, &forkMap); err != nil {
 		return err
 	}
-	*c = *NewAstriaEIP1559Params(heights)
+
+	newForks, err := NewAstriaForks(forkMap)
+	if err != nil {
+		return err
+	}
+
+	*c = *newForks
 	return nil
+}
+
+func (c *ChainConfig) GetAstriaForks() *AstriaForks {
+	if c.AstriaForks == nil {
+		forks, _ := NewAstriaForks(nil)
+		return forks
+	}
+	return c.AstriaForks
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -850,18 +1012,12 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 
 // BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
 func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.BaseFeeChangeDenominatorAt(height)
-	}
-	return DefaultBaseFeeChangeDenominator
+	return c.GetAstriaForks().GetForkAtHeight(height).EIP1559Params.BaseFeeChangeDenominator
 }
 
 // ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
 func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
-	}
-	return DefaultElasticityMultiplier
+	return c.GetAstriaForks().GetForkAtHeight(height).EIP1559Params.ElasticityMultiplier
 }
 
 // LatestFork returns the latest time-based fork that would be active for the given time.
