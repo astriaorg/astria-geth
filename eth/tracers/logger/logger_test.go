@@ -52,11 +52,23 @@ type dummyStatedb struct {
 func (*dummyStatedb) GetRefund() uint64                                       { return 1337 }
 func (*dummyStatedb) GetState(_ common.Address, _ common.Hash) common.Hash    { return common.Hash{} }
 func (*dummyStatedb) SetState(_ common.Address, _ common.Hash, _ common.Hash) {}
+func (*dummyStatedb) GetCommittedState(_ common.Address, _ common.Hash) common.Hash {
+	return common.Hash{}
+}
+func (*dummyStatedb) SlotInAccessList(_ common.Address, _ common.Hash) (bool, bool) {
+	return true, true
+}
+
+func newDummyBlockContext() vm.BlockContext {
+	return vm.BlockContext{
+		BlockNumber: big.NewInt(0),
+	}
+}
 
 func TestStoreCapture(t *testing.T) {
 	var (
 		logger   = NewStructLogger(nil)
-		env      = vm.NewEVM(vm.BlockContext{}, vm.TxContext{}, &dummyStatedb{}, params.TestChainConfig, vm.Config{Tracer: logger.Hooks()})
+		env      = vm.NewEVM(newDummyBlockContext(), vm.TxContext{}, &dummyStatedb{}, params.TestChainConfig, vm.Config{Tracer: logger.Hooks()})
 		contract = vm.NewContract(&dummyContractRef{}, &dummyContractRef{}, new(uint256.Int), 100000)
 	)
 	contract.Code = []byte{byte(vm.PUSH1), 0x1, byte(vm.PUSH1), 0x0, byte(vm.SSTORE)}
