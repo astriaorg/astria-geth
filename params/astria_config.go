@@ -245,22 +245,13 @@ func GetDefaultAstriaForkData() AstriaForkData {
 }
 
 func (c *AstriaForks) GetForkAtHeight(height uint64) AstriaForkData {
-	if len(c.orderedForks) == 0 {
-		return GetDefaultAstriaForkData()
-	}
-
-	if height < c.orderedForks[0].Height {
-		return GetDefaultAstriaForkData()
-	}
-
 	idx := sort.Search(len(c.orderedForks), func(i int) bool {
-		return c.orderedForks[i].Height > height
-	}) - 1
-
-	if idx < 0 {
+		return c.orderedForks[i].Height >= height
+	})
+	// no named fork at this height
+	if idx == len(c.orderedForks) {
 		return GetDefaultAstriaForkData()
 	}
-
 	return c.orderedForks[idx]
 }
 
@@ -268,7 +259,7 @@ func (c *AstriaForks) GetNextForkAtHeight(height uint64) *AstriaForkData {
 	idx := sort.Search(len(c.orderedForks), func(i int) bool {
 		return c.orderedForks[i].Height > height
 	})
-	if idx < 0 {
+	if idx == len(c.orderedForks) {
 		return nil
 	}
 	return &c.orderedForks[idx]
