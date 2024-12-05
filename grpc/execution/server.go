@@ -305,14 +305,11 @@ func (s *ExecutionServiceServerV1) GetCommitmentState(ctx context.Context, req *
 	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
 
 	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(uint64(softBlock.Number))
-	if fork.Height == uint64(softBlock.Number) && fork.Celestia.StartHeight > celestiaBlock {
-		celestiaBlock = fork.Celestia.StartHeight
-	}
 
 	res := &astriaPb.CommitmentState{
 		Soft:               softBlock,
 		Firm:               firmBlock,
-		BaseCelestiaHeight: celestiaBlock,
+		BaseCelestiaHeight: max(celestiaBlock, fork.Celestia.StartHeight),
 	}
 
 	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
