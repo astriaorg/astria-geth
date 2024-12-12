@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -196,7 +197,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
+			_, err := validateAndUnmarshalSequencerTx(context.Background(), 2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, nil)
 			if test.wantErr == "" && err == nil {
 				return
 			}

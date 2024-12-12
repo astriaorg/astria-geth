@@ -1,29 +1,148 @@
 package execution
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"math/big"
 
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
+	connecttypesv2 "buf.build/gen/go/astria/vendored/protocolbuffers/go/connect/types/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/holiman/uint256"
 )
 
-// `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction.
+func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
+	cpStr := fmt.Sprintf("%s/%s", currencyPair.Base, currencyPair.Quote)
+	return sha256.Sum256([]byte(cpStr))
+}
+
+// `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction and converts it into
+// an EVM transaction.
+// If the sequencer transaction is an oracle data update tx, we create a transaction to update the oracle data.
 // If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
-// If the sequencer transaction is not a deposit tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
+// If the sequencer transaction is a normal user tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
 // tx is not a blob tx or a deposit tx.
 func validateAndUnmarshalSequencerTx(
+	ctx context.Context,
 	height uint64,
 	tx *sequencerblockv1.RollupData,
 	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{},
-) (*types.Transaction, error) {
+	api *eth.EthAPIBackend,
+) ([]*types.Transaction, error) {
+	// TODO: get from genesis
+	oracleSenderAddress := common.Address{}
+	oracleContractAddress := common.Address{}
+
+	if oracleData := tx.GetOracleData(); oracleData != nil {
+		txs := make([]*types.Transaction, 0)
+
+		log.Debug("creating oracle data update tx")
+		abi, err := contracts.AstriaOracleMetaData.GetAbi()
+		if err != nil {
+			// this should never happen, as the abi is hardcoded in the contract bindings
+			return nil, fmt.Errorf("failed to get abi for AstriaOracle: %w", err)
+		}
+
+		state, header, err := api.StateAndHeaderByNumber(ctx, rpc.BlockNumber(int64(height-1)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
+		}
+
+		// pack arguments for calling the `updatePriceData` function on the oracle contract
+		currencyPairs := make([][32]byte, len(oracleData.Prices))
+		prices := make([]*big.Int, len(oracleData.Prices))
+		for i, price := range oracleData.Prices {
+			currencyPairs[i] = hashCurrencyPair(price.CurrencyPair)
+			prices[i] = protoU128ToBigInt(price.Price)
+
+			// see if currency pair was already initialized; if not, update it
+			//
+			// call `currencyPairInfo` on the parent state; since oracle data is always top of block,
+			// if the currency pair is not initialized in the parent state, then we need to initialize it here
+			// as it has never been initialized before.
+			evm := api.GetEVM(ctx, &core.Message{}, state, header, &vm.Config{NoBaseFee: true}, nil)
+			args := []interface{}{currencyPairs[i]}
+			calldata, err := abi.Pack("currencyPairInfo", args...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
+			}
+			ret, _, err := evm.Call(vm.AccountRef(oracleSenderAddress), oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary
+			if err != nil {
+				return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
+			}
+
+			// result should be packed (bool initialized, uint8 decimals)
+			res, err := abi.Unpack("currencyPairInfo", ret)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unpack currencyPairInfo: %w", err)
+			}
+			if len(res) != 2 {
+				return nil, fmt.Errorf("unexpected result length from currencyPairInfo: %d", len(res))
+			}
+
+			init, ok := res[0].(bool)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type for initialized: %T", res[0])
+			}
+			if init {
+				continue
+			}
+
+			// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
+			args = []interface{}{currencyPairs[i], uint8(price.Decimals)}
+			calldata, err = abi.Pack("initializeCurrencyPair", args...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
+			}
+
+			// TODO: rename `DepositTx` to `InjectedTx` or something along those lines
+			txdata := types.DepositTx{
+				From:                   oracleSenderAddress,
+				Value:                  new(big.Int),
+				Gas:                    64000, // TODO
+				To:                     &oracleContractAddress,
+				Data:                   calldata,
+				SourceTransactionId:    primitivev1.TransactionId{},
+				SourceTransactionIndex: 0,
+			}
+			tx := types.NewTx(&txdata)
+			txs = append(txs, tx)
+		}
+
+		args := []interface{}{}
+		calldata, err := abi.Pack("updatePriceData", args...)
+		if err != nil {
+			return nil, err
+		}
+
+		txdata := types.DepositTx{
+			From:  oracleSenderAddress,
+			Value: new(big.Int),
+			// TODO: max gas costs?
+			Gas:                    64000,
+			To:                     &oracleContractAddress,
+			Data:                   calldata,
+			SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
+			SourceTransactionIndex: 0,                           // not relevant
+		}
+
+		tx := types.NewTx(&txdata)
+		txs = append(txs, tx)
+		return txs, nil
+	}
+
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := deposit.BridgeAddress.GetBech32M()
 		bac, ok := bridgeAddresses[bridgeAddress]
@@ -75,8 +194,7 @@ func validateAndUnmarshalSequencerTx(
 				SourceTransactionIndex: deposit.SourceActionIndex,
 			}
 
-			tx := types.NewTx(&txdata)
-			return tx, nil
+			return []*types.Transaction{types.NewTx(&txdata)}, nil
 		}
 
 		txdata := types.DepositTx{
@@ -87,7 +205,7 @@ func validateAndUnmarshalSequencerTx(
 			SourceTransactionId:    *deposit.SourceTransactionId,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
-		return types.NewTx(&txdata), nil
+		return []*types.Transaction{types.NewTx(&txdata)}, nil
 	} else {
 		ethTx := new(types.Transaction)
 		err := ethTx.UnmarshalBinary(tx.GetSequencedData())
@@ -103,7 +221,7 @@ func validateAndUnmarshalSequencerTx(
 			return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
 		}
 
-		return ethTx, nil
+		return []*types.Transaction{ethTx}, nil
 	}
 }
 

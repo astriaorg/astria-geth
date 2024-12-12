@@ -262,12 +262,12 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets)
+		txs, err := validateAndUnmarshalSequencerTx(ctx, height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.eth.APIBackend)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+		txsToProcess = append(txsToProcess, txs...)
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
