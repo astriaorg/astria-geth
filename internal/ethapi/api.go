@@ -58,7 +58,7 @@ import (
 const estimateGasErrorRatio = 0.015
 
 var errBlobTxNotSupported = errors.New("blob transactions not supported")
-var errInjectedTxNotSupported = errors.New("deposit transactions not supported")
+var errInjectedTxNotSupported = errors.New("injected transactions not supported")
 
 // EthereumAPI provides an API to access Ethereum related information.
 type EthereumAPI struct {

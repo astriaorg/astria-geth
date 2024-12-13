@@ -60,7 +60,7 @@ func TestSequenceTxValidation(t *testing.T) {
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
 
 	InjectedTx, err := testInjectedTx().MarshalBinary()
-	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
+	require.Nil(t, err, "failed to marshal random injected tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
@@ -110,13 +110,13 @@ func TestSequenceTxValidation(t *testing.T) {
 			wantErr: "blob tx not allowed in sequenced data",
 		},
 		{
-			description: "deposit type sequence tx",
+			description: "injected type sequence tx",
 			sequencerTx: &sequencerblockv1.RollupData{
 				Value: &sequencerblockv1.RollupData_SequencedData{
 					SequencedData: InjectedTx,
 				},
 			},
-			wantErr: "deposit tx not allowed in sequenced data",
+			wantErr: "injected tx not allowed in sequenced data",
 		},
 		{
 			description: "deposit tx with an unknown bridge address",

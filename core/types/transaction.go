@@ -104,14 +104,14 @@ type TxData interface {
 }
 
 // From returns the sender of the transaction
-// only for deposit transactions.
+// only for injected transactions.
 func (tx *Transaction) From() common.Address {
 	if tx.Type() != InjectedTxType {
 		return common.Address{}
 	}
 
-	deposit := tx.inner.(*InjectedTx)
-	return deposit.From
+	injected := tx.inner.(*InjectedTx)
+	return injected.From
 }
 
 // EncodeRLP implements rlp.Encoder

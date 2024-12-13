@@ -12,8 +12,8 @@ import (
 var _ TxData = &InjectedTx{}
 
 type InjectedTx struct {
-	// the bridge sender address set in the genesis file
-	// ie. the minter or the caller of the ERC20 contract
+	// the caller address set in the genesis file (either bridge or oracle)
+	// ie. the minter or the caller of the ERC20/oracle contract
 	From common.Address
 	// value to be minted to the recipient, if this is a native asset mint
 	Value *big.Int
@@ -21,14 +21,17 @@ type InjectedTx struct {
 	Gas uint64
 	// if this is a native asset mint, this is set to the mint recipient
 	// if this is an ERC20 mint, this is set to the ERC20 contract address
+	// if this is an oracle update, this is set to the oracle contract address
 	To *common.Address
 	// if this is an ERC20 mint, the following field is set
 	// to the `mint` function calldata.
+	// if this is an oracle update, the following field is set to the
+	// `initializeCurrencyPair` or `updatePriceData` function calldata.
 	Data []byte
-	// the transaction ID of the source action for the deposit, consisting
+	// the transaction ID of the source action on the sequencer, consisting
 	// of the transaction hash.
 	SourceTransactionId primitivev1.TransactionId
-	// index of the deposit's source action within its transaction
+	// index of the source action within its sequencer transaction
 	SourceTransactionIndex uint64
 }
 

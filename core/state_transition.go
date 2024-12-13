@@ -71,7 +71,7 @@ func (result *ExecutionResult) Revert() []byte {
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
 func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool, isInjectedTx bool) (uint64, error) {
 	if isInjectedTx {
-		// deposit txs are gasless
+		// injected txs are gasless
 		return 0, nil
 	}
 
@@ -293,7 +293,7 @@ func (st *StateTransition) buyGas() error {
 
 func (st *StateTransition) preCheck() error {
 	if st.msg.IsInjectedTx {
-		// deposit txs do not require checks as they are part of rollup consensus,
+		// injected txs do not require checks as they are part of rollup consensus,
 		// not txs that originate externally.
 		return nil
 	}
@@ -391,7 +391,7 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
-	// if this is a deposit tx, we only need to mint funds and no gas is used.
+	// if this is a injected tx, we only need to mint funds and no gas is used.
 	if st.msg.IsInjectedTx && len(st.msg.Data) == 0 {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
 		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaInjectedTx)
@@ -474,10 +474,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, value)
 	}
 
-	// if this is a deposit tx, don't refund gas and also don't pay to the coinbase,
+	// if this is a injected tx, don't refund gas and also don't pay to the coinbase,
 	// as no gas was used.
 	if st.msg.IsInjectedTx {
-		log.Debug("deposit tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
+		log.Debug("injected tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
 		return &ExecutionResult{
 			UsedGas:    st.gasUsed(),
 			Err:        vmerr,
