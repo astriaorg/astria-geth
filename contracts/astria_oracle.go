@@ -31,8 +31,8 @@ var (
 
 // AstriaOracleMetaData contains all meta data concerning the AstriaOracle contract.
 var AstriaOracleMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_oracle\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"ORACLE\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"currencyPairInfo\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"initialized\",\"type\":\"bool\"},{\"internalType\":\"uint8\",\"name\":\"decimals\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_currencyPair\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"_decimals\",\"type\":\"uint8\"}],\"name\":\"initializeCurrencyPair\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"latestBlockNumber\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"priceData\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"price\",\"type\":\"uint128\"},{\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"_currencyPairs\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint128[]\",\"name\":\"_prices\",\"type\":\"uint128[]\"}],\"name\":\"updatePriceData\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x60a060405234801561000f575f80fd5b506040516106d73803806106d783398101604081905261002e9161003f565b6001600160a01b031660805261006c565b5f6020828403121561004f575f80fd5b81516001600160a01b0381168114610065575f80fd5b9392505050565b6080516106466100915f395f8181607e0152818161018f015261030b01526106465ff3fe608060405234801561000f575f80fd5b5060043610610060575f3560e01c80633595f6911461006457806338013f02146100795780634599c788146100bd57806348832f3c146100d4578063859bd5b5146100e7578063dad84e9d1461012b575b5f80fd5b610077610072366004610477565b610184565b005b6100a07f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020015b60405180910390f35b6100c660025481565b6040519081526020016100b4565b6100776100e236600461052a565b610300565b6101126100f536600461055d565b60016020525f908152604090205460ff8082169161010090041682565b60408051921515835260ff9091166020830152016100b4565b610165610139366004610574565b5f602081815292815260408082209093529081522080546001909101546001600160801b039091169082565b604080516001600160801b0390931683526020830191909152016100b4565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146101d55760405162461bcd60e51b81526004016101cc90610594565b60405180910390fd5b80518251146102365760405162461bcd60e51b815260206004820152602760248201527f63757272656e6379207061697220616e64207072696365206c656e677468206d6044820152660d2e6dac2e8c6d60cb1b60648201526084016101cc565b436002555f5b82518110156102fb576040518060400160405280838381518110610262576102626105d8565b60200260200101516001600160801b03168152602001428152505f8060025481526020019081526020015f205f8584815181106102a1576102a16105d8565b6020908102919091018101518252818101929092526040015f20825181546fffffffffffffffffffffffffffffffff19166001600160801b03909116178155910151600190910155806102f3816105ec565b91505061023c565b505050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146103485760405162461bcd60e51b81526004016101cc90610594565b604080518082018252600180825260ff93841660208084019182525f968752919091529190932092518354915161ffff1990921690151561ff001916176101009190921602179055565b634e487b7160e01b5f52604160045260245ffd5b604051601f8201601f1916810167ffffffffffffffff811182821017156103cf576103cf610392565b604052919050565b5f67ffffffffffffffff8211156103f0576103f0610392565b5060051b60200190565b5f82601f830112610409575f80fd5b8135602061041e610419836103d7565b6103a6565b82815260059290921b8401810191818101908684111561043c575f80fd5b8286015b8481101561046c5780356001600160801b038116811461045f575f8081fd5b8352918301918301610440565b509695505050505050565b5f8060408385031215610488575f80fd5b823567ffffffffffffffff8082111561049f575f80fd5b818501915085601f8301126104b2575f80fd5b813560206104c2610419836103d7565b82815260059290921b840181019181810190898411156104e0575f80fd5b948201945b838610156104fe578535825294820194908201906104e5565b96505086013592505080821115610513575f80fd5b50610520858286016103fa565b9150509250929050565b5f806040838503121561053b575f80fd5b82359150602083013560ff81168114610552575f80fd5b809150509250929050565b5f6020828403121561056d575f80fd5b5035919050565b5f8060408385031215610585575f80fd5b50508035926020909101359150565b60208082526024908201527f4173747269614f7261636c653a206f6e6c79206f7261636c652063616e2075706040820152636461746560e01b606082015260800190565b634e487b7160e01b5f52603260045260245ffd5b5f6001820161060957634e487b7160e01b5f52601160045260245ffd5b506001019056fea2646970667358221220ea51ee7bfc144111b13d6d504a4639f5b68c5675339ceff47b9eda652b6cd8e664736f6c63430008150033",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_oracle\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\"}],\"name\":\"UninitializedCurrencyPair\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"currencyPair\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"decimals\",\"type\":\"uint8\"}],\"name\":\"CurrencyPairInitialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"currencyPair\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint128\",\"name\":\"price\",\"type\":\"uint128\"}],\"name\":\"PriceDataUpdated\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"ORACLE\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"currencyPairInfo\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"initialized\",\"type\":\"bool\"},{\"internalType\":\"uint8\",\"name\":\"decimals\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"_currencyPair\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"_decimals\",\"type\":\"uint8\"}],\"name\":\"initializeCurrencyPair\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"latestBlockNumber\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"priceData\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"price\",\"type\":\"uint128\"},{\"internalType\":\"uint256\",\"name\":\"timestamp\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32[]\",\"name\":\"_currencyPairs\",\"type\":\"bytes32[]\"},{\"internalType\":\"uint128[]\",\"name\":\"_prices\",\"type\":\"uint128[]\"}],\"name\":\"updatePriceData\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x60a060405234801561000f575f80fd5b506040516107e33803806107e383398101604081905261002e9161003f565b6001600160a01b031660805261006c565b5f6020828403121561004f575f80fd5b81516001600160a01b0381168114610065575f80fd5b9392505050565b6080516107526100915f395f8181607e0152818161018f01526103dd01526107525ff3fe608060405234801561000f575f80fd5b5060043610610060575f3560e01c80633595f6911461006457806338013f02146100795780634599c788146100bd57806348832f3c146100d4578063859bd5b5146100e7578063dad84e9d1461012b575b5f80fd5b610077610072366004610583565b610184565b005b6100a07f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020015b60405180910390f35b6100c660025481565b6040519081526020016100b4565b6100776100e2366004610636565b6103d2565b6101126100f5366004610669565b5f6020819052908152604090205460ff8082169161010090041682565b60408051921515835260ff9091166020830152016100b4565b610165610139366004610680565b600160208181525f9384526040808520909152918352912080549101546001600160801b039091169082565b604080516001600160801b0390931683526020830191909152016100b4565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146101d55760405162461bcd60e51b81526004016101cc906106a0565b60405180910390fd5b80518251146102365760405162461bcd60e51b815260206004820152602760248201527f63757272656e6379207061697220616e64207072696365206c656e677468206d6044820152660d2e6dac2e8c6d60cb1b60648201526084016101cc565b436002555f5b82518110156103cd575f80848381518110610259576102596106e4565b60209081029190910181015182528101919091526040015f205460ff166102965760405163183c4ba760e01b8152600481018290526024016101cc565b60405180604001604052808383815181106102b3576102b36106e4565b60200260200101516001600160801b031681526020014281525060015f60025481526020019081526020015f205f8584815181106102f3576102f36106e4565b6020908102919091018101518252818101929092526040015f20825181546fffffffffffffffffffffffffffffffff19166001600160801b0390911617815591015160019091015582517fd616ae5f8d378c1264fdbbbc72af91e16e3645564d7eae37e267ef1c67bf5cee90849083908110610371576103716106e4565b602002602001015183838151811061038b5761038b6106e4565b60200260200101516040516103b39291909182526001600160801b0316602082015260400190565b60405180910390a1806103c5816106f8565b91505061023c565b505050565b336001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000161461041a5760405162461bcd60e51b81526004016101cc906106a0565b6040805180820182526001815260ff83811660208084018281525f88815280835286902094518554915161ffff1990921690151561ff001916176101009190941602929092179092558251858152908101919091527f675b5c62c7826a107baf315a10339c41c59f32f58ac6431f359e9ac89c64a01b910160405180910390a15050565b634e487b7160e01b5f52604160045260245ffd5b604051601f8201601f1916810167ffffffffffffffff811182821017156104db576104db61049e565b604052919050565b5f67ffffffffffffffff8211156104fc576104fc61049e565b5060051b60200190565b5f82601f830112610515575f80fd5b8135602061052a610525836104e3565b6104b2565b82815260059290921b84018101918181019086841115610548575f80fd5b8286015b848110156105785780356001600160801b038116811461056b575f8081fd5b835291830191830161054c565b509695505050505050565b5f8060408385031215610594575f80fd5b823567ffffffffffffffff808211156105ab575f80fd5b818501915085601f8301126105be575f80fd5b813560206105ce610525836104e3565b82815260059290921b840181019181810190898411156105ec575f80fd5b948201945b8386101561060a578535825294820194908201906105f1565b9650508601359250508082111561061f575f80fd5b5061062c85828601610506565b9150509250929050565b5f8060408385031215610647575f80fd5b82359150602083013560ff8116811461065e575f80fd5b809150509250929050565b5f60208284031215610679575f80fd5b5035919050565b5f8060408385031215610691575f80fd5b50508035926020909101359150565b60208082526024908201527f4173747269614f7261636c653a206f6e6c79206f7261636c652063616e2075706040820152636461746560e01b606082015260800190565b634e487b7160e01b5f52603260045260245ffd5b5f6001820161071557634e487b7160e01b5f52601160045260245ffd5b506001019056fea264697066735822122076a958d2e7755560af9869273695ac12aa1ed68a2b86b4ced8faf6c3c6c4505464736f6c63430008150033",
 }
 
 // AstriaOracleABI is the input ABI used to generate the binding from.
@@ -394,4 +394,274 @@ func (_AstriaOracle *AstriaOracleSession) UpdatePriceData(_currencyPairs [][32]b
 // Solidity: function updatePriceData(bytes32[] _currencyPairs, uint128[] _prices) returns()
 func (_AstriaOracle *AstriaOracleTransactorSession) UpdatePriceData(_currencyPairs [][32]byte, _prices []*big.Int) (*types.Transaction, error) {
 	return _AstriaOracle.Contract.UpdatePriceData(&_AstriaOracle.TransactOpts, _currencyPairs, _prices)
+}
+
+// AstriaOracleCurrencyPairInitializedIterator is returned from FilterCurrencyPairInitialized and is used to iterate over the raw logs and unpacked data for CurrencyPairInitialized events raised by the AstriaOracle contract.
+type AstriaOracleCurrencyPairInitializedIterator struct {
+	Event *AstriaOracleCurrencyPairInitialized // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *AstriaOracleCurrencyPairInitializedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AstriaOracleCurrencyPairInitialized)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(AstriaOracleCurrencyPairInitialized)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *AstriaOracleCurrencyPairInitializedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *AstriaOracleCurrencyPairInitializedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// AstriaOracleCurrencyPairInitialized represents a CurrencyPairInitialized event raised by the AstriaOracle contract.
+type AstriaOracleCurrencyPairInitialized struct {
+	CurrencyPair [32]byte
+	Decimals     uint8
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterCurrencyPairInitialized is a free log retrieval operation binding the contract event 0x675b5c62c7826a107baf315a10339c41c59f32f58ac6431f359e9ac89c64a01b.
+//
+// Solidity: event CurrencyPairInitialized(bytes32 currencyPair, uint8 decimals)
+func (_AstriaOracle *AstriaOracleFilterer) FilterCurrencyPairInitialized(opts *bind.FilterOpts) (*AstriaOracleCurrencyPairInitializedIterator, error) {
+
+	logs, sub, err := _AstriaOracle.contract.FilterLogs(opts, "CurrencyPairInitialized")
+	if err != nil {
+		return nil, err
+	}
+	return &AstriaOracleCurrencyPairInitializedIterator{contract: _AstriaOracle.contract, event: "CurrencyPairInitialized", logs: logs, sub: sub}, nil
+}
+
+// WatchCurrencyPairInitialized is a free log subscription operation binding the contract event 0x675b5c62c7826a107baf315a10339c41c59f32f58ac6431f359e9ac89c64a01b.
+//
+// Solidity: event CurrencyPairInitialized(bytes32 currencyPair, uint8 decimals)
+func (_AstriaOracle *AstriaOracleFilterer) WatchCurrencyPairInitialized(opts *bind.WatchOpts, sink chan<- *AstriaOracleCurrencyPairInitialized) (event.Subscription, error) {
+
+	logs, sub, err := _AstriaOracle.contract.WatchLogs(opts, "CurrencyPairInitialized")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(AstriaOracleCurrencyPairInitialized)
+				if err := _AstriaOracle.contract.UnpackLog(event, "CurrencyPairInitialized", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseCurrencyPairInitialized is a log parse operation binding the contract event 0x675b5c62c7826a107baf315a10339c41c59f32f58ac6431f359e9ac89c64a01b.
+//
+// Solidity: event CurrencyPairInitialized(bytes32 currencyPair, uint8 decimals)
+func (_AstriaOracle *AstriaOracleFilterer) ParseCurrencyPairInitialized(log types.Log) (*AstriaOracleCurrencyPairInitialized, error) {
+	event := new(AstriaOracleCurrencyPairInitialized)
+	if err := _AstriaOracle.contract.UnpackLog(event, "CurrencyPairInitialized", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// AstriaOraclePriceDataUpdatedIterator is returned from FilterPriceDataUpdated and is used to iterate over the raw logs and unpacked data for PriceDataUpdated events raised by the AstriaOracle contract.
+type AstriaOraclePriceDataUpdatedIterator struct {
+	Event *AstriaOraclePriceDataUpdated // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *AstriaOraclePriceDataUpdatedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AstriaOraclePriceDataUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(AstriaOraclePriceDataUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *AstriaOraclePriceDataUpdatedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *AstriaOraclePriceDataUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// AstriaOraclePriceDataUpdated represents a PriceDataUpdated event raised by the AstriaOracle contract.
+type AstriaOraclePriceDataUpdated struct {
+	CurrencyPair [32]byte
+	Price        *big.Int
+	Raw          types.Log // Blockchain specific contextual infos
+}
+
+// FilterPriceDataUpdated is a free log retrieval operation binding the contract event 0xd616ae5f8d378c1264fdbbbc72af91e16e3645564d7eae37e267ef1c67bf5cee.
+//
+// Solidity: event PriceDataUpdated(bytes32 currencyPair, uint128 price)
+func (_AstriaOracle *AstriaOracleFilterer) FilterPriceDataUpdated(opts *bind.FilterOpts) (*AstriaOraclePriceDataUpdatedIterator, error) {
+
+	logs, sub, err := _AstriaOracle.contract.FilterLogs(opts, "PriceDataUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &AstriaOraclePriceDataUpdatedIterator{contract: _AstriaOracle.contract, event: "PriceDataUpdated", logs: logs, sub: sub}, nil
+}
+
+// WatchPriceDataUpdated is a free log subscription operation binding the contract event 0xd616ae5f8d378c1264fdbbbc72af91e16e3645564d7eae37e267ef1c67bf5cee.
+//
+// Solidity: event PriceDataUpdated(bytes32 currencyPair, uint128 price)
+func (_AstriaOracle *AstriaOracleFilterer) WatchPriceDataUpdated(opts *bind.WatchOpts, sink chan<- *AstriaOraclePriceDataUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _AstriaOracle.contract.WatchLogs(opts, "PriceDataUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(AstriaOraclePriceDataUpdated)
+				if err := _AstriaOracle.contract.UnpackLog(event, "PriceDataUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParsePriceDataUpdated is a log parse operation binding the contract event 0xd616ae5f8d378c1264fdbbbc72af91e16e3645564d7eae37e267ef1c67bf5cee.
+//
+// Solidity: event PriceDataUpdated(bytes32 currencyPair, uint128 price)
+func (_AstriaOracle *AstriaOracleFilterer) ParsePriceDataUpdated(log types.Log) (*AstriaOraclePriceDataUpdated, error) {
+	event := new(AstriaOraclePriceDataUpdated)
+	if err := _AstriaOracle.contract.UnpackLog(event, "PriceDataUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
