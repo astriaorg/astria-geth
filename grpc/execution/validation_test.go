@@ -197,7 +197,11 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(context.Background(), 2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets, nil)
+			cfg := &conversionConfig{
+				bridgeAddresses:     serviceV1Alpha1.bridgeAddresses,
+				bridgeAllowedAssets: serviceV1Alpha1.bridgeAllowedAssets,
+			}
+			_, err := validateAndConvertSequencerTx(context.Background(), 2, test.sequencerTx, cfg)
 			if test.wantErr == "" && err == nil {
 				return
 			}

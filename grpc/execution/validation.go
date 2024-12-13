@@ -15,9 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/holiman/uint256"
 )
@@ -27,201 +25,217 @@ func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
 	return sha256.Sum256([]byte(cpStr))
 }
 
-// `validateAndUnmarshalSequencerTx` validates and unmarshals the given rollup sequencer transaction and converts it into
-// an EVM transaction.
-// If the sequencer transaction is an oracle data update tx, we create a transaction to update the oracle data.
-// If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
-// If the sequencer transaction is a normal user tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
-// tx is not a blob tx or a deposit tx.
-func validateAndUnmarshalSequencerTx(
+func validateAndConvertOracleDataTx(
 	ctx context.Context,
 	height uint64,
-	tx *sequencerblockv1.RollupData,
-	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{},
-	api *eth.EthAPIBackend,
+	oracleData *sequencerblockv1.OracleData,
+	cfg *conversionConfig,
 ) ([]*types.Transaction, error) {
-	// TODO: get from genesis
-	oracleSenderAddress := common.Address{}
-	oracleContractAddress := common.Address{}
+	txs := make([]*types.Transaction, 0)
 
-	if oracleData := tx.GetOracleData(); oracleData != nil {
-		txs := make([]*types.Transaction, 0)
+	log.Debug("creating oracle data update tx")
+	abi, err := contracts.AstriaOracleMetaData.GetAbi()
+	if err != nil {
+		// this should never happen, as the abi is hardcoded in the contract bindings
+		return nil, fmt.Errorf("failed to get abi for AstriaOracle: %w", err)
+	}
 
-		log.Debug("creating oracle data update tx")
-		abi, err := contracts.AstriaOracleMetaData.GetAbi()
+	state, header, err := cfg.api.StateAndHeaderByNumber(ctx, rpc.BlockNumber(int64(height-1)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
+	}
+
+	// pack arguments for calling the `updatePriceData` function on the oracle contract
+	currencyPairs := make([][32]byte, len(oracleData.Prices))
+	prices := make([]*big.Int, len(oracleData.Prices))
+	for i, price := range oracleData.Prices {
+		currencyPairs[i] = hashCurrencyPair(price.CurrencyPair)
+		prices[i] = protoU128ToBigInt(price.Price)
+
+		// see if currency pair was already initialized; if not, update it
+		//
+		// call `currencyPairInfo` on the parent state; since oracle data is always top of block,
+		// if the currency pair is not initialized in the parent state, then we need to initialize it here
+		// as it has never been initialized before.
+		evm := cfg.api.GetEVM(ctx, &core.Message{}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		args := []interface{}{currencyPairs[i]}
+		calldata, err := abi.Pack("currencyPairInfo", args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
+		}
+		ret, _, err := evm.Call(vm.AccountRef(cfg.oracleCallerAddress), cfg.oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary
+		if err != nil {
+			return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
+		}
+
+		// result should be packed (bool initialized, uint8 decimals)
+		res, err := abi.Unpack("currencyPairInfo", ret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unpack currencyPairInfo: %w", err)
+		}
+		if len(res) != 2 {
+			return nil, fmt.Errorf("unexpected result length from currencyPairInfo: %d", len(res))
+		}
+
+		init, ok := res[0].(bool)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for initialized: %T", res[0])
+		}
+		if init {
+			continue
+		}
+
+		// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
+		args = []interface{}{currencyPairs[i], uint8(price.Decimals)}
+		calldata, err = abi.Pack("initializeCurrencyPair", args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
+		}
+
+		// TODO: rename `DepositTx` to `InjectedTx` or something along those lines
+		txdata := types.DepositTx{
+			From:                   cfg.oracleCallerAddress,
+			Value:                  new(big.Int),
+			Gas:                    64000, // TODO
+			To:                     &cfg.oracleContractAddress,
+			Data:                   calldata,
+			SourceTransactionId:    primitivev1.TransactionId{},
+			SourceTransactionIndex: 0,
+		}
+		tx := types.NewTx(&txdata)
+		txs = append(txs, tx)
+	}
+
+	args := []interface{}{}
+	calldata, err := abi.Pack("updatePriceData", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	txdata := types.DepositTx{
+		From:  cfg.oracleCallerAddress,
+		Value: new(big.Int),
+		// TODO: max gas costs?
+		Gas:                    64000,
+		To:                     &cfg.oracleContractAddress,
+		Data:                   calldata,
+		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
+		SourceTransactionIndex: 0,                           // not relevant
+	}
+
+	tx := types.NewTx(&txdata)
+	txs = append(txs, tx)
+	return txs, nil
+}
+
+func validateAndConvertDepositTx(
+	height uint64,
+	deposit *sequencerblockv1.Deposit,
+	cfg *conversionConfig,
+) ([]*types.Transaction, error) {
+	bridgeAddress := deposit.BridgeAddress.GetBech32M()
+	bac, ok := cfg.bridgeAddresses[bridgeAddress]
+	if !ok {
+		return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
+	}
+
+	if height < uint64(bac.StartHeight) {
+		return nil, fmt.Errorf("bridging asset %s from bridge %s not allowed before height %d", bac.AssetDenom, bridgeAddress, bac.StartHeight)
+	}
+
+	if _, ok := cfg.bridgeAllowedAssets[deposit.Asset]; !ok {
+		return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
+	}
+
+	if deposit.Asset != bac.AssetDenom {
+		return nil, fmt.Errorf("asset %s does not match bridge address %s asset", deposit.Asset, bridgeAddress)
+	}
+
+	recipient := common.HexToAddress(deposit.DestinationChainAddress)
+	amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
+
+	if bac.Erc20Asset != nil {
+		log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
+		abi, err := contracts.AstriaBridgeableERC20MetaData.GetAbi()
 		if err != nil {
 			// this should never happen, as the abi is hardcoded in the contract bindings
-			return nil, fmt.Errorf("failed to get abi for AstriaOracle: %w", err)
+			return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)
 		}
 
-		state, header, err := api.StateAndHeaderByNumber(ctx, rpc.BlockNumber(int64(height-1)))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
-		}
-
-		// pack arguments for calling the `updatePriceData` function on the oracle contract
-		currencyPairs := make([][32]byte, len(oracleData.Prices))
-		prices := make([]*big.Int, len(oracleData.Prices))
-		for i, price := range oracleData.Prices {
-			currencyPairs[i] = hashCurrencyPair(price.CurrencyPair)
-			prices[i] = protoU128ToBigInt(price.Price)
-
-			// see if currency pair was already initialized; if not, update it
-			//
-			// call `currencyPairInfo` on the parent state; since oracle data is always top of block,
-			// if the currency pair is not initialized in the parent state, then we need to initialize it here
-			// as it has never been initialized before.
-			evm := api.GetEVM(ctx, &core.Message{}, state, header, &vm.Config{NoBaseFee: true}, nil)
-			args := []interface{}{currencyPairs[i]}
-			calldata, err := abi.Pack("currencyPairInfo", args...)
-			if err != nil {
-				return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
-			}
-			ret, _, err := evm.Call(vm.AccountRef(oracleSenderAddress), oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary
-			if err != nil {
-				return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
-			}
-
-			// result should be packed (bool initialized, uint8 decimals)
-			res, err := abi.Unpack("currencyPairInfo", ret)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unpack currencyPairInfo: %w", err)
-			}
-			if len(res) != 2 {
-				return nil, fmt.Errorf("unexpected result length from currencyPairInfo: %d", len(res))
-			}
-
-			init, ok := res[0].(bool)
-			if !ok {
-				return nil, fmt.Errorf("unexpected type for initialized: %T", res[0])
-			}
-			if init {
-				continue
-			}
-
-			// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
-			args = []interface{}{currencyPairs[i], uint8(price.Decimals)}
-			calldata, err = abi.Pack("initializeCurrencyPair", args...)
-			if err != nil {
-				return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
-			}
-
-			// TODO: rename `DepositTx` to `InjectedTx` or something along those lines
-			txdata := types.DepositTx{
-				From:                   oracleSenderAddress,
-				Value:                  new(big.Int),
-				Gas:                    64000, // TODO
-				To:                     &oracleContractAddress,
-				Data:                   calldata,
-				SourceTransactionId:    primitivev1.TransactionId{},
-				SourceTransactionIndex: 0,
-			}
-			tx := types.NewTx(&txdata)
-			txs = append(txs, tx)
-		}
-
-		args := []interface{}{}
-		calldata, err := abi.Pack("updatePriceData", args...)
+		// pack arguments for calling the `mint` function on the ERC20 contract
+		args := []interface{}{recipient, amount}
+		calldata, err := abi.Pack("mint", args...)
 		if err != nil {
 			return nil, err
 		}
 
 		txdata := types.DepositTx{
-			From:  oracleSenderAddress,
-			Value: new(big.Int),
-			// TODO: max gas costs?
+			From:  bac.SenderAddress,
+			Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
+			// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
+			//
+			// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
+			// address defined by consensus, so the gas cost is not actually deducted from any account.
 			Gas:                    64000,
-			To:                     &oracleContractAddress,
+			To:                     &bac.Erc20Asset.ContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
-			SourceTransactionIndex: 0,                           // not relevant
-		}
-
-		tx := types.NewTx(&txdata)
-		txs = append(txs, tx)
-		return txs, nil
-	}
-
-	if deposit := tx.GetDeposit(); deposit != nil {
-		bridgeAddress := deposit.BridgeAddress.GetBech32M()
-		bac, ok := bridgeAddresses[bridgeAddress]
-		if !ok {
-			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
-		}
-
-		if height < uint64(bac.StartHeight) {
-			return nil, fmt.Errorf("bridging asset %s from bridge %s not allowed before height %d", bac.AssetDenom, bridgeAddress, bac.StartHeight)
-		}
-
-		if _, ok := bridgeAllowedAssets[deposit.Asset]; !ok {
-			return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
-		}
-
-		if deposit.Asset != bac.AssetDenom {
-			return nil, fmt.Errorf("asset %s does not match bridge address %s asset", deposit.Asset, bridgeAddress)
-		}
-
-		recipient := common.HexToAddress(deposit.DestinationChainAddress)
-		amount := bac.ScaledDepositAmount(protoU128ToBigInt(deposit.Amount))
-
-		if bac.Erc20Asset != nil {
-			log.Debug("creating deposit tx to mint ERC20 asset", "token", bac.AssetDenom, "erc20Address", bac.Erc20Asset.ContractAddress)
-			abi, err := contracts.AstriaBridgeableERC20MetaData.GetAbi()
-			if err != nil {
-				// this should never happen, as the abi is hardcoded in the contract bindings
-				return nil, fmt.Errorf("failed to get abi for erc20 contract for asset %s: %w", bac.AssetDenom, err)
-			}
-
-			// pack arguments for calling the `mint` function on the ERC20 contract
-			args := []interface{}{recipient, amount}
-			calldata, err := abi.Pack("mint", args...)
-			if err != nil {
-				return nil, err
-			}
-
-			txdata := types.DepositTx{
-				From:  bac.SenderAddress,
-				Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
-				// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
-				//
-				// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
-				// address defined by consensus, so the gas cost is not actually deducted from any account.
-				Gas:                    64000,
-				To:                     &bac.Erc20Asset.ContractAddress,
-				Data:                   calldata,
-				SourceTransactionId:    *deposit.SourceTransactionId,
-				SourceTransactionIndex: deposit.SourceActionIndex,
-			}
-
-			return []*types.Transaction{types.NewTx(&txdata)}, nil
-		}
-
-		txdata := types.DepositTx{
-			From:                   bac.SenderAddress,
-			To:                     &recipient,
-			Value:                  amount,
-			Gas:                    0,
 			SourceTransactionId:    *deposit.SourceTransactionId,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
+
 		return []*types.Transaction{types.NewTx(&txdata)}, nil
-	} else {
-		ethTx := new(types.Transaction)
-		err := ethTx.UnmarshalBinary(tx.GetSequencedData())
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal sequenced data into transaction: %w. tx hash: %s", err, sha256.Sum256(tx.GetSequencedData()))
-		}
+	}
 
-		if ethTx.Type() == types.DepositTxType {
-			return nil, fmt.Errorf("deposit tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
-		}
+	txdata := types.DepositTx{
+		From:                   bac.SenderAddress,
+		To:                     &recipient,
+		Value:                  amount,
+		Gas:                    0,
+		SourceTransactionId:    *deposit.SourceTransactionId,
+		SourceTransactionIndex: deposit.SourceActionIndex,
+	}
+	return []*types.Transaction{types.NewTx(&txdata)}, nil
+}
 
-		if ethTx.Type() == types.BlobTxType {
-			return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(tx.GetSequencedData()))
-		}
+func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transaction, error) {
+	ethTx := new(types.Transaction)
+	err := ethTx.UnmarshalBinary(sequencedData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sequenced data into transaction: %w. tx hash: %s", err, sha256.Sum256(sequencedData))
+	}
 
-		return []*types.Transaction{ethTx}, nil
+	if ethTx.Type() == types.DepositTxType {
+		return nil, fmt.Errorf("deposit tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
+	}
+
+	if ethTx.Type() == types.BlobTxType {
+		return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
+	}
+
+	return []*types.Transaction{ethTx}, nil
+}
+
+// `validateAndConvertSequencerTx` validates and unmarshals the given rollup sequencer transaction and converts it into
+// an EVM transaction.
+// If the sequencer transaction is an oracle data update tx, we create a transaction to update the oracle data.
+// If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
+// If the sequencer transaction is a normal user tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
+// tx is not a blob tx or a deposit tx.
+func validateAndConvertSequencerTx(
+	ctx context.Context,
+	height uint64,
+	tx *sequencerblockv1.RollupData,
+	cfg *conversionConfig,
+) ([]*types.Transaction, error) {
+	switch {
+	case tx.GetOracleData() != nil:
+		return validateAndConvertOracleDataTx(ctx, height, tx.GetOracleData(), cfg)
+	case tx.GetDeposit() != nil:
+		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
+	case tx.GetSequencedData() != nil:
+		return validateAndConvertSequencedDataTx(tx.GetSequencedData())
+	default:
+		return nil, fmt.Errorf("unknown sequencer tx type %v", tx)
 	}
 }
 

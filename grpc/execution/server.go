@@ -49,6 +49,9 @@ type ExecutionServiceServerV1 struct {
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
 
+	oracleContractAddress common.Address
+	oracleCallerAddress   common.Address
+
 	nextFeeRecipient common.Address // Fee recipient for the next block
 }
 
@@ -144,11 +147,13 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 	}
 
 	return &ExecutionServiceServerV1{
-		eth:                 eth,
-		bc:                  bc,
-		bridgeAddresses:     bridgeAddresses,
-		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
+		eth:                   eth,
+		bc:                    bc,
+		bridgeAddresses:       bridgeAddresses,
+		bridgeAllowedAssets:   bridgeAllowedAssets,
+		nextFeeRecipient:      nextFeeRecipient,
+		oracleContractAddress: bc.Config().AstriaOracleContractAddress,
+		oracleCallerAddress:   bc.Config().AstriaOracleCallerAddress,
 	}, nil
 }
 
@@ -230,6 +235,14 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+type conversionConfig struct {
+	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	bridgeAllowedAssets   map[string]struct{}
+	api                   *eth.EthAPIBackend
+	oracleContractAddress common.Address
+	oracleCallerAddress   common.Address
+}
+
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
@@ -261,8 +274,16 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
 	txsToProcess := types.Transactions{}
+	conversionConfig := &conversionConfig{
+		bridgeAddresses:       s.bridgeAddresses,
+		bridgeAllowedAssets:   s.bridgeAllowedAssets,
+		api:                   s.eth.APIBackend,
+		oracleContractAddress: s.oracleContractAddress,
+		oracleCallerAddress:   s.oracleCallerAddress,
+	}
+
 	for _, tx := range req.Transactions {
-		txs, err := validateAndUnmarshalSequencerTx(ctx, height, tx, s.bridgeAddresses, s.bridgeAllowedAssets, s.eth.APIBackend)
+		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
