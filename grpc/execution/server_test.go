@@ -294,7 +294,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
 
-				InjectedTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 					BridgeAddress: &primitivev1.Address{
 						Bech32M: bridgeAddress,
 					},
@@ -308,7 +308,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					SourceActionIndex: 0,
 				}}}
 
-				marshalledTxs = append(marshalledTxs, InjectedTx)
+				marshalledTxs = append(marshalledTxs, depositTx)
 			}
 
 			executeBlockReq := &astriaPb.ExecuteBlockRequest{
@@ -389,7 +389,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 	chainDestinationAddressBalanceBefore := stateDb.GetBalance(chainDestinationAddress)
 
-	InjectedTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 		BridgeAddress: &primitivev1.Address{
 			Bech32M: bridgeAddress,
 		},
@@ -403,7 +403,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		SourceActionIndex: 0,
 	}}}
 
-	marshalledTxs = append(marshalledTxs, InjectedTx)
+	marshalledTxs = append(marshalledTxs, depositTx)
 
 	executeBlockReq := &astriaPb.ExecuteBlockRequest{
 		PrevBlockHash: previousBlock.Hash().Bytes(),

@@ -204,7 +204,7 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transacti
 	}
 
 	if ethTx.Type() == types.InjectedTxType {
-		return nil, fmt.Errorf("deposit tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
+		return nil, fmt.Errorf("injected tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
 	}
 
 	if ethTx.Type() == types.BlobTxType {

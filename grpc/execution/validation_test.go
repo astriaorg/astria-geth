@@ -59,7 +59,7 @@ func TestSequenceTxValidation(t *testing.T) {
 	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
 
-	InjectedTx, err := testInjectedTx().MarshalBinary()
+	injectedTx, err := testInjectedTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random injected tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
@@ -113,7 +113,7 @@ func TestSequenceTxValidation(t *testing.T) {
 			description: "injected type sequence tx",
 			sequencerTx: &sequencerblockv1.RollupData{
 				Value: &sequencerblockv1.RollupData_SequencedData{
-					SequencedData: InjectedTx,
+					SequencedData: injectedTx,
 				},
 			},
 			wantErr: "injected tx not allowed in sequenced data",
