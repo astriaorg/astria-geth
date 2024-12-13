@@ -45,16 +45,16 @@ func validateAndConvertOracleDataTx(
 		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
 	}
 
-	// pack arguments for calling the `updatePriceData` function on the oracle contract
+	// arguments for calling the `updatePriceData()` function on the oracle contract
 	currencyPairs := make([][32]byte, len(oracleData.Prices))
 	prices := make([]*big.Int, len(oracleData.Prices))
 	for i, price := range oracleData.Prices {
 		currencyPairs[i] = hashCurrencyPair(price.CurrencyPair)
 		prices[i] = protoU128ToBigInt(price.Price)
 
-		// see if currency pair was already initialized; if not, update it
+		// see if currency pair was already initialized; if not, initialize it
 		//
-		// call `currencyPairInfo` on the parent state; since oracle data is always top of block,
+		// to check if it was initialized, we call `currencyPairInfo()` on the parent state; since oracle data is always top of block,
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
 		evm := cfg.api.GetEVM(ctx, &core.Message{}, state, header, &vm.Config{NoBaseFee: true}, nil)
@@ -68,7 +68,7 @@ func validateAndConvertOracleDataTx(
 			return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
 		}
 
-		// result should be packed (bool initialized, uint8 decimals)
+		// result should be abi-packed `(bool initialized, uint8 decimals)`
 		res, err := abi.Unpack("currencyPairInfo", ret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack currencyPairInfo: %w", err)
@@ -92,11 +92,10 @@ func validateAndConvertOracleDataTx(
 			return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
 		}
 
-		// TODO: rename `DepositTx` to `InjectedTx` or something along those lines
-		txdata := types.DepositTx{
+		txdata := types.InjectedTx{
 			From:                   cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
-			Gas:                    64000, // TODO
+			Gas:                    500000, // TODO
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    primitivev1.TransactionId{},
@@ -112,7 +111,7 @@ func validateAndConvertOracleDataTx(
 		return nil, err
 	}
 
-	txdata := types.DepositTx{
+	txdata := types.InjectedTx{
 		From:  cfg.oracleCallerAddress,
 		Value: new(big.Int),
 		// TODO: max gas costs?
@@ -128,7 +127,7 @@ func validateAndConvertOracleDataTx(
 	return txs, nil
 }
 
-func validateAndConvertDepositTx(
+func validateAndConvertInjectedTx(
 	height uint64,
 	deposit *sequencerblockv1.Deposit,
 	cfg *conversionConfig,
@@ -169,7 +168,7 @@ func validateAndConvertDepositTx(
 			return nil, err
 		}
 
-		txdata := types.DepositTx{
+		txdata := types.InjectedTx{
 			From:  bac.SenderAddress,
 			Value: new(big.Int), // don't need to set this, as we aren't minting the native asset
 			// mints cost ~14k gas, however this can vary based on existing storage, so we add a little extra as buffer.
@@ -186,7 +185,7 @@ func validateAndConvertDepositTx(
 		return []*types.Transaction{types.NewTx(&txdata)}, nil
 	}
 
-	txdata := types.DepositTx{
+	txdata := types.InjectedTx{
 		From:                   bac.SenderAddress,
 		To:                     &recipient,
 		Value:                  amount,
@@ -204,7 +203,7 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transacti
 		return nil, fmt.Errorf("failed to unmarshal sequenced data into transaction: %w. tx hash: %s", err, sha256.Sum256(sequencedData))
 	}
 
-	if ethTx.Type() == types.DepositTxType {
+	if ethTx.Type() == types.InjectedTxType {
 		return nil, fmt.Errorf("deposit tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
 	}
 
@@ -231,7 +230,7 @@ func validateAndConvertSequencerTx(
 	case tx.GetOracleData() != nil:
 		return validateAndConvertOracleDataTx(ctx, height, tx.GetOracleData(), cfg)
 	case tx.GetDeposit() != nil:
-		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
+		return validateAndConvertInjectedTx(height, tx.GetDeposit(), cfg)
 	case tx.GetSequencedData() != nil:
 		return validateAndConvertSequencedDataTx(tx.GetSequencedData())
 	default:

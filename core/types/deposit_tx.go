@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-var _ TxData = &DepositTx{}
+var _ TxData = &InjectedTx{}
 
-type DepositTx struct {
+type InjectedTx struct {
 	// the bridge sender address set in the genesis file
 	// ie. the minter or the caller of the ERC20 contract
 	From common.Address
@@ -32,13 +32,13 @@ type DepositTx struct {
 	SourceTransactionIndex uint64
 }
 
-func (tx *DepositTx) copy() TxData {
+func (tx *InjectedTx) copy() TxData {
 	to := new(common.Address)
 	if tx.To != nil {
 		*to = *tx.To
 	}
 
-	cpy := &DepositTx{
+	cpy := &InjectedTx{
 		From:                   tx.From,
 		Value:                  new(big.Int),
 		Gas:                    tx.Gas,
@@ -55,34 +55,34 @@ func (tx *DepositTx) copy() TxData {
 	return cpy
 }
 
-func (tx *DepositTx) txType() byte           { return DepositTxType }
-func (tx *DepositTx) chainID() *big.Int      { return common.Big0 }
-func (tx *DepositTx) accessList() AccessList { return nil }
-func (tx *DepositTx) data() []byte           { return tx.Data }
-func (tx *DepositTx) gas() uint64            { return tx.Gas }
-func (tx *DepositTx) gasFeeCap() *big.Int    { return new(big.Int) }
-func (tx *DepositTx) gasTipCap() *big.Int    { return new(big.Int) }
-func (tx *DepositTx) gasPrice() *big.Int     { return new(big.Int) }
-func (tx *DepositTx) value() *big.Int        { return tx.Value }
-func (tx *DepositTx) nonce() uint64          { return 0 }
-func (tx *DepositTx) to() *common.Address    { return tx.To }
+func (tx *InjectedTx) txType() byte           { return InjectedTxType }
+func (tx *InjectedTx) chainID() *big.Int      { return common.Big0 }
+func (tx *InjectedTx) accessList() AccessList { return nil }
+func (tx *InjectedTx) data() []byte           { return tx.Data }
+func (tx *InjectedTx) gas() uint64            { return tx.Gas }
+func (tx *InjectedTx) gasFeeCap() *big.Int    { return new(big.Int) }
+func (tx *InjectedTx) gasTipCap() *big.Int    { return new(big.Int) }
+func (tx *InjectedTx) gasPrice() *big.Int     { return new(big.Int) }
+func (tx *InjectedTx) value() *big.Int        { return tx.Value }
+func (tx *InjectedTx) nonce() uint64          { return 0 }
+func (tx *InjectedTx) to() *common.Address    { return tx.To }
 
-func (tx *DepositTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
+func (tx *InjectedTx) effectiveGasPrice(dst *big.Int, baseFee *big.Int) *big.Int {
 	return dst.Set(new(big.Int))
 }
 
-func (tx *DepositTx) rawSignatureValues() (v, r, s *big.Int) {
+func (tx *InjectedTx) rawSignatureValues() (v, r, s *big.Int) {
 	return common.Big0, common.Big0, common.Big0
 }
 
-func (tx *DepositTx) setSignatureValues(chainID, v, r, s *big.Int) {
+func (tx *InjectedTx) setSignatureValues(chainID, v, r, s *big.Int) {
 	// noop
 }
 
-func (tx *DepositTx) encode(b *bytes.Buffer) error {
+func (tx *InjectedTx) encode(b *bytes.Buffer) error {
 	return rlp.Encode(b, tx)
 }
 
-func (tx *DepositTx) decode(input []byte) error {
+func (tx *InjectedTx) decode(input []byte) error {
 	return rlp.DecodeBytes(input, tx)
 }

@@ -1,12 +1,16 @@
 package execution
 
 import (
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
-	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"math/big"
+	"testing"
+	"time"
+
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
+	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,9 +20,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"math/big"
-	"testing"
-	"time"
 )
 
 func TestExecutionService_GetGenesisInfo(t *testing.T) {
@@ -206,7 +207,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 		numberOfTxs                          int
 		prevBlockHash                        []byte
 		timestamp                            uint64
-		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
+		InjectedTxAmount                     *big.Int // if this is non zero then we send a deposit tx
 		expectedReturnCode                   codes.Code
 	}{
 		{
@@ -215,7 +216,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			numberOfTxs:                          5,
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
+			InjectedTxAmount:                     big.NewInt(0),
 			expectedReturnCode:                   codes.PermissionDenied,
 		},
 		{
@@ -224,7 +225,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			numberOfTxs:                          5,
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(0),
+			InjectedTxAmount:                     big.NewInt(0),
 			expectedReturnCode:                   0,
 		},
 		{
@@ -233,7 +234,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			numberOfTxs:                          5,
 			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(1000000000000000000),
+			InjectedTxAmount:                     big.NewInt(1000000000000000000),
 			expectedReturnCode:                   0,
 		},
 		{
@@ -242,7 +243,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			numberOfTxs:                          5,
 			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
 			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
+			InjectedTxAmount:                     big.NewInt(0),
 			expectedReturnCode:                   codes.FailedPrecondition,
 		},
 	}
@@ -283,9 +284,9 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				})
 			}
 
-			// create deposit tx if depositTxAmount is non zero
-			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
-				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
+			// create deposit tx if InjectedTxAmount is non zero
+			if tt.InjectedTxAmount.Cmp(big.NewInt(0)) != 0 {
+				depositAmount := bigIntToProtoU128(tt.InjectedTxAmount)
 				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
 				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
 
@@ -295,7 +296,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
 
-				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+				InjectedTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 					BridgeAddress: &primitivev1.Address{
 						Bech32M: bridgeAddress,
 					},
@@ -309,7 +310,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 					SourceActionIndex: 0,
 				}}}
 
-				marshalledTxs = append(marshalledTxs, depositTx)
+				marshalledTxs = append(marshalledTxs, InjectedTx)
 			}
 
 			executeBlockReq := &astriaPb.ExecuteBlockRequest{
@@ -392,7 +393,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 	chainDestinationAddressBalanceBefore := stateDb.GetBalance(chainDestinationAddress)
 
-	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+	InjectedTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 		BridgeAddress: &primitivev1.Address{
 			Bech32M: bridgeAddress,
 		},
@@ -406,7 +407,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		SourceActionIndex: 0,
 	}}}
 
-	marshalledTxs = append(marshalledTxs, depositTx)
+	marshalledTxs = append(marshalledTxs, InjectedTx)
 
 	executeBlockReq := &astriaPb.ExecuteBlockRequest{
 		PrevBlockHash: previousBlock.Hash().Bytes(),

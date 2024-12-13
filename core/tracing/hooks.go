@@ -243,8 +243,8 @@ const (
 	// Note it doesn't account for a self-destruct which appoints itself as recipient.
 	BalanceDecreaseSelfdestructBurn BalanceChangeReason = 14
 
-	// BalanceIncreaseAstriaDepositTx is ether deposited to the user via an
-	BalanceIncreaseAstriaDepositTx BalanceChangeReason = 15
+	// BalanceIncreaseAstriaInjectedTx is ether deposited to the user via an
+	BalanceIncreaseAstriaInjectedTx BalanceChangeReason = 15
 )
 
 // GasChangeReason is used to indicate the reason for a gas change, useful
