@@ -54,25 +54,9 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		panic(err)
 	}
 
-	config.AstriaRollupName = "astria"
-	config.AstriaSequencerAddressPrefix = "astria"
-	config.AstriaSequencerInitialHeight = 10
-	config.AstriaCelestiaInitialHeight = 10
-	config.AstriaCelestiaHeightVariance = 10
-
-	bech32mBridgeAddress, err := bech32.EncodeM(config.AstriaSequencerAddressPrefix, bridgeAddressBytes)
+	bech32mBridgeAddress, err := bech32.EncodeM("astria", bridgeAddressBytes)
 	if err != nil {
 		panic(err)
-	}
-	config.AstriaBridgeAddressConfigs = []params.AstriaBridgeAddressConfig{
-		{
-			BridgeAddress:  bech32mBridgeAddress,
-			SenderAddress:  common.Address{},
-			StartHeight:    2,
-			AssetDenom:     "nria",
-			AssetPrecision: 18,
-			Erc20Asset:     nil,
-		},
 	}
 
 	feeCollectorKey, err := crypto.GenerateKey()
@@ -81,9 +65,33 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	}
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
 
-	astriaFeeCollectors := make(map[uint32]common.Address)
-	astriaFeeCollectors[1] = feeCollector
-	config.AstriaFeeCollectors = astriaFeeCollectors
+	config.AstriaRollupName = "astria"
+	config.AstriaForks, _ = params.NewAstriaForks(map[string]params.AstriaForkConfig{
+		"genesis": {
+			Height:       1,
+			FeeCollector: &feeCollector,
+			Sequencer: &params.AstriaSequencerConfig{
+				ChainID:       "astria",
+				AddressPrefix: "astria",
+				StartHeight:   10,
+			},
+			Celestia: &params.AstriaCelestiaConfig{
+				ChainID:        "celestia",
+				StartHeight:    10,
+				HeightVariance: 10,
+			},
+			BridgeAddresses: []params.AstriaBridgeAddressConfig{
+				{
+					BridgeAddress:  bech32mBridgeAddress,
+					SenderAddress:  common.Address{},
+					StartHeight:    2,
+					AssetDenom:     "nria",
+					AssetPrecision: 18,
+					Erc20Asset:     nil,
+				},
+			},
+		},
+	})
 
 	genesis := &core.Genesis{
 		Config: &config,
@@ -138,15 +146,17 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	serviceV1Alpha1, err := NewExecutionServiceServerV1(ethservice)
 	require.Nil(t, err, "can't create execution service")
 
+	fork := genesis.Config.AstriaForks.GetForkAtHeight(1)
+
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
-	require.Equal(t, feeCollector, serviceV1Alpha1.nextFeeRecipient, "nextFeeRecipient not set correctly")
+	require.Equal(t, feeCollector, fork.FeeCollector, "feeCollector not set correctly")
 
-	bridgeAsset := genesis.Config.AstriaBridgeAddressConfigs[0].AssetDenom
-	_, ok := serviceV1Alpha1.bridgeAllowedAssets[bridgeAsset]
-	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
-
-	_, ok = serviceV1Alpha1.bridgeAddresses[bridgeAddress]
+	bridgeCfg, ok := fork.BridgeAddresses[bridgeAddress]
 	require.True(t, ok, "bridgeAddress not set correctly")
+
+	bridgeAsset := bridgeCfg.AssetDenom
+	_, ok = fork.BridgeAllowedAssets[bridgeAsset]
+	require.True(t, ok, "bridgeAllowedAssetIDs does not contain bridge asset id")
 
 	_, err = ethservice.BlockChain().InsertChain(blocks)
 	require.Nil(t, err, "can't insert blocks")

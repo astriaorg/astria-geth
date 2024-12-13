@@ -190,6 +190,11 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		return nil, err
 	}
 
+	// Sort orderedForks in descending order by Height
+	sort.Slice(orderedForks, func(i, j int) bool {
+		return orderedForks[i].Height > orderedForks[j].Height
+	})
+
 	return &AstriaForks{
 		orderedForks: orderedForks,
 		forkMap:      forks,
@@ -246,7 +251,7 @@ func GetDefaultAstriaForkData() AstriaForkData {
 
 func (c *AstriaForks) GetForkAtHeight(height uint64) AstriaForkData {
 	idx := sort.Search(len(c.orderedForks), func(i int) bool {
-		return c.orderedForks[i].Height >= height
+		return c.orderedForks[i].Height <= height
 	})
 	// no named fork at this height
 	if idx == len(c.orderedForks) {

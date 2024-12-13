@@ -53,7 +53,7 @@ func generateBech32MAddress() string {
 }
 
 func TestSequenceTxValidation(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, _ := setupExecutionService(t, 10)
 
 	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
@@ -72,17 +72,25 @@ func TestSequenceTxValidation(t *testing.T) {
 	require.Nil(t, err, "failed to generate chain destination key: %v", err)
 	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationKey.PublicKey)
 
-	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+
+	var bridgeAssetDenom string
+	var bridgeAddress string
+	for _, bridgeCfg := range fork.BridgeAddresses {
+		bridgeAssetDenom = bridgeCfg.AssetDenom
+		bridgeAddress = bridgeCfg.BridgeAddress
+		break
+	}
+	require.NotEmpty(t, bridgeAssetDenom, "bridgeAssetDenom not found")
+
 	invalidBridgeAssetDenom := "invalid-asset-denom"
 
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
-	serviceV1Alpha1.bridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
+	fork.BridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
 		AssetDenom:  invalidHeightBridgeAssetDenom,
 		StartHeight: 100,
 	}
-
-	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
 
 	tests := []struct {
 		description string
@@ -196,7 +204,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
+			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, fork.BridgeAddresses, fork.BridgeAllowedAssets)
 			if test.wantErr == "" && err == nil {
 				return
 			}

@@ -75,7 +75,7 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		return nil, errors.New("rollup name not set")
 	}
 
-	fork := bc.Config().GetAstriaForks().GetForkAtHeight(bc.CurrentBlock().Number.Uint64())
+	fork := bc.Config().GetAstriaForks().GetForkAtHeight(bc.CurrentSafeBlock().Number.Uint64())
 
 	if fork.Sequencer.ChainID == "" {
 		return nil, errors.New("sequencer chain ID not set")
@@ -114,7 +114,7 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
 	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
 
-	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentBlock().Number.Uint64())
+	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
 
 	res := &astriaPb.GenesisInfo{
 		RollupId:                  &rollupId,
@@ -123,6 +123,7 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 		SequencerStopBlockHeight:  fork.Sequencer.StopHeight,
 		CelestiaChainId:           fork.Celestia.ChainID,
 		CelestiaBlockVariance:     fork.Celestia.HeightVariance,
+		RollupStartBlockHeight:    fork.Height,
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)
@@ -241,6 +242,9 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// This set of ordered TXs on the TxPool is has been configured to be used by
 	// the Miner when building a payload.
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
+
+	// set extra data
+	s.eth.Miner().SetExtra(s.bc.Config().AstriaExtraData(height))
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
