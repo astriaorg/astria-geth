@@ -57,7 +57,7 @@ func validateAndConvertOracleDataTx(
 		// to check if it was initialized, we call `currencyPairInfo()` on the parent state; since oracle data is always top of block,
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
-		evm := cfg.api.GetEVM(ctx, &core.Message{}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(1)}, state, header, &vm.Config{NoBaseFee: true}, nil)
 		args := []interface{}{currencyPairs[i]}
 		calldata, err := abi.Pack("currencyPairInfo", args...)
 		if err != nil {
