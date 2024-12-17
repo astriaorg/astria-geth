@@ -63,6 +63,11 @@ func validateAndConvertOracleDataTx(
 		if err != nil {
 			return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
 		}
+		code := evm.StateDB.GetCode(cfg.oracleCallerAddress)
+		if len(code) == 0 {
+			return nil, fmt.Errorf("oracle caller address %s has no code", cfg.oracleCallerAddress)
+		}
+
 		ret, _, err := evm.Call(vm.AccountRef(cfg.oracleCallerAddress), cfg.oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary
 		if err != nil {
 			return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)

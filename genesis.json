@@ -46,7 +46,8 @@
         "astriaEIP1559Params": {
             "1": { "minBaseFee": 0, "elasticityMultiplier": 2, "BaseFeeChangeDenominator": 8 }
         },
-        "astriaOracleCallerAddress": "0x0000000000000000000000000000000000000088"
+        "astriaOracleCallerAddress": "0x0000000000000000000000000000000000000088",
+        "astriaOracleContractAddress": "0x0000000000000000000000000000000000000089"
     },
     "difficulty": "10000000",
     "gasLimit": "8000000",
