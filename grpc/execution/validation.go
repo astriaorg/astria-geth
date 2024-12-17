@@ -33,7 +33,7 @@ func validateAndConvertOracleDataTx(
 ) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, 0)
 
-	log.Debug("creating oracle data update tx")
+	log.Info("creating oracle data update tx, price count: %d", len(oracleData.Prices))
 	abi, err := contracts.AstriaOracleMetaData.GetAbi()
 	if err != nil {
 		// this should never happen, as the abi is hardcoded in the contract bindings
@@ -103,6 +103,7 @@ func validateAndConvertOracleDataTx(
 		}
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
+		log.Info("created initializeCurrencyPair tx for currency pair %s", currencyPairs[i])
 	}
 
 	args := []interface{}{}
@@ -115,19 +116,19 @@ func validateAndConvertOracleDataTx(
 		From:  cfg.oracleCallerAddress,
 		Value: new(big.Int),
 		// TODO: max gas costs?
-		Gas:                    64000,
+		Gas:                    500000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-
+	log.Info("created updatePriceData tx")
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil
 }
 
-func validateAndConvertInjectedTx(
+func validateAndConvertDepositTx(
 	height uint64,
 	deposit *sequencerblockv1.Deposit,
 	cfg *conversionConfig,
@@ -230,7 +231,7 @@ func validateAndConvertSequencerTx(
 	case tx.GetOracleData() != nil:
 		return validateAndConvertOracleDataTx(ctx, height, tx.GetOracleData(), cfg)
 	case tx.GetDeposit() != nil:
-		return validateAndConvertInjectedTx(height, tx.GetDeposit(), cfg)
+		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
 	case tx.GetSequencedData() != nil:
 		return validateAndConvertSequencedDataTx(tx.GetSequencedData())
 	default:
