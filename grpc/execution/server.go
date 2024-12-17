@@ -146,6 +146,9 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		}
 	}
 
+	log.Info("astriaOracleContractAddress", bc.Config().AstriaOracleContractAddress.String())
+	log.Info("astriaOracleCallerAddress", bc.Config().AstriaOracleCallerAddress.String())
+
 	return &ExecutionServiceServerV1{
 		eth:                   eth,
 		bc:                    bc,
@@ -285,7 +288,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	for _, tx := range req.Transactions {
 		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
 		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
 		txsToProcess = append(txsToProcess, txs...)

@@ -33,7 +33,7 @@ func validateAndConvertOracleDataTx(
 ) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, 0)
 
-	log.Info("creating oracle data update tx, price count: %d", len(oracleData.Prices))
+	log.Info("creating oracle data update tx", "price count", len(oracleData.Prices))
 	abi, err := contracts.AstriaOracleMetaData.GetAbi()
 	if err != nil {
 		// this should never happen, as the abi is hardcoded in the contract bindings
@@ -57,7 +57,7 @@ func validateAndConvertOracleDataTx(
 		// to check if it was initialized, we call `currencyPairInfo()` on the parent state; since oracle data is always top of block,
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
-		evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(1)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
 		args := []interface{}{currencyPairs[i]}
 		calldata, err := abi.Pack("currencyPairInfo", args...)
 		if err != nil {
