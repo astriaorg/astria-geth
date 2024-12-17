@@ -111,7 +111,7 @@ func validateAndConvertOracleDataTx(
 		log.Info("created initializeCurrencyPair tx for currency pair %s", currencyPairs[i])
 	}
 
-	args := []interface{}{}
+	args := []interface{}{currencyPairs, prices}
 	calldata, err := abi.Pack("updatePriceData", args...)
 	if err != nil {
 		return nil, err
