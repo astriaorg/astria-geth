@@ -108,7 +108,7 @@ func validateAndConvertOracleDataTx(
 		}
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
-		log.Info("created initializeCurrencyPair tx for currency pair %s", currencyPairs[i])
+		log.Info("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair)
 	}
 
 	args := []interface{}{currencyPairs, prices}
@@ -127,7 +127,7 @@ func validateAndConvertOracleDataTx(
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-	log.Info("created updatePriceData tx")
+	log.Info("created updatePriceData tx", "pair", price.CurrencyPair, "price", price.price)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil
