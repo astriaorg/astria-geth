@@ -100,7 +100,7 @@ func validateAndConvertOracleDataTx(
 		txdata := types.InjectedTx{
 			From:                   cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
-			Gas:                    500000, // TODO
+			Gas:                    100000, // TODO
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    primitivev1.TransactionId{},
@@ -127,7 +127,7 @@ func validateAndConvertOracleDataTx(
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-	log.Info("created updatePriceData tx", "pair", price.CurrencyPair, "price", price.price)
+	log.Info("created updatePriceData tx", "pairs", oracleData.Prices)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil
