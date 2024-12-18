@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -103,7 +104,7 @@ func validateAndConvertOracleDataTx(
 		txdata := types.InjectedTx{
 			From:                   cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
-			Gas:                    10000,
+			Gas:                    100000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    primitivev1.TransactionId{},
@@ -111,7 +112,7 @@ func validateAndConvertOracleDataTx(
 		}
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
-		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair)
+		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair, "hash", hex.EncodeToString(currencyPairs[i][:]))
 	}
 
 	args := []interface{}{currencyPairs, prices}
@@ -124,7 +125,7 @@ func validateAndConvertOracleDataTx(
 		From:  cfg.oracleCallerAddress,
 		Value: new(big.Int),
 		// TODO: max gas costs; proportional to the amount of pairs being updated
-		Gas:                    500000,
+		Gas:                    900000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant

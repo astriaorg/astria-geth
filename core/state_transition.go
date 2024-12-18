@@ -391,7 +391,7 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
-	// if this is a injected tx, we only need to mint funds and no gas is used.
+	// if this is a injected tx with no data, it's a native token mint.
 	if st.msg.IsInjectedTx && len(st.msg.Data) == 0 {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
 		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaInjectedTx)
@@ -405,7 +405,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if st.msg.IsInjectedTx {
 		st.initialGas = st.msg.GasLimit
 		st.gasRemaining = st.msg.GasLimit
-		log.Debug("deposit tx minting erc20", "to", *st.msg.To, "value", st.msg.Value)
 	}
 
 	// First check this message satisfies all consensus rules before
