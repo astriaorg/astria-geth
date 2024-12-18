@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/holiman/uint256"
@@ -22,7 +23,9 @@ import (
 
 func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
 	cpStr := fmt.Sprintf("%s/%s", currencyPair.Base, currencyPair.Quote)
-	return sha256.Sum256([]byte(cpStr))
+	var bytes [32]byte
+	copy(bytes[:], crypto.Keccak256([]byte(cpStr)))
+	return bytes
 }
 
 func validateAndConvertOracleDataTx(
@@ -33,7 +36,7 @@ func validateAndConvertOracleDataTx(
 ) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, 0)
 
-	log.Info("creating oracle data update tx", "price count", len(oracleData.Prices))
+	log.Debug("creating oracle data update tx", "price count", len(oracleData.Prices))
 	abi, err := contracts.AstriaOracleMetaData.GetAbi()
 	if err != nil {
 		// this should never happen, as the abi is hardcoded in the contract bindings
@@ -100,7 +103,7 @@ func validateAndConvertOracleDataTx(
 		txdata := types.InjectedTx{
 			From:                   cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
-			Gas:                    100000, // TODO
+			Gas:                    10000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    primitivev1.TransactionId{},
@@ -108,7 +111,7 @@ func validateAndConvertOracleDataTx(
 		}
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
-		log.Info("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair)
+		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair)
 	}
 
 	args := []interface{}{currencyPairs, prices}
@@ -120,14 +123,14 @@ func validateAndConvertOracleDataTx(
 	txdata := types.InjectedTx{
 		From:  cfg.oracleCallerAddress,
 		Value: new(big.Int),
-		// TODO: max gas costs?
+		// TODO: max gas costs; proportional to the amount of pairs being updated
 		Gas:                    500000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-	log.Info("created updatePriceData tx", "pairs", oracleData.Prices)
+	log.Debug("created updatePriceData tx", "pairs", oracleData.Prices)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil

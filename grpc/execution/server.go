@@ -146,9 +146,6 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		}
 	}
 
-	log.Info("astriaOracleContractAddress", "address", bc.Config().AstriaOracleContractAddress.String())
-	log.Info("astriaOracleCallerAddress", "address", bc.Config().AstriaOracleCallerAddress.String())
-
 	return &ExecutionServiceServerV1{
 		eth:                   eth,
 		bc:                    bc,
