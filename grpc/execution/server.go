@@ -149,16 +149,18 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 	}
 
 	// sanity code check for oracle contract address
-	height := bc.CurrentBlock().Number.Uint64()
-	state, header, err := eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
-	}
+	if bc.Config().AstriaOracleContractAddress != (common.Address{}) {
+		height := bc.CurrentBlock().Number.Uint64()
+		state, header, err := eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
+		}
 
-	evm := eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
-	code := evm.StateDB.GetCode(bc.Config().AstriaOracleContractAddress)
-	if len(code) == 0 {
-		return nil, fmt.Errorf("oracle contract address %s has no code", bc.Config().AstriaOracleContractAddress)
+		evm := eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		code := evm.StateDB.GetCode(bc.Config().AstriaOracleContractAddress)
+		if len(code) == 0 {
+			return nil, fmt.Errorf("oracle contract address %s has no code", bc.Config().AstriaOracleContractAddress)
+		}
 	}
 
 	return &ExecutionServiceServerV1{
