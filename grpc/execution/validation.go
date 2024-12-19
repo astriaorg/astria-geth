@@ -44,6 +44,7 @@ func validateAndConvertOracleDataTx(
 		return nil, fmt.Errorf("failed to get abi for AstriaOracle: %w", err)
 	}
 
+	// subtract 1 from the height to get the parent height (height parameter is the height of the current block being executed)
 	state, header, err := cfg.api.StateAndHeaderByNumber(ctx, rpc.BlockNumber(int64(height-1)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
@@ -66,10 +67,6 @@ func validateAndConvertOracleDataTx(
 		calldata, err := abi.Pack("currencyPairInfo", args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
-		}
-		code := evm.StateDB.GetCode(cfg.oracleContractAddress)
-		if len(code) == 0 {
-			return nil, fmt.Errorf("oracle contract address %s has no code", cfg.oracleContractAddress)
 		}
 
 		ret, _, err := evm.Call(vm.AccountRef(cfg.oracleCallerAddress), cfg.oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary

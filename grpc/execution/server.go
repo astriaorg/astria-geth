@@ -20,11 +20,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -144,6 +146,19 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 				nextFeeRecipient = collector
 			}
 		}
+	}
+
+	// sanity code check for oracle contract address
+	height := bc.CurrentBlock().Number.Uint64()
+	state, header, err := eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
+	}
+
+	evm := eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+	code := evm.StateDB.GetCode(bc.Config().AstriaOracleContractAddress)
+	if len(code) == 0 {
+		return nil, fmt.Errorf("oracle contract address %s has no code", bc.Config().AstriaOracleContractAddress)
 	}
 
 	return &ExecutionServiceServerV1{
