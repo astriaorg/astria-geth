@@ -118,6 +118,7 @@ func validateAndUnmarshallSequenceAction(tx *sequencerblockv1.RollupData) (*type
 }
 
 func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHash []byte, auctioneerBech32Address string, addressPrefix string) (types.Transactions, error) {
+	log.Info("Found a potential allocation in the rollup data. Checking if it is valid.")
 	processedTxs := types.Transactions{}
 	payload := allocation.GetPayload()
 
@@ -136,14 +137,15 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 
 	message, err := proto.Marshal(allocation.GetPayload())
 	if err != nil {
-		return nil, WrapError(err, "failed to marshal allocation")
+		return nil, WrapError(err, "failed to marshal allocation to verify signature")
 	}
 
 	signature := allocation.GetSignature()
 	if !ed25519.Verify(publicKey, message, signature) {
-		return nil, fmt.Errorf("failed to verify signature")
+		return nil, fmt.Errorf("signature in allocation does not match the public key")
 	}
 
+	log.Info("Allocation is valid. Unmarshalling the transactions in the bundle.")
 	// unmarshall the transactions in the bundle
 	for _, allocationTx := range payload.GetTransactions() {
 		ethtx := new(types.Transaction)
@@ -162,6 +164,7 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 // TODO - this function has become too big. we should start breaking it down
 func UnbundleRollupDataTransactions(txs []*sequencerblockv1.RollupData, height uint64, bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
 	bridgeAllowedAssets map[string]struct{}, prevBlockHash []byte, auctioneerBech32Address string, addressPrefix string) types.Transactions {
+
 	processedTxs := types.Transactions{}
 	allocationTxs := types.Transactions{}
 	// we just return the allocation here and do not unmarshall the transactions in the bundle if we find it

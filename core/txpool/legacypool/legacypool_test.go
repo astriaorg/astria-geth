@@ -689,21 +689,15 @@ func TestDropping(t *testing.T) {
 		tx11 = transaction(11, 200, key)
 		tx12 = transaction(12, 300, key)
 	)
-	pool.all.Add(tx0, false)
-	pool.priced.Put(tx0, false)
-	pool.promoteTx(account, tx0.Hash(), tx0)
 
-	pool.all.Add(tx1, false)
-	pool.priced.Put(tx1, false)
-	pool.promoteTx(account, tx1.Hash(), tx1)
+	pool.add(tx0, false)
+	pool.add(tx1, false)
+	pool.add(tx2, false)
+	pool.add(tx10, false)
+	pool.add(tx11, false)
+	pool.add(tx12, false)
 
-	pool.all.Add(tx2, false)
-	pool.priced.Put(tx2, false)
-	pool.promoteTx(account, tx2.Hash(), tx2)
-
-	pool.enqueueTx(tx10.Hash(), tx10, false, true)
-	pool.enqueueTx(tx11.Hash(), tx11, false, true)
-	pool.enqueueTx(tx12.Hash(), tx12, false, true)
+	pool.promoteExecutables([]common.Address{account})
 
 	// Check that pre and post validations leave the pool as is
 	if pool.pending[account].Len() != 3 {

@@ -159,7 +159,7 @@ func TestUnmarshallAllocationTxs(t *testing.T) {
 			},
 			prevBlockHash:  []byte("prev rollup block hash"),
 			expectedOutput: types.Transactions{},
-			wantErr:        "failed to verify signature",
+			wantErr:        "signature in allocation does not match the public key",
 		},
 		{
 			description: "valid allocation",
