@@ -13,9 +13,20 @@ import (
 	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/golang/protobuf/proto"
 	"math/big"
+	"time"
+)
+
+var (
+	successfulUnbundledAllocations      = metrics.GetOrRegisterGauge("astria/optimistic/successful_unbundled_allocations", nil)
+	allocationsWithInvalidPrevBlockHash = metrics.GetOrRegisterGauge("astria/optimistic/allocations_with_invalid_prev_block_hash", nil)
+	allocationsWithInvalidPubKey        = metrics.GetOrRegisterGauge("astria/optimistic/allocations_with_invalid_pub_key", nil)
+	allocationsWithInvalidSignature     = metrics.GetOrRegisterGauge("astria/optimistic/allocations_with_invalid_signature", nil)
+
+	allocationUnbundlingTimer = metrics.GetOrRegisterTimer("astria/optimistic/allocation_unbundling_time", nil)
 )
 
 func WrapError(err error, msg string) error {
@@ -118,11 +129,16 @@ func validateAndUnmarshallSequenceAction(tx *sequencerblockv1.RollupData) (*type
 }
 
 func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHash []byte, auctioneerBech32Address string, addressPrefix string) (types.Transactions, error) {
-	log.Info("Found a potential allocation in the rollup data. Checking if it is valid.")
+	unbundlingStart := time.Now()
+	defer allocationUnbundlingTimer.UpdateSince(unbundlingStart)
+
 	processedTxs := types.Transactions{}
 	payload := allocation.GetPayload()
 
+	log.Info("Found a potential allocation in the rollup data. Checking if it is valid.")
+
 	if !bytes.Equal(payload.PrevRollupBlockHash, prevBlockHash) {
+		allocationsWithInvalidPrevBlockHash.Inc(1)
 		return nil, errors.New("prev block hash do not match in allocation")
 	}
 
@@ -132,6 +148,7 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 		return nil, WrapError(err, fmt.Sprintf("failed to encode public key to bech32m address: %s", publicKey))
 	}
 	if auctioneerBech32Address != bech32Address {
+		allocationsWithInvalidPubKey.Inc(1)
 		return nil, fmt.Errorf("address in allocation does not match auctioneer address. expected: %s, got: %s", auctioneerBech32Address, bech32Address)
 	}
 
@@ -142,6 +159,7 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 
 	signature := allocation.GetSignature()
 	if !ed25519.Verify(publicKey, message, signature) {
+		allocationsWithInvalidSignature.Inc(1)
 		return nil, fmt.Errorf("signature in allocation does not match the public key")
 	}
 
@@ -155,6 +173,8 @@ func unmarshallAllocationTxs(allocation *bundlev1alpha1.Allocation, prevBlockHas
 		}
 		processedTxs = append(processedTxs, ethtx)
 	}
+
+	successfulUnbundledAllocations.Inc(1)
 
 	return processedTxs, nil
 

@@ -38,6 +38,8 @@ type OptimisticServiceV1Alpha1 struct {
 var (
 	executeOptimisticBlockRequestCount = metrics.GetOrRegisterCounter("astria/optimistic/execute_optimistic_block_requests", nil)
 	executeOptimisticBlockSuccessCount = metrics.GetOrRegisterCounter("astria/optimistic/execute_optimistic_block_success", nil)
+	optimisticBlockHeight              = metrics.GetOrRegisterGauge("astria/execution/optimistic_block_height", nil)
+	txsStreamedCount                   = metrics.GetOrRegisterCounter("astria/optimistic/txs_streamed", nil)
 
 	executionOptimisticBlockTimer = metrics.GetOrRegisterTimer("astria/optimistic/execute_optimistic_block_time", nil)
 )
@@ -85,6 +87,7 @@ func (o *OptimisticServiceV1Alpha1) GetBundleStream(_ *optimsticPb.GetBundleStre
 				bundle.BaseSequencerBlockHash = *o.currentOptimisticSequencerBlock.Load()
 				bundle.PrevRollupBlockHash = optimisticBlock.Hash().Bytes()
 
+				txsStreamedCount.Inc(1)
 				err = stream.Send(&optimsticPb.GetBundleStreamResponse{Bundle: &bundle})
 				if err != nil {
 					log.Error("error sending bundle over stream", "err", err)
@@ -124,6 +127,8 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 			return err
 		}
 
+		executeOptimisticBlockRequestCount.Inc(1)
+
 		baseBlock := msg.GetBaseBlock()
 
 		// execute the optimistic block and wait for the mempool clearing event
@@ -140,6 +145,7 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 				return status.Error(codes.Internal, "failed to clear mempool after optimistic block execution")
 			}
 			o.currentOptimisticSequencerBlock.Store(&baseBlock.SequencerBlockHash)
+			executeOptimisticBlockSuccessCount.Inc(1)
 			err = stream.Send(&optimsticPb.ExecuteOptimisticBlockStreamResponse{
 				Block:                  optimisticBlock,
 				BaseSequencerBlockHash: baseBlock.SequencerBlockHash,
@@ -164,7 +170,10 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlockStream(stream optimist
 func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, req *optimsticPb.BaseBlock) (*astriaPb.Block, error) {
 	// we need to execute the optimistic block
 	log.Debug("ExecuteOptimisticBlock called", "timestamp", req.Timestamp, "sequencer_block_hash", req.SequencerBlockHash)
-	executeOptimisticBlockRequestCount.Inc(1)
+
+	// Deliberately called after lock, to more directly measure the time spent executing
+	executionStart := time.Now()
+	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
 	if err := validateStaticExecuteOptimisticBlockRequest(req); err != nil {
 		log.Error("ExecuteOptimisticBlock called with invalid BaseBlock", "err", err)
@@ -174,10 +183,6 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 	if !o.SyncMethodsCalled() {
 		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
 	}
-
-	// Deliberately called after lock, to more directly measure the time spent executing
-	executionStart := time.Now()
-	defer executionOptimisticBlockTimer.UpdateSince(executionStart)
 
 	softBlock := o.Bc().CurrentSafeBlock()
 
@@ -234,8 +239,9 @@ func (o *OptimisticServiceV1Alpha1) ExecuteOptimisticBlock(ctx context.Context, 
 		},
 	}
 
+	optimisticBlockHeight.Update(int64(block.NumberU64()))
+
 	log.Info("ExecuteOptimisticBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
-	executeOptimisticBlockSuccessCount.Inc(1)
 
 	return res, nil
 }
