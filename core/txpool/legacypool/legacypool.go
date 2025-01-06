@@ -1782,7 +1782,7 @@ func (pool *LegacyPool) truncateQueue() {
 // it assumes that the pool lock is being held
 func (pool *LegacyPool) clearPendingAndQueued(newHead *types.Header) {
 	// Iterate over all accounts and demote any non-executable transactions
-	addrsForWhichTxsRemoved := []common.Address{}
+	addrsForWhichTxsRemoved := map[common.Address]bool{}
 
 	for addr, list := range pool.pending {
 		dropped, invalids := list.ClearList()
@@ -1800,7 +1800,7 @@ func (pool *LegacyPool) clearPendingAndQueued(newHead *types.Header) {
 			delete(pool.pending, addr)
 			delete(pool.beats, addr)
 
-			addrsForWhichTxsRemoved = append(addrsForWhichTxsRemoved, addr)
+			addrsForWhichTxsRemoved[addr] = true
 		}
 	}
 
@@ -1817,10 +1817,12 @@ func (pool *LegacyPool) clearPendingAndQueued(newHead *types.Header) {
 
 		if list.Empty() {
 			delete(pool.queue, addr)
+
+			addrsForWhichTxsRemoved[addr] = true
 		}
 	}
 
-	for _, addr := range addrsForWhichTxsRemoved {
+	for addr := range addrsForWhichTxsRemoved {
 		pool.reserve(addr, false)
 	}
 }
