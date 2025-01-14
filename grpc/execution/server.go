@@ -75,7 +75,7 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		return nil, errors.New("rollup name not set")
 	}
 
-	fork := bc.Config().GetAstriaForks().GetForkAtHeight(bc.CurrentSafeBlock().Number.Uint64())
+	fork := bc.Config().GetAstriaForks().GetForkAtHeight(max(bc.CurrentSafeBlock().Number.Uint64(), 1))
 
 	if fork.Sequencer.ChainID == "" {
 		return nil, errors.New("sequencer chain ID not set")

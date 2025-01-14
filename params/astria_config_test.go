@@ -16,6 +16,15 @@ func TestAstriaEIP1559Params(t *testing.T) {
 	astriaForks, _ := NewAstriaForks(map[string]AstriaForkConfig{
 		"genesis": {
 			Height: 1,
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "sequencer-test-chain-0",
+				StartHeight: 2,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "mocha-4",
+				StartHeight:    2,
+				HeightVariance: 10,
+			},
 			EIP1559Params: &AstriaEIP1559Params{
 				MinBaseFee:               45000000000,
 				ElasticityMultiplier:     4,
