@@ -115,6 +115,7 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
 
 	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
+	nextFork := s.bc.Config().GetAstriaForks().GetNextForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
 
 	res := &astriaPb.GenesisInfo{
 		RollupId:                  &rollupId,
@@ -124,6 +125,7 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 		CelestiaChainId:           fork.Celestia.ChainID,
 		CelestiaBlockVariance:     fork.Celestia.HeightVariance,
 		RollupStartBlockHeight:    fork.Height,
+		HaltAtStopHeight:          nextFork != nil && nextFork.Halt,
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)

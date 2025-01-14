@@ -248,6 +248,13 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 		},
 	}
 
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	var bridgeConfig params.AstriaBridgeAddressConfig
+	for _, cfg := range fork.BridgeAddresses {
+		bridgeConfig = *cfg
+		break
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
@@ -287,8 +294,8 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			// create deposit tx if depositTxAmount is non zero
 			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
 				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
-				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+				bridgeAddress := bridgeConfig.BridgeAddress
+				bridgeAssetDenom := bridgeConfig.AssetDenom
 
 				// create new chain destination address for better testing
 				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -376,10 +383,17 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		})
 	}
 
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	var bridgeConfig params.AstriaBridgeAddressConfig
+	for _, cfg := range fork.BridgeAddresses {
+		bridgeConfig = *cfg
+		break
+	}
+
 	amountToDeposit := big.NewInt(1000000000000000000)
 	depositAmount := bigIntToProtoU128(amountToDeposit)
-	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	bridgeAddress := bridgeConfig.BridgeAddress
+	bridgeAssetDenom := bridgeConfig.AssetDenom
 
 	// create new chain destination address for better testing
 	chainDestinationAddressPrivKey, err := crypto.GenerateKey()

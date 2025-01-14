@@ -488,9 +488,9 @@ func (c *ChainConfig) Description() string {
 
 	// Add Astria forks
 	banner += "Astria forks (block based):\n"
-	forks := c.GetAstriaForks().orderedForks
-	for _, fork := range forks {
-		banner += fmt.Sprintf(" - %-30s #%-8v", fork.Name+":", fork.Height)
+	forks := c.GetAstriaForks().forkMap
+	for forkName, fork := range forks {
+		banner += fmt.Sprintf(" - %-30s #%-8v", forkName+":", fork.Height)
 		if fork.Halt {
 			banner += " (!chain halts at this height)"
 		}
@@ -762,16 +762,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
 	}
 	return nil
-}
-
-// BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
-func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
-	return c.GetAstriaForks().GetForkAtHeight(height).EIP1559Params.BaseFeeChangeDenominator
-}
-
-// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
-func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
-	return c.GetAstriaForks().GetForkAtHeight(height).EIP1559Params.ElasticityMultiplier
 }
 
 // LatestFork returns the latest time-based fork that would be active for the given time.

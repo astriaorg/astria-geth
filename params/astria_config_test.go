@@ -1,7 +1,6 @@
 package params
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -14,30 +13,32 @@ import (
 )
 
 func TestAstriaEIP1559Params(t *testing.T) {
-	jsonBuf := []byte(`{
-		"1":{ "minBaseFee": 45000000000, "elasticityMultiplier": 4, "baseFeeChangeDenominator": 100 },
-		"101":{ "minBaseFee": 120000000, "elasticityMultiplier": 11, "baseFeeChangeDenominator": 250 },
-		"15":{ "minBaseFee": 15000000000, "elasticityMultiplier": 5, "baseFeeChangeDenominator": 50 }
-	}`)
-
-	var eip1559Params AstriaEIP1559Params
-	err := json.Unmarshal(jsonBuf, &eip1559Params)
-	if err != nil {
-		t.Errorf("unexpected err %v", err)
-	}
-
-	expected := AstriaEIP1559Params{
-		heights: map[uint64]AstriaEIP1559Param{
-			1:   {MinBaseFee: 45000000000, ElasticityMultiplier: 4, BaseFeeChangeDenominator: 100},
-			101: {MinBaseFee: 120000000, ElasticityMultiplier: 11, BaseFeeChangeDenominator: 250},
-			15:  {MinBaseFee: 15000000000, ElasticityMultiplier: 5, BaseFeeChangeDenominator: 50},
+	astriaForks, _ := NewAstriaForks(map[string]AstriaForkConfig{
+		"genesis": {
+			Height: 1,
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               45000000000,
+				ElasticityMultiplier:     4,
+				BaseFeeChangeDenominator: 100,
+			},
 		},
-		orderedHeights: []uint64{101, 15, 1},
-	}
-
-	if !reflect.DeepEqual(eip1559Params, expected) {
-		t.Errorf("expected %v, got %v", expected, eip1559Params)
-	}
+		"fork1": {
+			Height: 15,
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               15000000000,
+				ElasticityMultiplier:     5,
+				BaseFeeChangeDenominator: 50,
+			},
+		},
+		"fork2": {
+			Height: 101,
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               120000000,
+				ElasticityMultiplier:     11,
+				BaseFeeChangeDenominator: 250,
+			},
+		},
+	})
 
 	minBaseTests := map[uint64]*big.Int{
 		0:      common.Big0,
@@ -54,7 +55,7 @@ func TestAstriaEIP1559Params(t *testing.T) {
 	}
 
 	for height, expected := range minBaseTests {
-		if got := eip1559Params.MinBaseFeeAt(height); got.Cmp(expected) != 0 {
+		if got := astriaForks.MinBaseFeeAt(height); got.Cmp(expected) != 0 {
 			t.Errorf("MinBaseFeeAt(%d): expected %v, got %v", height, expected, got)
 		}
 	}
@@ -74,7 +75,7 @@ func TestAstriaEIP1559Params(t *testing.T) {
 	}
 
 	for height, expected := range elasticityMultiplierTests {
-		if got := eip1559Params.ElasticityMultiplierAt(height); got != expected {
+		if got := astriaForks.ElasticityMultiplierAt(height); got != expected {
 			t.Errorf("ElasticityMultiplierAt(%d): expected %v, got %v", height, expected, got)
 		}
 	}
@@ -94,7 +95,7 @@ func TestAstriaEIP1559Params(t *testing.T) {
 	}
 
 	for height, expected := range baseFeeChangeDenominatorTests {
-		if got := eip1559Params.BaseFeeChangeDenominatorAt(height); got != expected {
+		if got := astriaForks.BaseFeeChangeDenominatorAt(height); got != expected {
 			t.Errorf("BaseFeeChangeDenominatorAt(%d): expected %v, got %v", height, expected, got)
 		}
 	}

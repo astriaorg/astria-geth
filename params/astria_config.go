@@ -25,7 +25,7 @@ type AstriaForkConfig struct {
 	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
 	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
 	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
-	EIP1559Params     *AstriaEIP1559Param         `json:"eip1559Params,omitempty"`
+	EIP1559Params     *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
 	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
 	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
 	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
@@ -38,7 +38,7 @@ type AstriaForkData struct {
 	SnapshotChecksum    string
 	ExtraDataOverride   hexutil.Bytes
 	FeeCollector        common.Address
-	EIP1559Params       AstriaEIP1559Param
+	EIP1559Params       AstriaEIP1559Params
 	Sequencer           AstriaSequencerConfig
 	Celestia            AstriaCelestiaConfig
 	BridgeAddresses     map[string]*AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
@@ -59,7 +59,7 @@ type AstriaCelestiaConfig struct {
 	HeightVariance uint64 `json:"heightVariance"`
 }
 
-type AstriaEIP1559Param struct {
+type AstriaEIP1559Params struct {
 	MinBaseFee               uint64 `json:"minBaseFee"`
 	ElasticityMultiplier     uint64 `json:"elasticityMultiplier"`
 	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
@@ -239,7 +239,7 @@ func GetDefaultAstriaForkData() AstriaForkData {
 	return AstriaForkData{
 		Height:       1,
 		FeeCollector: common.Address{},
-		EIP1559Params: AstriaEIP1559Param{
+		EIP1559Params: AstriaEIP1559Params{
 			MinBaseFee:               0,
 			ElasticityMultiplier:     DefaultElasticityMultiplier,
 			BaseFeeChangeDenominator: DefaultBaseFeeChangeDenominator,
@@ -272,6 +272,16 @@ func (c *AstriaForks) GetNextForkAtHeight(height uint64) *AstriaForkData {
 
 func (c *AstriaForks) MinBaseFeeAt(height uint64) *big.Int {
 	return big.NewInt(0).SetUint64(c.GetForkAtHeight(height).EIP1559Params.MinBaseFee)
+}
+
+// BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
+func (c *AstriaForks) BaseFeeChangeDenominatorAt(height uint64) uint64 {
+	return c.GetForkAtHeight(height).EIP1559Params.BaseFeeChangeDenominator
+}
+
+// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
+func (c *AstriaForks) ElasticityMultiplierAt(height uint64) uint64 {
+	return c.GetForkAtHeight(height).EIP1559Params.ElasticityMultiplier
 }
 
 func (c *AstriaForks) MarshalJSON() ([]byte, error) {
