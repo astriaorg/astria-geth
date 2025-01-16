@@ -253,3 +253,324 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestGetForkAtHeight(t *testing.T) {
+	forkMap := map[string]AstriaForkConfig{
+		"fork1": {
+			Height: 1,
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain1",
+				StartHeight: 1,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "celestia1",
+				StartHeight:    1,
+				HeightVariance: 100,
+			},
+		},
+		"fork2": {
+			Height: 1000,
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain2",
+				StartHeight: 2,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "celestia2",
+				StartHeight:    2,
+				HeightVariance: 200,
+			},
+		},
+		"fork3": {
+			Height: 2000,
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain3",
+				StartHeight: 3,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "celestia3",
+				StartHeight:    3,
+				HeightVariance: 300,
+			},
+		},
+	}
+
+	forks, err := NewAstriaForks(forkMap)
+	if err != nil {
+		t.Fatalf("failed to create forks: %v", err)
+	}
+
+	tests := []struct {
+		description string
+		height      uint64
+		wantFork    string
+	}{
+		{
+			description: "height 1 returns first fork",
+			height:      1,
+			wantFork:    "fork1",
+		},
+		{
+			description: "height 500 returns first fork",
+			height:      500,
+			wantFork:    "fork1",
+		},
+		{
+			description: "height 1000 returns second fork",
+			height:      1000,
+			wantFork:    "fork2",
+		},
+		{
+			description: "height 1500 returns second fork",
+			height:      1500,
+			wantFork:    "fork2",
+		},
+		{
+			description: "height 2000 returns third fork",
+			height:      2000,
+			wantFork:    "fork3",
+		},
+		{
+			description: "height 3000 returns third fork",
+			height:      3000,
+			wantFork:    "fork3",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			fork := forks.GetForkAtHeight(test.height)
+			if fork.Name != test.wantFork {
+				t.Errorf("got fork %s, want %s", fork.Name, test.wantFork)
+			}
+		})
+	}
+}
+
+func TestGetNextForkAtHeight(t *testing.T) {
+	forkMap := map[string]AstriaForkConfig{
+		"fork1": {
+			Height: 1,
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain1",
+				StartHeight: 1,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "celestia1",
+				StartHeight:    1,
+				HeightVariance: 100,
+			},
+		},
+		"fork2": {
+			Height: 1000,
+		},
+		"fork3": {
+			Height: 2000,
+		},
+	}
+
+	forks, err := NewAstriaForks(forkMap)
+	if err != nil {
+		t.Fatalf("failed to create forks: %v", err)
+	}
+
+	tests := []struct {
+		description string
+		height      uint64
+		wantFork    *string
+	}{
+		{
+			description: "height 0 returns first fork",
+			height:      0,
+			wantFork:    strPtr("fork1"),
+		},
+		{
+			description: "height 1 returns second fork",
+			height:      1,
+			wantFork:    strPtr("fork2"),
+		},
+		{
+			description: "height 500 returns second fork",
+			height:      500,
+			wantFork:    strPtr("fork2"),
+		},
+		{
+			description: "height 1500 returns third fork",
+			height:      1500,
+			wantFork:    strPtr("fork3"),
+		},
+		{
+			description: "height 1999 returns third fork",
+			height:      1999,
+			wantFork:    strPtr("fork3"),
+		},
+		{
+			description: "height 2000 returns nil",
+			height:      2000,
+			wantFork:    nil,
+		},
+		{
+			description: "height 3000 returns nil",
+			height:      3000,
+			wantFork:    nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			nextFork := forks.GetNextForkAtHeight(test.height)
+			if test.wantFork == nil {
+				if nextFork != nil {
+					t.Errorf("got fork %v, want nil", nextFork)
+				}
+				return
+			}
+			if nextFork == nil {
+				t.Errorf("got nil fork, want %s", *test.wantFork)
+				return
+			}
+			if nextFork.Name != *test.wantFork {
+				t.Errorf("got fork %s, want %s", nextFork.Name, *test.wantFork)
+			}
+		})
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func TestAstriaForksInheritance(t *testing.T) {
+	forkMap := map[string]AstriaForkConfig{
+		"fork1": {
+			Height: 1,
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               1000,
+				ElasticityMultiplier:     2,
+				BaseFeeChangeDenominator: 8,
+			},
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain1",
+				StartHeight: 1,
+			},
+			Celestia: &AstriaCelestiaConfig{
+				ChainID:        "celestia1",
+				StartHeight:    1,
+				HeightVariance: 100,
+			},
+		},
+		"fork2": {
+			Height: 200,
+			// override EIP1559Params
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               2000,
+				ElasticityMultiplier:     4,
+				BaseFeeChangeDenominator: 16,
+			},
+		},
+		"fork3": {
+			Height: 300,
+			// override sequencer config
+			Sequencer: &AstriaSequencerConfig{
+				ChainID:     "chain3",
+				StartHeight: 3,
+			},
+			// EIP1559Params should be inherited from fork2
+		},
+	}
+
+	forks, err := NewAstriaForks(forkMap)
+	if err != nil {
+		t.Fatalf("failed to create forks: %v", err)
+	}
+
+	type testCheck struct {
+		minBaseFee               uint64
+		elasticityMultiplier     uint64
+		baseFeeChangeDenominator uint64
+		sequencerChainID         string
+		sequencerStartHeight     uint32
+		celestiaChainID          string
+		celestiaStartHeight      uint64
+		celestiaHeightVariance   uint64
+	}
+
+	tests := []struct {
+		description string
+		height      uint64
+		checks      testCheck
+	}{
+		{
+			description: "fork1 sets initial values",
+			height:      150,
+			checks: testCheck{
+				minBaseFee:               1000,
+				elasticityMultiplier:     2,
+				baseFeeChangeDenominator: 8,
+				sequencerChainID:         "chain1",
+				sequencerStartHeight:     1,
+				celestiaChainID:          "celestia1",
+				celestiaStartHeight:      1,
+				celestiaHeightVariance:   100,
+			},
+		},
+		{
+			description: "fork2 inherits everything but EIP1559Params",
+			height:      250,
+			checks: testCheck{
+				minBaseFee:               2000,
+				elasticityMultiplier:     4,
+				baseFeeChangeDenominator: 16,
+				sequencerChainID:         "chain1",
+				sequencerStartHeight:     1,
+				celestiaChainID:          "celestia1",
+				celestiaStartHeight:      1,
+				celestiaHeightVariance:   100,
+			},
+		},
+		{
+			description: "fork3 inherits EIP1559Params but changes sequencer",
+			height:      350,
+			checks: testCheck{
+				minBaseFee:               2000,
+				elasticityMultiplier:     4,
+				baseFeeChangeDenominator: 16,
+				sequencerChainID:         "chain3",
+				sequencerStartHeight:     3,
+				celestiaChainID:          "celestia1",
+				celestiaStartHeight:      1,
+				celestiaHeightVariance:   100,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			fork := forks.GetForkAtHeight(test.height)
+
+			if got := fork.EIP1559Params.MinBaseFee; got != test.checks.minBaseFee {
+				t.Errorf("MinBaseFee = %v, want %v", got, test.checks.minBaseFee)
+			}
+			if got := fork.EIP1559Params.ElasticityMultiplier; got != test.checks.elasticityMultiplier {
+				t.Errorf("ElasticityMultiplier = %v, want %v", got, test.checks.elasticityMultiplier)
+			}
+			if got := fork.EIP1559Params.BaseFeeChangeDenominator; got != test.checks.baseFeeChangeDenominator {
+				t.Errorf("BaseFeeChangeDenominator = %v, want %v", got, test.checks.baseFeeChangeDenominator)
+			}
+			if got := fork.Sequencer.ChainID; got != test.checks.sequencerChainID {
+				t.Errorf("Sequencer.ChainID = %v, want %v", got, test.checks.sequencerChainID)
+			}
+			if got := fork.Sequencer.StartHeight; got != test.checks.sequencerStartHeight {
+				t.Errorf("Sequencer.StartHeight = %v, want %v", got, test.checks.sequencerStartHeight)
+			}
+			if got := fork.Celestia.ChainID; got != test.checks.celestiaChainID {
+				t.Errorf("Celestia.ChainID = %v, want %v", got, test.checks.celestiaChainID)
+			}
+			if got := fork.Celestia.StartHeight; got != test.checks.celestiaStartHeight {
+				t.Errorf("Celestia.StartHeight = %v, want %v", got, test.checks.celestiaStartHeight)
+			}
+			if got := fork.Celestia.HeightVariance; got != test.checks.celestiaHeightVariance {
+				t.Errorf("Celestia.HeightVariance = %v, want %v", got, test.checks.celestiaHeightVariance)
+			}
+		})
+	}
+}

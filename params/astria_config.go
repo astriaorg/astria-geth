@@ -15,7 +15,7 @@ import (
 )
 
 type AstriaForks struct {
-	orderedForks []AstriaForkData
+	orderedForks []AstriaForkData // sorted in descending order by Height
 	forkMap      map[string]AstriaForkConfig
 }
 
@@ -237,6 +237,7 @@ func validateAstriaForks(forks []AstriaForkData) error {
 
 func GetDefaultAstriaForkData() AstriaForkData {
 	return AstriaForkData{
+		Name:         "default",
 		Height:       1,
 		FeeCollector: common.Address{},
 		EIP1559Params: AstriaEIP1559Params{
@@ -261,13 +262,13 @@ func (c *AstriaForks) GetForkAtHeight(height uint64) AstriaForkData {
 }
 
 func (c *AstriaForks) GetNextForkAtHeight(height uint64) *AstriaForkData {
-	idx := sort.Search(len(c.orderedForks), func(i int) bool {
-		return c.orderedForks[i].Height > height
-	})
-	if idx == len(c.orderedForks) {
-		return nil
+	// orderedForks are sorted in descending order; iterate from the end
+	for i := len(c.orderedForks) - 1; i >= 0; i-- {
+		if c.orderedForks[i].Height > height {
+			return &c.orderedForks[i]
+		}
 	}
-	return &c.orderedForks[idx]
+	return nil
 }
 
 func (c *AstriaForks) MinBaseFeeAt(height uint64) *big.Int {
@@ -325,7 +326,7 @@ type AstriaErc20AssetConfig struct {
 	ContractPrecision uint16         `json:"contractPrecision"`
 }
 
-func (abc *AstriaBridgeAddressConfig) Validate(genesisPrefix string) error {
+func (abc *AstriaBridgeAddressConfig) Validate(expectedPrefix string) error {
 	prefix, byteAddress, err := bech32.Decode(abc.BridgeAddress)
 	if err != nil {
 		return fmt.Errorf("bridge address must be a bech32 encoded string")
@@ -334,8 +335,8 @@ func (abc *AstriaBridgeAddressConfig) Validate(genesisPrefix string) error {
 	if err != nil {
 		return fmt.Errorf("failed to convert address to 8 bit")
 	}
-	if prefix != genesisPrefix {
-		return fmt.Errorf("bridge address must have prefix %s", genesisPrefix)
+	if prefix != expectedPrefix {
+		return fmt.Errorf("bridge address must have prefix %s", expectedPrefix)
 	}
 	if len(byteAddress) != 20 {
 		return fmt.Errorf("bridge address must have resolve to 20 byte address, got %d", len(byteAddress))
