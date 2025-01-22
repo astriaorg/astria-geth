@@ -724,7 +724,7 @@ func (n *Node) HTTPEndpoint() string {
 	return "http://" + n.http.listenAddr()
 }
 
-// GRPCENDPOINT returns the URL of the GRPC server.
+// GRPCEndpoint returns the URL of the GRPC server.
 func (n *Node) GRPCEndpoint() string {
 	return "http://" + n.grpcServerHandler.endpoint
 }

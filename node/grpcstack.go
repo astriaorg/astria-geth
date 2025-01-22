@@ -19,7 +19,7 @@ type GRPCServerHandler struct {
 	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
 }
 
-// NewServer creates a new gRPC server.
+// NewGRPCServerHandler creates a new gRPC server.
 // It registers the execution service server.
 // It registers the gRPC server with the node so it can be stopped on shutdown.
 func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer, cfg *Config) error {
