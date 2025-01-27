@@ -240,7 +240,7 @@ func (s *stateObject) SetState(key, value common.Hash) {
 }
 
 // setState updates a value in account dirty storage. If the value being set is
-// nil (assuming journal revert), the dirtyness is removed.
+// nil (assuming journal revert), the dirtiness is removed.
 func (s *stateObject) setState(key common.Hash, value *common.Hash) {
 	// If the first set is being reverted, undo the dirty marker
 	if value == nil {
