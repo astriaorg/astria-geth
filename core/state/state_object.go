@@ -264,7 +264,7 @@ func (s *stateObject) finalise(prefetch bool) {
 			slotsToPrefetch = append(slotsToPrefetch, common.CopyBytes(key[:])) // Copy needed for closure
 		} else {
 			// Otherwise, the slot was reverted to its original value, remove it
-			// from the pending area to avoid thrashing the data strutures.
+			// from the pending area to avoid thrashing the data structures.
 			delete(s.pendingStorage, key)
 		}
 	}
