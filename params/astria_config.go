@@ -132,6 +132,8 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 			for k, v := range orderedForks[i-1].Precompiles {
 				orderedForks[i].Precompiles[k] = v
 			}
+		} else {
+			orderedForks[i] = GetDefaultAstriaForkData()
 		}
 
 		// Set fork-specific fields
@@ -207,10 +209,6 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 			for addr, pType := range currentFork.Precompiles {
 				orderedForks[i].Precompiles[addr] = pType
 			}
-		}
-
-		if orderedForks[i].Precompiles == nil {
-			orderedForks[i].Precompiles = make(map[common.Address]PrecompileType)
 		}
 	}
 
