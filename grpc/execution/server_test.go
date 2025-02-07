@@ -31,7 +31,7 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
 
 	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
-	require.Equal(t, genesisInfo.GetSequencerStartBlockHeight(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Sequencer.StartHeight, "SequencerInitialHeight is not correct")
+	require.Equal(t, genesisInfo.GetSequencerStartHeight(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Sequencer.StartHeight, "SequencerInitialHeight is not correct")
 	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.HeightVariance, "CelestiaHeightVariance is not correct")
 	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
 }

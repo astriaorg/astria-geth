@@ -20,15 +20,16 @@ type AstriaForks struct {
 }
 
 type AstriaForkConfig struct {
-	Height            uint64                      `json:"height"`
-	Halt              bool                        `json:"halt,omitempty"`
-	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
-	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
-	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
-	EIP1559Params     *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
-	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
-	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
-	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+	Height            uint64                            `json:"height"`
+	Halt              bool                              `json:"halt,omitempty"`
+	SnapshotChecksum  string                            `json:"snapshotChecksum,omitempty"`
+	ExtraDataOverride hexutil.Bytes                     `json:"extraDataOverride,omitempty"`
+	FeeCollector      *common.Address                   `json:"feeCollector,omitempty"`
+	EIP1559Params     *AstriaEIP1559Params              `json:"eip1559Params,omitempty"`
+	Sequencer         *AstriaSequencerConfig            `json:"sequencer,omitempty"`
+	Celestia          *AstriaCelestiaConfig             `json:"celestia,omitempty"`
+	BridgeAddresses   []AstriaBridgeAddressConfig       `json:"bridgeAddresses,omitempty"`
+	Precompiles       map[common.Address]PrecompileType `json:"precompiles,omitempty"`
 }
 
 type AstriaForkData struct {
@@ -44,6 +45,7 @@ type AstriaForkData struct {
 	Celestia            AstriaCelestiaConfig
 	BridgeAddresses     map[string]*AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
+	Precompiles         map[common.Address]PrecompileType
 }
 
 type AstriaSequencerConfig struct {
@@ -114,9 +116,22 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		if i > 0 {
 			// Copy previous fork's configuration as the base
 			orderedForks[i] = orderedForks[i-1]
-		} else {
-			// set default values
-			orderedForks[i] = GetDefaultAstriaForkData()
+
+			// maps are pointers, so we need to create new maps for each fork
+			orderedForks[i].BridgeAddresses = make(map[string]*AstriaBridgeAddressConfig)
+			orderedForks[i].BridgeAllowedAssets = make(map[string]struct{})
+			orderedForks[i].Precompiles = make(map[common.Address]PrecompileType)
+
+			// Copy previous fork's maps if needed
+			for k, v := range orderedForks[i-1].BridgeAddresses {
+				orderedForks[i].BridgeAddresses[k] = v
+			}
+			for k, v := range orderedForks[i-1].BridgeAllowedAssets {
+				orderedForks[i].BridgeAllowedAssets[k] = v
+			}
+			for k, v := range orderedForks[i-1].Precompiles {
+				orderedForks[i].Precompiles[k] = v
+			}
 		}
 
 		// Set fork-specific fields
@@ -186,6 +201,17 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 				}
 			}
 		}
+
+		// add precompiles
+		if len(currentFork.Precompiles) > 0 {
+			for addr, pType := range currentFork.Precompiles {
+				orderedForks[i].Precompiles[addr] = pType
+			}
+		}
+
+		if orderedForks[i].Precompiles == nil {
+			orderedForks[i].Precompiles = make(map[common.Address]PrecompileType)
+		}
 	}
 
 	if err := validateAstriaForks(orderedForks); err != nil {
@@ -229,6 +255,12 @@ func validateAstriaForks(forks []AstriaForkData) error {
 			if fork.FeeCollector == (common.Address{}) {
 				log.Warn("fee asset collectors not set, assets will be burned", "fork", fork.Name)
 			}
+
+			for _, pType := range fork.Precompiles {
+				if err := pType.Validate(); err != nil {
+					return fmt.Errorf("fork %s: invalid precompile %s", fork.Name, pType)
+				}
+			}
 		} else {
 			log.Warn("fork will halt", "fork", fork.Name, "height", fork.Height)
 		}
@@ -249,6 +281,7 @@ func GetDefaultAstriaForkData() AstriaForkData {
 		},
 		BridgeAddresses:     make(map[string]*AstriaBridgeAddressConfig),
 		BridgeAllowedAssets: make(map[string]struct{}),
+		Precompiles:         make(map[common.Address]PrecompileType),
 	}
 }
 
@@ -369,4 +402,22 @@ func (abc *AstriaBridgeAddressConfig) ScaledDepositAmount(deposit *big.Int) *big
 	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
 
 	return new(big.Int).Mul(deposit, multiplier)
+}
+
+// PrecompileType represents the type of precompile to enable
+type PrecompileType string
+
+const (
+	PrecompileBase64 PrecompileType = "base64"
+	// Add other precompile types here as needed
+)
+
+// Validate ensures the PrecompileType is a known value
+func (p PrecompileType) Validate() error {
+	switch p {
+	case PrecompileBase64:
+		return nil
+	default:
+		return fmt.Errorf("unknown precompile type: %s", p)
+	}
 }

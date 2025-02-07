@@ -156,7 +156,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 
 	// Set up precompiles
 	evm.precompileManager = NewPrecompileManager(evm)
-	evm.precompileManager.RegisterMap(pconfig.PrecompileConfig(chainConfig, blockCtx.BlockNumber.Uint64(), blockCtx.Time))
+	evm.precompileManager.RegisterMap(pconfig.GetPrecompiles(chainConfig, blockCtx.BlockNumber.Uint64(), blockCtx.Time))
 
 	return evm
 }
