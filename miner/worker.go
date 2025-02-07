@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
@@ -320,14 +319,10 @@ func (miner *Miner) generateWork(params *generateParams) *newPayloadResult {
 	}
 	if !params.noTxs {
 		interrupt := new(atomic.Int32)
-		timer := time.AfterFunc(miner.config.Recommit, func() {
-			interrupt.Store(commitInterruptTimeout)
-		})
-		defer timer.Stop()
 
 		err := miner.fillAstriaTransactions(interrupt, work)
 		if errors.Is(err, errBlockInterruptedByTimeout) {
-			log.Warn("Block building is interrupted", "allowance", common.PrettyDuration(miner.config.Recommit))
+			log.Error("Block building is interrupted", "allowance", common.PrettyDuration(miner.config.Recommit))
 		}
 	}
 	body := types.Body{Transactions: work.txs, Withdrawals: params.withdrawals}

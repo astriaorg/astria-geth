@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
@@ -39,7 +40,8 @@ var loopInterruptTests = []string{
 func TestLoopInterrupt(t *testing.T) {
 	address := common.BytesToAddress([]byte("contract"))
 	vmctx := BlockContext{
-		Transfer: func(StateDB, common.Address, common.Address, *uint256.Int) {},
+		Transfer:    func(StateDB, common.Address, common.Address, *uint256.Int) {},
+		BlockNumber: big.NewInt(0),
 	}
 
 	for i, tt := range loopInterruptTests {
