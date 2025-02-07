@@ -118,14 +118,14 @@ func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astr
 	nextFork := s.bc.Config().GetAstriaForks().GetNextForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
 
 	res := &astriaPb.GenesisInfo{
-		RollupId:                  &rollupId,
-		SequencerChainId:          fork.Sequencer.ChainID,
-		SequencerStartBlockHeight: fork.Sequencer.StartHeight,
-		SequencerStopBlockHeight:  fork.Sequencer.StopHeight,
-		CelestiaChainId:           fork.Celestia.ChainID,
-		CelestiaBlockVariance:     fork.Celestia.HeightVariance,
-		RollupStartBlockHeight:    fork.Height,
-		HaltAtStopHeight:          nextFork != nil && nextFork.Halt,
+		RollupId:               &rollupId,
+		SequencerChainId:       fork.Sequencer.ChainID,
+		SequencerStartHeight:   fork.Sequencer.StartHeight,
+		CelestiaChainId:        fork.Celestia.ChainID,
+		CelestiaBlockVariance:  fork.Celestia.HeightVariance,
+		RollupStartBlockNumber: fork.Height,
+		RollupStopBlockNumber:  fork.StopHeight,
+		HaltAtRollupStopNumber: nextFork != nil && nextFork.Halt,
 	}
 
 	log.Info("GetGenesisInfo completed", "response", res)

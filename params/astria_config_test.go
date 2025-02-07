@@ -450,7 +450,7 @@ func TestAstriaForksInheritance(t *testing.T) {
 			},
 			Sequencer: &AstriaSequencerConfig{
 				ChainID:     "chain1",
-				StartHeight: 1,
+				StartHeight: 100,
 			},
 			Celestia: &AstriaCelestiaConfig{
 				ChainID:        "celestia1",
@@ -468,11 +468,20 @@ func TestAstriaForksInheritance(t *testing.T) {
 			},
 		},
 		"fork3": {
+			Height: 251,
+			// override EIP1559Params
+			EIP1559Params: &AstriaEIP1559Params{
+				MinBaseFee:               1000,
+				ElasticityMultiplier:     4,
+				BaseFeeChangeDenominator: 16,
+			},
+		},
+		"fork4": {
 			Height: 300,
 			// override sequencer config
 			Sequencer: &AstriaSequencerConfig{
 				ChainID:     "chain3",
-				StartHeight: 3,
+				StartHeight: 325,
 			},
 			// EIP1559Params should be inherited from fork2
 		},
@@ -483,7 +492,19 @@ func TestAstriaForksInheritance(t *testing.T) {
 		t.Fatalf("failed to create forks: %v", err)
 	}
 
+	t.Logf("Forks configuration:")
+	for i := len(forks.orderedForks) - 1; i >= 0; i-- {
+		fork := forks.orderedForks[i]
+		t.Logf("  Fork %s:", fork.Name)
+		t.Logf("    Height: %d", fork.Height)
+		t.Logf("    StopHeight: %d", fork.StopHeight)
+		t.Logf("    Sequencer:")
+		t.Logf("      ChainID: %s", fork.Sequencer.ChainID)
+		t.Logf("      StartHeight: %d", fork.Sequencer.StartHeight)
+	}
+
 	type testCheck struct {
+		stopHeight               uint64
 		minBaseFee               uint64
 		elasticityMultiplier     uint64
 		baseFeeChangeDenominator uint64
@@ -503,11 +524,12 @@ func TestAstriaForksInheritance(t *testing.T) {
 			description: "fork1 sets initial values",
 			height:      150,
 			checks: testCheck{
+				stopHeight:               199,
 				minBaseFee:               1000,
 				elasticityMultiplier:     2,
 				baseFeeChangeDenominator: 8,
 				sequencerChainID:         "chain1",
-				sequencerStartHeight:     1,
+				sequencerStartHeight:     100,
 				celestiaChainID:          "celestia1",
 				celestiaStartHeight:      1,
 				celestiaHeightVariance:   100,
@@ -517,25 +539,42 @@ func TestAstriaForksInheritance(t *testing.T) {
 			description: "fork2 inherits everything but EIP1559Params",
 			height:      250,
 			checks: testCheck{
+				stopHeight:               250,
 				minBaseFee:               2000,
 				elasticityMultiplier:     4,
 				baseFeeChangeDenominator: 16,
 				sequencerChainID:         "chain1",
-				sequencerStartHeight:     1,
+				sequencerStartHeight:     299,
 				celestiaChainID:          "celestia1",
 				celestiaStartHeight:      1,
 				celestiaHeightVariance:   100,
 			},
 		},
 		{
-			description: "fork3 inherits EIP1559Params but changes sequencer",
+			description: "fork3 inherits everything but EIP1559Params",
+			height:      251,
+			checks: testCheck{
+				stopHeight:               299,
+				minBaseFee:               1000,
+				elasticityMultiplier:     4,
+				baseFeeChangeDenominator: 16,
+				sequencerChainID:         "chain1",
+				sequencerStartHeight:     350,
+				celestiaChainID:          "celestia1",
+				celestiaStartHeight:      1,
+				celestiaHeightVariance:   100,
+			},
+		},
+		{
+			description: "fork4 inherits EIP1559Params but changes sequencer",
 			height:      350,
 			checks: testCheck{
-				minBaseFee:               2000,
+				stopHeight:               0,
+				minBaseFee:               1000,
 				elasticityMultiplier:     4,
 				baseFeeChangeDenominator: 16,
 				sequencerChainID:         "chain3",
-				sequencerStartHeight:     3,
+				sequencerStartHeight:     325,
 				celestiaChainID:          "celestia1",
 				celestiaStartHeight:      1,
 				celestiaHeightVariance:   100,
@@ -547,6 +586,9 @@ func TestAstriaForksInheritance(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			fork := forks.GetForkAtHeight(test.height)
 
+			if got := fork.StopHeight; got != test.checks.stopHeight {
+				t.Errorf("StopHeight = %v, want %v", got, test.checks.stopHeight)
+			}
 			if got := fork.EIP1559Params.MinBaseFee; got != test.checks.minBaseFee {
 				t.Errorf("MinBaseFee = %v, want %v", got, test.checks.minBaseFee)
 			}

@@ -34,6 +34,7 @@ type AstriaForkConfig struct {
 type AstriaForkData struct {
 	Name                string
 	Height              uint64
+	StopHeight          uint64
 	Halt                bool
 	SnapshotChecksum    string
 	ExtraDataOverride   hexutil.Bytes
@@ -46,11 +47,9 @@ type AstriaForkData struct {
 }
 
 type AstriaSequencerConfig struct {
-	ChainID           string `json:"chainId"`
-	AddressPrefix     string `json:"addressPrefix,omitempty"`
-	StartHeight       uint32 `json:"startHeight"`
-	StopHeight        uint32 `json:"-"`
-	RollupStartHeight uint64 `json:"-"`
+	ChainID       string `json:"chainId"`
+	AddressPrefix string `json:"addressPrefix,omitempty"`
+	StartHeight   uint32 `json:"startHeight"`
 }
 
 type AstriaCelestiaConfig struct {
@@ -123,8 +122,14 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		// Set fork-specific fields
 		orderedForks[i].Name = nh.name
 		orderedForks[i].Height = currentFork.Height
+		orderedForks[i].StopHeight = 0
 		orderedForks[i].Halt = currentFork.Halt
 		orderedForks[i].SnapshotChecksum = ""
+
+		// set stop height of previous fork
+		if i > 0 {
+			orderedForks[i-1].StopHeight = currentFork.Height - 1
+		}
 
 		// Override with any new values from current fork
 		if currentFork.SnapshotChecksum != "" {
@@ -145,11 +150,8 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 
 		if currentFork.Sequencer != nil {
 			orderedForks[i].Sequencer = *currentFork.Sequencer
-			orderedForks[i].Sequencer.RollupStartHeight = currentFork.Height
-			// set stop height for previous fork if sequencer data is changed
-			if i > 0 {
-				orderedForks[i-1].Sequencer.StopHeight = orderedForks[i-1].Sequencer.StartHeight + uint32(currentFork.Height-orderedForks[i-1].Sequencer.RollupStartHeight)
-			}
+		} else {
+			orderedForks[i].Sequencer.StartHeight = orderedForks[i-1].Sequencer.StartHeight + uint32(currentFork.Height-orderedForks[i-1].Height)
 		}
 
 		if currentFork.Celestia != nil {
