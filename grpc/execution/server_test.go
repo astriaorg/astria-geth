@@ -1,12 +1,16 @@
 package execution
 
 import (
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
-	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"math/big"
+	"testing"
+	"time"
+
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
+	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,9 +20,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"math/big"
-	"testing"
-	"time"
 )
 
 func TestExecutionService_GetGenesisInfo(t *testing.T) {
@@ -30,8 +31,8 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
 
 	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
-	require.Equal(t, genesisInfo.GetSequencerGenesisBlockHeight(), ethservice.BlockChain().Config().AstriaSequencerInitialHeight, "SequencerInitialHeight is not correct")
-	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaCelestiaHeightVariance, "CelestiaHeightVariance is not correct")
+	require.Equal(t, genesisInfo.GetSequencerStartHeight(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Sequencer.StartHeight, "SequencerInitialHeight is not correct")
+	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.HeightVariance, "CelestiaHeightVariance is not correct")
 	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
 }
 
@@ -56,7 +57,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 	require.True(t, bytes.Equal(commitmentState.Firm.Hash, firmBlock.Hash().Bytes()), "Firm Block Hashes do not match")
 	require.True(t, bytes.Equal(commitmentState.Firm.ParentBlockHash, firmBlock.ParentHash.Bytes()), "Firm Block Parent Hash do not match")
 	require.Equal(t, uint64(commitmentState.Firm.Number), firmBlock.Number.Uint64(), "Firm Block Number do not match")
-	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaCelestiaInitialHeight, "BaseCelestiaHeight is not correct")
+	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.StartHeight, "BaseCelestiaHeight is not correct")
 
 	require.True(t, serviceV1Alpha1.getCommitmentStateCalled, "GetCommitmentState should be called")
 }
@@ -247,6 +248,13 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 		},
 	}
 
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	var bridgeConfig params.AstriaBridgeAddressConfig
+	for _, cfg := range fork.BridgeAddresses {
+		bridgeConfig = *cfg
+		break
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
@@ -286,8 +294,8 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			// create deposit tx if depositTxAmount is non zero
 			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
 				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
-				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+				bridgeAddress := bridgeConfig.BridgeAddress
+				bridgeAssetDenom := bridgeConfig.AssetDenom
 
 				// create new chain destination address for better testing
 				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
@@ -375,10 +383,17 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 		})
 	}
 
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	var bridgeConfig params.AstriaBridgeAddressConfig
+	for _, cfg := range fork.BridgeAddresses {
+		bridgeConfig = *cfg
+		break
+	}
+
 	amountToDeposit := big.NewInt(1000000000000000000)
 	depositAmount := bigIntToProtoU128(amountToDeposit)
-	bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
-	bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+	bridgeAddress := bridgeConfig.BridgeAddress
+	bridgeAssetDenom := bridgeConfig.AssetDenom
 
 	// create new chain destination address for better testing
 	chainDestinationAddressPrivKey, err := crypto.GenerateKey()
