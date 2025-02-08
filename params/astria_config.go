@@ -10,8 +10,8 @@ import (
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type AstriaForks struct {
@@ -72,18 +72,13 @@ func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
 		return fork.ExtraDataOverride
 	}
 
-	// create default extradata
-	extra, _ := rlp.EncodeToBytes([]interface{}{
-		c.AstriaRollupName,
-		fork.Sequencer.StartHeight,
-		fork.Celestia.StartHeight,
-		fork.Celestia.HeightVariance,
-	})
-	if uint64(len(extra)) > MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
-		extra = nil
+	forkJSON, err := json.Marshal(fork)
+	if err != nil {
+		log.Error("failed to marshal astria forks", "error", err)
+		return nil
 	}
-	return extra
+
+	return crypto.Keccak256(forkJSON)
 }
 
 func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
@@ -418,4 +413,32 @@ func (p PrecompileType) Validate() error {
 	default:
 		return fmt.Errorf("unknown precompile type: %s", p)
 	}
+}
+
+// converts an AstriaForkData to AstriaForkConfig
+func (fd AstriaForkData) ToConfig() AstriaForkConfig {
+	// Convert bridge addresses from map to slice
+	bridgeAddrs := make([]AstriaBridgeAddressConfig, 0, len(fd.BridgeAddresses))
+	for _, cfg := range fd.BridgeAddresses {
+		bridgeAddrs = append(bridgeAddrs, *cfg)
+	}
+
+	config := AstriaForkConfig{
+		Height:            fd.Height,
+		Halt:              fd.Halt,
+		SnapshotChecksum:  fd.SnapshotChecksum,
+		ExtraDataOverride: fd.ExtraDataOverride,
+		FeeCollector:      &fd.FeeCollector,
+		EIP1559Params:     &fd.EIP1559Params,
+		Sequencer:         &fd.Sequencer,
+		Celestia:          &fd.Celestia,
+		BridgeAddresses:   bridgeAddrs,
+		Precompiles:       fd.Precompiles,
+	}
+
+	return config
+}
+
+func (fd AstriaForkData) MarshalJSON() ([]byte, error) {
+	return json.Marshal(fd.ToConfig())
 }
