@@ -50,7 +50,7 @@ func validateAndConvertOracleDataTx(
 		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
 	}
 
-	// arguments for calling the `updatePriceData()` function on the oracle contract
+	// arguments for calling the `setPrices()` function on the oracle contract
 	currencyPairs := make([][32]byte, len(oracleData.Prices))
 	prices := make([]*big.Int, len(oracleData.Prices))
 	for i, price := range oracleData.Prices {
@@ -113,7 +113,7 @@ func validateAndConvertOracleDataTx(
 	}
 
 	args := []interface{}{currencyPairs, prices}
-	calldata, err := abi.Pack("updatePriceData", args...)
+	calldata, err := abi.Pack("setPrices", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func validateAndConvertOracleDataTx(
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-	log.Debug("created updatePriceData tx", "pairs", oracleData.Prices)
+	log.Debug("created setPrices tx", "pairs", oracleData.Prices)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil

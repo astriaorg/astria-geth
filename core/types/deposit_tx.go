@@ -26,7 +26,7 @@ type InjectedTx struct {
 	// if this is an ERC20 mint, the following field is set
 	// to the `mint` function calldata.
 	// if this is an oracle update, the following field is set to the
-	// `initializeCurrencyPair` or `updatePriceData` function calldata.
+	// `initializeCurrencyPair` or `setPrices` function calldata.
 	Data []byte
 	// the transaction ID of the source action on the sequencer, consisting
 	// of the transaction hash.
