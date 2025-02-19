@@ -103,14 +103,15 @@ func TestTransaction_RoundTripRpcJSON(t *testing.T) {
 	testTransactionMarshal(t, tests, config)
 }
 
-func TestTransactionBlobTx(t *testing.T) {
-	config := *params.TestChainConfig
-	config.ShanghaiTime = new(uint64)
-	config.CancunTime = new(uint64)
-	tests := allBlobTxs(common.Address{0xde, 0xad}, &config)
-
-	testTransactionMarshal(t, tests, &config)
-}
+// Blob submission disabled
+//func TestTransactionBlobTx(t *testing.T) {
+//	config := *params.TestChainConfig
+//	config.ShanghaiTime = new(uint64)
+//	config.CancunTime = new(uint64)
+//	tests := allBlobTxs(common.Address{0xde, 0xad}, &config)
+//
+//	testTransactionMarshal(t, tests, &config)
+//}
 
 type txData struct {
 	Tx   types.TxData
