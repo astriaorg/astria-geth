@@ -11,6 +11,7 @@ import (
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	connecttypesv2 "buf.build/gen/go/astria/vendored/protocolbuffers/go/connect/types/v2"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
 	"github.com/ethereum/go-ethereum/core"
@@ -51,49 +52,79 @@ func validateAndConvertOracleDataTx(
 	}
 
 	// arguments for calling the `setPrices()` function on the oracle contract
-	currencyPairs := make([][32]byte, len(oracleData.Prices))
-	prices := make([]*big.Int, len(oracleData.Prices))
-	for i, price := range oracleData.Prices {
-		currencyPairs[i] = hashCurrencyPair(price.CurrencyPair)
-		prices[i] = protoU128ToBigInt(price.Price)
+	currencyPairsToSet := make([][32]byte, 0)
+	pricesToSet := make([]*big.Int, 0)
+
+	// see if contract requires currency pair authorization
+	evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+	res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "requireCurrencyPairAuthorization")
+	if err != nil {
+		return nil, fmt.Errorf("failed to call requireCurrencyPairAuthorization: %w", err)
+	}
+
+	// result should be `(bool requireCurrencyPairAuthorization)`
+	if len(res) != 1 {
+		return nil, fmt.Errorf("unexpected result length from requireCurrencyPairAuthorization: %d", len(res))
+	}
+
+	requireCurrencyPairAuthorization, ok := res[0].(bool)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return type for requireCurrencyPairAuthorization: %T", res[0])
+	}
+
+	for _, price := range oracleData.Prices {
+		currencyPairHash := hashCurrencyPair(price.CurrencyPair)
 
 		// see if currency pair was already initialized; if not, initialize it
 		//
 		// to check if it was initialized, we call `currencyPairInfo()` on the parent state; since oracle data is always top of block,
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
-		evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
-		args := []interface{}{currencyPairs[i]}
-		calldata, err := abi.Pack("currencyPairInfo", args...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to pack args for currencyPairInfo: %w", err)
-		}
-
-		ret, _, err := evm.Call(vm.AccountRef(cfg.oracleCallerAddress), cfg.oracleContractAddress, calldata, 100000, uint256.NewInt(0)) // gas is arbitrary
+		res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "currencyPairInfo", currencyPairHash)
 		if err != nil {
 			return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
 		}
 
-		// result should be abi-packed `(bool initialized, uint8 decimals)`
-		res, err := abi.Unpack("currencyPairInfo", ret)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unpack currencyPairInfo: %w", err)
-		}
+		// result should be `(bool initialized, uint8 decimals)`
 		if len(res) != 2 {
 			return nil, fmt.Errorf("unexpected result length from currencyPairInfo: %d", len(res))
 		}
 
 		init, ok := res[0].(bool)
 		if !ok {
-			return nil, fmt.Errorf("unexpected type for initialized: %T", res[0])
+			return nil, fmt.Errorf("unexpected return type for initialized: %T", res[0])
 		}
 		if init {
+			currencyPairsToSet = append(currencyPairsToSet, currencyPairHash)
+			pricesToSet = append(pricesToSet, protoU128ToBigInt(price.Price))
 			continue
 		}
 
+		// if contract requires currency pair authorization to initialize,
+		// check if pair is authorized and skip it if not
+		if requireCurrencyPairAuthorization {
+			res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "authorizedCurrencyPairs", currencyPairHash)
+			if err != nil {
+				return nil, fmt.Errorf("failed to call authorizedCurrencyPairs: %w", err)
+			}
+
+			// result should be `(bool)`
+			if len(res) != 1 {
+				return nil, fmt.Errorf("unexpected result length from authorizedCurrencyPairs: %d", len(res))
+			}
+
+			authorized, ok := res[0].(bool)
+			if !ok {
+				return nil, fmt.Errorf("unexpected return type for authorizedCurrencyPairs: %T", res[0])
+			}
+			if !authorized {
+				continue
+			}
+		}
+
 		// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
-		args = []interface{}{currencyPairs[i], uint8(price.Decimals)}
-		calldata, err = abi.Pack("initializeCurrencyPair", args...)
+		args := []interface{}{currencyPairHash, uint8(price.Decimals)}
+		calldata, err := abi.Pack("initializeCurrencyPair", args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
 		}
@@ -109,10 +140,12 @@ func validateAndConvertOracleDataTx(
 		}
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
-		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair, "hash", hex.EncodeToString(currencyPairs[i][:]))
+		currencyPairsToSet = append(currencyPairsToSet, currencyPairHash)
+		pricesToSet = append(pricesToSet, protoU128ToBigInt(price.Price))
+		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair, "hash", hex.EncodeToString(currencyPairHash[:]))
 	}
 
-	args := []interface{}{currencyPairs, prices}
+	args := []interface{}{currencyPairsToSet, pricesToSet}
 	calldata, err := abi.Pack("setPrices", args...)
 	if err != nil {
 		return nil, err
@@ -297,4 +330,25 @@ func validateStaticBlock(block *astriaPb.Block) error {
 	}
 
 	return nil
+}
+
+func callContract(abi *abi.ABI, evm *vm.EVM, from common.Address, to common.Address, methodName string, args ...interface{}) ([]interface{}, error) {
+	const CONTRACT_CALL_GAS = 100000 // gas is arbitrary
+
+	calldata, err := abi.Pack(methodName, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack args for %s: %w", methodName, err)
+	}
+
+	ret, _, err := evm.Call(vm.AccountRef(from), to, calldata, CONTRACT_CALL_GAS, uint256.NewInt(0))
+	if err != nil {
+		return nil, fmt.Errorf("failed to call %s: %w", methodName, err)
+	}
+
+	res, err := abi.Unpack(methodName, ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack %s: %w", methodName, err)
+	}
+
+	return res, nil
 }
