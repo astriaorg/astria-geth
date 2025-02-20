@@ -71,7 +71,7 @@ func validateAndUnmarshalSequencerTx(
 				Gas:                    64000,
 				To:                     &bac.Erc20Asset.ContractAddress,
 				Data:                   calldata,
-				SourceTransactionId:    *deposit.SourceTransactionId,
+				SourceTransactionId:    deposit.SourceTransactionId.GetInner(),
 				SourceTransactionIndex: deposit.SourceActionIndex,
 			}
 
@@ -84,7 +84,7 @@ func validateAndUnmarshalSequencerTx(
 			To:                     &recipient,
 			Value:                  amount,
 			Gas:                    0,
-			SourceTransactionId:    *deposit.SourceTransactionId,
+			SourceTransactionId:    deposit.SourceTransactionId.GetInner(),
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 		return types.NewTx(&txdata), nil
@@ -115,7 +115,7 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 		return fmt.Errorf("PrevBlockHash cannot be nil")
 	}
 	if req.Timestamp == nil {
-		return fmt.Errorf("Timestamp cannot be nil")
+		return fmt.Errorf("timestamp cannot be nil")
 	}
 
 	return nil
