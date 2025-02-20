@@ -80,7 +80,8 @@ func (s *Suite) EthTests() []utesting.Test {
 		{Name: "Transaction", Fn: s.TestTransaction},
 		{Name: "InvalidTxs", Fn: s.TestInvalidTxs},
 		{Name: "NewPooledTxs", Fn: s.TestNewPooledTxs},
-		{Name: "BlobViolations", Fn: s.TestBlobViolations},
+		// Blob tests are not relevant to Astria Geth
+		// {Name: "BlobViolations", Fn: s.TestBlobViolations},
 	}
 }
 
