@@ -2,10 +2,12 @@ buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20241017141511-7e4bcc0ebba
 buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20241017141511-7e4bcc0ebba5.1/go.mod h1:T5EsLvEE5UMk62gVSwNY/7XlxknAP3sL8tYRsU68b4s=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.35.1-20241017141511-7e4bcc0ebba5.1 h1:3G2O21DuY5Y/G32tP1mAI16AxwDYTscG2YaOb/WQty0=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.35.1-20241017141511-7e4bcc0ebba5.1/go.mod h1:U4LUlabiYNYBd1pqYS9o8SsHjBRoEBysrfRVnebzJH0=
-buf.build/gen/go/astria/primitives/protocolbuffers/go v1.35.1-20240911152449-eeebd3decdce.1 h1:kG4riHqlF9X6iZ1Oxs5/6ul6aue7MS+A6DK6HAchuTk=
-buf.build/gen/go/astria/primitives/protocolbuffers/go v1.35.1-20240911152449-eeebd3decdce.1/go.mod h1:n9L7X3VAj4od4VHf2ScJuHARUUQTSxJqtRHZk/7Ptt0=
-buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.35.1-20241017141511-71aab1871615.1 h1:hPMoxTiT7jJjnIbWqneBbL05VeVOTD9UeC/qdvzHL8g=
-buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.35.1-20241017141511-71aab1871615.1/go.mod h1:2uasRFMH+a3DaF34c1o+w7/YtYnoknmARyYpb9W2QIc=
+buf.build/gen/go/astria/primitives/protocolbuffers/go v1.35.2-00000000000000-3bfd63a8e304.1 h1:E1Y+/mSS0HUOJzvgIosnILMJIN5XLQ/tZCnYA9HxNHw=
+buf.build/gen/go/astria/primitives/protocolbuffers/go v1.35.2-00000000000000-3bfd63a8e304.1/go.mod h1:I9FcB1oNqT1nI+ny0GD8gF9YrIYrHmczgNu6MTE9fAo=
+buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.35.2-00000000000000-0afe5f04c432.1 h1:qY1mMo1UCSZLB0kCRLMAppqG81i7ynnBAtWN/uSqNJs=
+buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.35.2-00000000000000-0afe5f04c432.1/go.mod h1:pWhIvNCTAQCnfu7yiguleI6AApVskVRb8zMqAzbXmyk=
+buf.build/gen/go/astria/vendored/protocolbuffers/go v1.35.2-00000000000000-af6d4456b07b.1 h1:u9CKtSqLe8Xhl1oteTmpPN+/tjdoRglIJx2xizAoU5Y=
+buf.build/gen/go/astria/vendored/protocolbuffers/go v1.35.2-00000000000000-af6d4456b07b.1/go.mod h1:SrweGbOriTsmWXpeqXdbqCwAs+mohaV0SGtjRjq7mHk=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=
@@ -895,8 +897,8 @@ google.golang.org/protobuf v1.24.0/go.mod h1:r/3tXBNzIEhYS9I1OUVjXDlt8tc493IdKGj
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
-google.golang.org/protobuf v1.35.1 h1:m3LfL6/Ca+fqnjnlqQXNpFPABW1UD7mjh8KO2mKFytA=
-google.golang.org/protobuf v1.35.1/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
+google.golang.org/protobuf v1.35.2 h1:8Ar7bF+apOIoThw1EdZl0p1oWvMqTHmpA2fRTyZO8io=
+google.golang.org/protobuf v1.35.2/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

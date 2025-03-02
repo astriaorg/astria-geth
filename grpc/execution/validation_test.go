@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -25,8 +26,8 @@ func testBlobTx() *types.Transaction {
 	})
 }
 
-func testDepositTx() *types.Transaction {
-	return types.NewTx(&types.DepositTx{
+func testInjectedTx() *types.Transaction {
+	return types.NewTx(&types.InjectedTx{
 		From:  testAddr,
 		Value: big.NewInt(1000),
 		Gas:   1000,
@@ -58,8 +59,8 @@ func TestSequenceTxValidation(t *testing.T) {
 	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)
 
-	depositTx, err := testDepositTx().MarshalBinary()
-	require.Nil(t, err, "failed to marshal random deposit tx: %v", err)
+	injectedTx, err := testInjectedTx().MarshalBinary()
+	require.Nil(t, err, "failed to marshal random injected tx: %v", err)
 
 	unsignedTx := types.NewTransaction(uint64(0), common.HexToAddress("0x9a9070028361F7AAbeB3f2F2Dc07F82C4a98A02a"), big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
@@ -109,13 +110,13 @@ func TestSequenceTxValidation(t *testing.T) {
 			wantErr: "blob tx not allowed in sequenced data",
 		},
 		{
-			description: "deposit type sequence tx",
+			description: "injected type sequence tx",
 			sequencerTx: &sequencerblockv1.RollupData{
 				Value: &sequencerblockv1.RollupData_SequencedData{
-					SequencedData: depositTx,
+					SequencedData: injectedTx,
 				},
 			},
-			wantErr: "deposit tx not allowed in sequenced data",
+			wantErr: "injected tx not allowed in sequenced data",
 		},
 		{
 			description: "deposit tx with an unknown bridge address",
@@ -196,7 +197,11 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, serviceV1Alpha1.bridgeAddresses, serviceV1Alpha1.bridgeAllowedAssets)
+			cfg := &conversionConfig{
+				bridgeAddresses:     serviceV1Alpha1.bridgeAddresses,
+				bridgeAllowedAssets: serviceV1Alpha1.bridgeAllowedAssets,
+			}
+			_, err := validateAndConvertSequencerTx(context.Background(), 2, test.sequencerTx, cfg)
 			if test.wantErr == "" && err == nil {
 				return
 			}
