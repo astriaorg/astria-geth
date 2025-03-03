@@ -40,7 +40,6 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
 		config.TerminalTotalDifficulty = common.Big0
-		config.TerminalTotalDifficultyPassed = true
 		engine = beaconConsensus.NewFaker()
 	}
 

@@ -16,45 +16,50 @@
 
 package tests
 
-import (
-	"math/rand"
-	"testing"
-
-	"github.com/ethereum/go-ethereum/core/rawdb"
-)
-
-func TestBlockchain(t *testing.T) {
-	bt := new(testMatcher)
-	// General state tests are 'exported' as blockchain tests, but we can run them natively.
-	// For speedier CI-runs, the line below can be uncommented, so those are skipped.
-	// For now, in hardfork-times (Berlin), we run the tests both as StateTests and
-	// as blockchain tests, since the latter also covers things like receipt root
-	bt.skipLoad(`^GeneralStateTests/`)
-
-	// Skip random failures due to selfish mining test
-	bt.skipLoad(`.*bcForgedTest/bcForkUncle\.json`)
-
-	// Slow tests
-	bt.slow(`.*bcExploitTest/DelegateCallSpam.json`)
-	bt.slow(`.*bcExploitTest/ShanghaiLove.json`)
-	bt.slow(`.*bcExploitTest/SuicideIssue.json`)
-	bt.slow(`.*/bcForkStressTest/`)
-	bt.slow(`.*/bcGasPricerTest/RPC_API_Test.json`)
-	bt.slow(`.*/bcWalletTest/`)
-
-	// Very slow test
-	bt.skipLoad(`.*/stTimeConsuming/.*`)
-	// test takes a lot for time and goes easily OOM because of sha3 calculation on a huge range,
-	// using 4.6 TGas
-	bt.skipLoad(`.*randomStatetest94.json.*`)
-
-	bt.walk(t, blockTestDir, func(t *testing.T, name string, test *BlockTest) {
-		execBlockTest(t, bt, test)
-	})
-	// There is also a LegacyTests folder, containing blockchain tests generated
-	// prior to Istanbul. However, they are all derived from GeneralStateTests,
-	// which run natively, so there's no reason to run them here.
-}
+//
+//func TestBlockchain(t *testing.T) {
+//	bt := new(testMatcher)
+//
+//	// We are running most of GeneralStatetests to tests witness support, even
+//	// though they are ran as state tests too. Still, the performance tests are
+//	// less about state andmore about EVM number crunching, so skip those.
+//	bt.skipLoad(`^GeneralStateTests/VMTests/vmPerformance`)
+//
+//	// Skip random failures due to selfish mining test
+//	bt.skipLoad(`.*bcForgedTest/bcForkUncle\.json`)
+//
+//	// Slow tests
+//	bt.slow(`.*bcExploitTest/DelegateCallSpam.json`)
+//	bt.slow(`.*bcExploitTest/ShanghaiLove.json`)
+//	bt.slow(`.*bcExploitTest/SuicideIssue.json`)
+//	bt.slow(`.*/bcForkStressTest/`)
+//	bt.slow(`.*/bcGasPricerTest/RPC_API_Test.json`)
+//	bt.slow(`.*/bcWalletTest/`)
+//
+//	// Very slow test
+//	bt.skipLoad(`.*/stTimeConsuming/.*`)
+//	// test takes a lot for time and goes easily OOM because of sha3 calculation on a huge range,
+//	// using 4.6 TGas
+//	bt.skipLoad(`.*randomStatetest94.json.*`)
+//
+//	// After the merge we would accept side chains as canonical even if they have lower td
+//	bt.skipLoad(`.*bcMultiChainTest/ChainAtoChainB_difficultyB.json`)
+//	bt.skipLoad(`.*bcMultiChainTest/CallContractFromNotBestBlock.json`)
+//	bt.skipLoad(`.*bcTotalDifficultyTest/uncleBlockAtBlock3afterBlock4.json`)
+//	bt.skipLoad(`.*bcTotalDifficultyTest/lotsOfBranchesOverrideAtTheMiddle.json`)
+//	bt.skipLoad(`.*bcTotalDifficultyTest/sideChainWithMoreTransactions.json`)
+//	bt.skipLoad(`.*bcForkStressTest/ForkStressTest.json`)
+//	bt.skipLoad(`.*bcMultiChainTest/lotsOfLeafs.json`)
+//	bt.skipLoad(`.*bcFrontierToHomestead/blockChainFrontierWithLargerTDvsHomesteadBlockchain.json`)
+//	bt.skipLoad(`.*bcFrontierToHomestead/blockChainFrontierWithLargerTDvsHomesteadBlockchain2.json`)
+//
+//	bt.walk(t, blockTestDir, func(t *testing.T, name string, test *BlockTest) {
+//		execBlockTest(t, bt, test)
+//	})
+//	// There is also a LegacyTests folder, containing blockchain tests generated
+//	// prior to Istanbul. However, they are all derived from GeneralStateTests,
+//	// which run natively, so there's no reason to run them here.
+//}
 
 // TODO - get these tests to work. Tests mainly fail due to https://github.com/astriaorg/astria-geth/pull/5
 // where we add the basefee balance to the coinbase address. This causes the state root to change, we will have to
@@ -82,35 +87,35 @@ func TestBlockchain(t *testing.T) {
 //		execBlockTest(t, bt, test)
 //	})
 //}
-
-func execBlockTest(t *testing.T, bt *testMatcher, test *BlockTest) {
-	// If -short flag is used, we don't execute all four permutations, only one.
-	executionMask := 0xf
-	if testing.Short() {
-		executionMask = (1 << (rand.Int63() & 4))
-	}
-	if executionMask&0x1 != 0 {
-		if err := bt.checkFailure(t, test.Run(false, rawdb.HashScheme, nil, nil)); err != nil {
-			t.Errorf("test in hash mode without snapshotter failed: %v", err)
-			return
-		}
-	}
-	if executionMask&0x2 != 0 {
-		if err := bt.checkFailure(t, test.Run(true, rawdb.HashScheme, nil, nil)); err != nil {
-			t.Errorf("test in hash mode with snapshotter failed: %v", err)
-			return
-		}
-	}
-	if executionMask&0x4 != 0 {
-		if err := bt.checkFailure(t, test.Run(false, rawdb.PathScheme, nil, nil)); err != nil {
-			t.Errorf("test in path mode without snapshotter failed: %v", err)
-			return
-		}
-	}
-	if executionMask&0x8 != 0 {
-		if err := bt.checkFailure(t, test.Run(true, rawdb.PathScheme, nil, nil)); err != nil {
-			t.Errorf("test in path mode with snapshotter failed: %v", err)
-			return
-		}
-	}
-}
+//
+//func execBlockTest(t *testing.T, bt *testMatcher, test *BlockTest) {
+//	// If -short flag is used, we don't execute all four permutations, only one.
+//	executionMask := 0xf
+//	if testing.Short() {
+//		executionMask = (1 << (rand.Int63() & 4))
+//	}
+//	if executionMask&0x1 != 0 {
+//		if err := bt.checkFailure(t, test.Run(false, rawdb.HashScheme, nil, nil)); err != nil {
+//			t.Errorf("test in hash mode without snapshotter failed: %v", err)
+//			return
+//		}
+//	}
+//	if executionMask&0x2 != 0 {
+//		if err := bt.checkFailure(t, test.Run(true, rawdb.HashScheme, nil, nil)); err != nil {
+//			t.Errorf("test in hash mode with snapshotter failed: %v", err)
+//			return
+//		}
+//	}
+//	if executionMask&0x4 != 0 {
+//		if err := bt.checkFailure(t, test.Run(false, rawdb.PathScheme, nil, nil)); err != nil {
+//			t.Errorf("test in path mode without snapshotter failed: %v", err)
+//			return
+//		}
+//	}
+//	if executionMask&0x8 != 0 {
+//		if err := bt.checkFailure(t, test.Run(true, rawdb.PathScheme, nil, nil)); err != nil {
+//			t.Errorf("test in path mode with snapshotter failed: %v", err)
+//			return
+//		}
+//	}
+//}

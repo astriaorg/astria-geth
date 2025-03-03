@@ -395,7 +395,6 @@ func TestTestVectorsV5(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			net := newHandshakeTest()
 			defer net.close()
@@ -606,7 +605,7 @@ func (n *handshakeTestNode) n() *enode.Node {
 }
 
 func (n *handshakeTestNode) addr() string {
-	return n.ln.Node().IP().String()
+	return n.ln.Node().IPAddr().String()
 }
 
 func (n *handshakeTestNode) id() enode.ID {

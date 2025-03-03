@@ -19,18 +19,18 @@ func NewMockStateDB() precompile.StateDB {
 	}
 }
 
-func (m *mockStateDB) SubBalance(address common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) {
+func (m *mockStateDB) SubBalance(address common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) uint256.Int {
 	if _, ok := m.balances[address]; !ok {
 		m.balances[address] = uint256.NewInt(0)
 	}
-	m.balances[address].Sub(m.balances[address], amount)
+	return *m.balances[address].Sub(m.balances[address], amount)
 }
 
-func (m *mockStateDB) AddBalance(address common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) {
+func (m *mockStateDB) AddBalance(address common.Address, amount *uint256.Int, reason tracing.BalanceChangeReason) uint256.Int {
 	if _, ok := m.balances[address]; !ok {
 		m.balances[address] = uint256.NewInt(0)
 	}
-	m.balances[address].Add(m.balances[address], amount)
+	return *m.balances[address].Add(m.balances[address], amount)
 }
 
 func (m *mockStateDB) GetBalance(address common.Address) *uint256.Int {
@@ -47,11 +47,12 @@ func (m *mockStateDB) GetState(address common.Address, hash common.Hash) common.
 	return m.states[address][hash]
 }
 
-func (m *mockStateDB) SetState(address common.Address, hash common.Hash, value common.Hash) {
+func (m *mockStateDB) SetState(address common.Address, hash common.Hash, value common.Hash) common.Hash {
 	if _, ok := m.states[address]; !ok {
 		m.states[address] = make(map[common.Hash]common.Hash)
 	}
 	m.states[address][hash] = value
+	return value
 }
 
 func (m *mockStateDB) GetCommittedState(address common.Address, hash common.Hash) common.Hash {

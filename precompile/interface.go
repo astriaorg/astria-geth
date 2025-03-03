@@ -10,11 +10,11 @@ import (
 type BalanceChangeReason byte
 
 type StateDB interface {
-	SubBalance(common.Address, *uint256.Int, tracing.BalanceChangeReason)
-	AddBalance(common.Address, *uint256.Int, tracing.BalanceChangeReason)
+	SubBalance(common.Address, *uint256.Int, tracing.BalanceChangeReason) uint256.Int
+	AddBalance(common.Address, *uint256.Int, tracing.BalanceChangeReason) uint256.Int
 	GetBalance(common.Address) *uint256.Int
 	GetState(common.Address, common.Hash) common.Hash
-	SetState(common.Address, common.Hash, common.Hash)
+	SetState(common.Address, common.Hash, common.Hash) common.Hash
 	GetCommittedState(common.Address, common.Hash) common.Hash
 }
 

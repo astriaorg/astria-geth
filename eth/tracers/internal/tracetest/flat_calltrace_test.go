@@ -89,12 +89,11 @@ func flatCallTracerTestRunner(tracerName string, filename string, dirPath string
 	defer state.Close()
 
 	// Create the tracer, the EVM environment and run it
-	tracer, err := tracers.DefaultDirectory.New(tracerName, new(tracers.Context), test.TracerConfig)
+	tracer, err := tracers.DefaultDirectory.New(tracerName, new(tracers.Context), test.TracerConfig, test.Genesis.Config)
 	if err != nil {
 		return fmt.Errorf("failed to create call tracer: %v", err)
 	}
 
-	state.StateDB.SetLogger(tracer.Hooks)
 	msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
 	if err != nil {
 		return fmt.Errorf("failed to prepare transaction for tracing: %v", err)
@@ -120,16 +119,16 @@ func flatCallTracerTestRunner(tracerName string, filename string, dirPath string
 		t.Logf("test %s failed", filename)
 
 		// uncomment this for easier debugging
-		// have, _ := json.MarshalIndent(ret, "", " ")
-		// want, _ := json.MarshalIndent(test.Result, "", " ")
-		// t.Logf("trace mismatch: \nhave %+v\nwant %+v", string(have), string(want))
+		have, _ := json.MarshalIndent(ret, "", " ")
+		want, _ := json.MarshalIndent(test.Result, "", " ")
+		t.Logf("trace mismatch: \nhave %+v\nwant %+v", string(have), string(want))
 
 		// uncomment this for harder debugging <3 meowsbits
-		// lines := deep.Equal(ret, test.Result)
-		// for _, l := range lines {
-		// 	t.Logf("%s", l)
-		// 	t.FailNow()
-		// }
+		//lines := deep.Equal(ret, test.Result)
+		//for _, l := range lines {
+		//	t.Logf("%s", l)
+		//	t.FailNow()
+		//}
 
 		t.Fatalf("trace mismatch: \nhave %+v\nwant %+v", ret, test.Result)
 	}
@@ -151,7 +150,6 @@ func testFlatCallTracer(tracerName string, dirPath string, t *testing.T) {
 		if !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
-		file := file // capture range variable
 		t.Run(camel(strings.TrimSuffix(file.Name(), ".json")), func(t *testing.T) {
 			t.Parallel()
 

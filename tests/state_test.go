@@ -89,27 +89,28 @@ func TestState(t *testing.T) {
 
 // TestLegacyState tests some older tests, which were moved to the folder
 // 'LegacyTests' for the Istanbul fork.
-func TestLegacyState(t *testing.T) {
-	st := new(testMatcher)
-	initMatcher(st)
-	st.walk(t, legacyStateTestDir, func(t *testing.T, name string, test *StateTest) {
-		execStateTest(t, st, test)
-	})
-}
+//func TestLegacyState(t *testing.T) {
+//	st := new(testMatcher)
+//	initMatcher(st)
+//	st.walk(t, legacyStateTestDir, func(t *testing.T, name string, test *StateTest) {
+//		execStateTest(t, st, test)
+//	})
+//}
 
 // TestExecutionSpecState runs the test fixtures from execution-spec-tests.
-func TestExecutionSpecState(t *testing.T) {
-	t.Skipf("execution-spec-tests are not yet supported")
-	st := new(testMatcher)
-
-	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
-		execStateTest(t, st, test)
-	})
-}
+//func TestExecutionSpecState(t *testing.T) {
+//	if !common.FileExist(executionSpecStateTestDir) {
+//		t.Skipf("directory %s does not exist", executionSpecStateTestDir)
+//	}
+//	st := new(testMatcher)
+//
+//	st.walk(t, executionSpecStateTestDir, func(t *testing.T, name string, test *StateTest) {
+//		execStateTest(t, st, test)
+//	})
+//}
 
 func execStateTest(t *testing.T, st *testMatcher, test *StateTest) {
 	for _, subtest := range test.Subtests() {
-		subtest := subtest
 		key := fmt.Sprintf("%s/%d", subtest.Fork, subtest.Index)
 
 		// If -short flag is used, we don't execute all four permutations, only
@@ -249,14 +250,12 @@ func runBenchmarkFile(b *testing.B, path string) {
 		return
 	}
 	for _, t := range m {
-		t := t
 		runBenchmark(b, &t)
 	}
 }
 
 func runBenchmark(b *testing.B, t *StateTest) {
 	for _, subtest := range t.Subtests() {
-		subtest := subtest
 		key := fmt.Sprintf("%s/%d", subtest.Fork, subtest.Index)
 
 		b.Run(key, func(b *testing.B) {

@@ -17,7 +17,12 @@
 package miner
 
 import (
-	"github.com/ethereum/go-ethereum/accounts"
+	"fmt"
+	"math/big"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -32,10 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
-	"reflect"
-	"testing"
-	"time"
 )
 
 var (
@@ -107,20 +108,18 @@ type testWorkerBackend struct {
 func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, db ethdb.Database, n int) *testWorkerBackend {
 	var gspec = &core.Genesis{
 		Config: chainConfig,
-		Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+		Alloc:  types.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 	}
 	switch e := engine.(type) {
 	case *clique.Clique:
 		gspec.ExtraData = make([]byte, 32+common.AddressLength+crypto.SignatureLength)
 		copy(gspec.ExtraData[32:32+common.AddressLength], testBankAddress.Bytes())
-		e.Authorize(testBankAddress, func(account accounts.Account, s string, data []byte) ([]byte, error) {
-			return crypto.Sign(crypto.Keccak256(data), testBankKey)
-		})
+		e.Authorize(testBankAddress)
 	case *ethash.Ethash:
 	default:
 		t.Fatalf("unexpected consensus engine type: %T", engine)
 	}
-	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieDirtyDisabled: true}, gspec, nil, engine, vm.Config{}, nil, nil)
+	chain, err := core.NewBlockChain(db, &core.CacheConfig{TrieDirtyDisabled: true}, gspec, nil, engine, vm.Config{}, nil)
 	if err != nil {
 		t.Fatalf("core.NewBlockChain failed: %v", err)
 	}
@@ -216,7 +215,7 @@ func TestBuildPayloadNotEnoughGas(t *testing.T) {
 		FeeRecipient: recipient,
 	}
 
-	payload, err := w.buildPayload(args)
+	payload, err := w.buildPayload(args, false)
 	if err != nil {
 		t.Fatalf("Failed to build payload %v", err)
 	}
@@ -302,7 +301,7 @@ func TestBuildPayloadTimeout(t *testing.T) {
 		FeeRecipient: recipient,
 	}
 
-	payload, err := w.buildPayload(args)
+	payload, err := w.buildPayload(args, false)
 	if err != nil {
 		t.Fatalf("Failed to build payload %v", err)
 	}
@@ -354,6 +353,9 @@ func TestBuildPayload(t *testing.T) {
 			t.Fatal("Unexpected fee recipient")
 		}
 		if len(payload.Transactions) != txs {
+			fmt.Printf("payload txs len is %d\n", len(payload.Transactions))
+			fmt.Printf("actual txs len is %d\n", txs)
+
 			t.Fatal("Unexpected transaction set")
 		}
 	}
@@ -466,7 +468,7 @@ func TestBuildPayload(t *testing.T) {
 				FeeRecipient: recipient,
 			}
 
-			payload, err := w.buildPayload(args)
+			payload, err := w.buildPayload(args, false)
 			if err != nil {
 				t.Fatalf("Failed to build payload %v", err)
 			}

@@ -273,44 +273,44 @@ var bindTests = []struct {
 		[]string{`6060604052604051610328380380610328833981016040528051018060006000509080519060200190828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10608d57805160ff19168380011785555b50607c9291505b8082111560ba57838155600101606b565b50505061026a806100be6000396000f35b828001600101855582156064579182015b828111156064578251826000505591602001919060010190609e565b509056606060405260e060020a60003504630d86a0e181146100315780636874e8091461008d578063d736c513146100ea575b005b610190600180546020600282841615610100026000190190921691909104601f810182900490910260809081016040526060828152929190828280156102295780601f106101fe57610100808354040283529160200191610229565b61019060008054602060026001831615610100026000190190921691909104601f810182900490910260809081016040526060828152929190828280156102295780601f106101fe57610100808354040283529160200191610229565b60206004803580820135601f81018490049093026080908101604052606084815261002f946024939192918401918190838280828437509496505050505050508060016000509080519060200190828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061023157805160ff19168380011785555b506102619291505b808211156102665760008155830161017d565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600f02600301f150905090810190601f1680156101f05780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b820191906000526020600020905b81548152906001019060200180831161020c57829003601f168201915b505050505081565b82800160010185558215610175579182015b82811115610175578251826000505591602001919060010190610243565b505050565b509056`},
 		[]string{`[{"constant":true,"inputs":[],"name":"transactString","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":true,"inputs":[],"name":"deployString","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":false,"inputs":[{"name":"str","type":"string"}],"name":"transact","outputs":[],"type":"function"},{"inputs":[{"name":"str","type":"string"}],"type":"constructor"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy an interaction tester contract and call a transaction on it
-				_, _, interactor, err := DeployInteractor(auth, sim, "Deploy string")
-				if err != nil {
-					t.Fatalf("Failed to deploy interactor contract: %v", err)
-				}
-				sim.Commit()
-				if _, err := interactor.Transact(auth, "Transact string"); err != nil {
-					t.Fatalf("Failed to transact with interactor contract: %v", err)
-				}
-				// Commit all pending transactions in the simulator and check the contract state
-				sim.Commit()
-	
-				if str, err := interactor.DeployString(nil); err != nil {
-					t.Fatalf("Failed to retrieve deploy string: %v", err)
-				} else if str != "Deploy string" {
-					t.Fatalf("Deploy string mismatch: have '%s', want 'Deploy string'", str)
-				}
-				if str, err := interactor.TransactString(nil); err != nil {
-					t.Fatalf("Failed to retrieve transact string: %v", err)
-				} else if str != "Transact string" {
-					t.Fatalf("Transact string mismatch: have '%s', want 'Transact string'", str)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy an interaction tester contract and call a transaction on it
+			_, _, interactor, err := DeployInteractor(auth, sim, "Deploy string")
+			if err != nil {
+				t.Fatalf("Failed to deploy interactor contract: %v", err)
+			}
+			sim.Commit()
+			if _, err := interactor.Transact(auth, "Transact string"); err != nil {
+				t.Fatalf("Failed to transact with interactor contract: %v", err)
+			}
+			// Commit all pending transactions in the simulator and check the contract state
+			sim.Commit()
+
+			if str, err := interactor.DeployString(nil); err != nil {
+				t.Fatalf("Failed to retrieve deploy string: %v", err)
+			} else if str != "Deploy string" {
+				t.Fatalf("Deploy string mismatch: have '%s', want 'Deploy string'", str)
+			}
+			if str, err := interactor.TransactString(nil); err != nil {
+				t.Fatalf("Failed to retrieve transact string: %v", err)
+			} else if str != "Transact string" {
+				t.Fatalf("Transact string mismatch: have '%s', want 'Transact string'", str)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -329,34 +329,34 @@ var bindTests = []struct {
 		[]string{`606060405260dc8060106000396000f3606060405260e060020a6000350463993a04b78114601a575b005b600060605260c0604052600260809081527f486900000000000000000000000000000000000000000000000000000000000060a05260017fc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a47060e0829052610100819052606060c0908152600261012081905281906101409060a09080838184600060046012f1505081517fffff000000000000000000000000000000000000000000000000000000000000169091525050604051610160819003945092505050f3`},
 		[]string{`[{"constant":true,"inputs":[],"name":"getter","outputs":[{"name":"","type":"string"},{"name":"","type":"int256"},{"name":"","type":"bytes32"}],"type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a tuple tester contract and execute a structured call on it
-				_, _, getter, err := DeployGetter(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy getter contract: %v", err)
-				}
-				sim.Commit()
-	
-				if str, num, _, err := getter.Getter(nil); err != nil {
-					t.Fatalf("Failed to call anonymous field retriever: %v", err)
-				} else if str != "Hi" || num.Cmp(big.NewInt(1)) != 0 {
-					t.Fatalf("Retrieved value mismatch: have %v/%v, want %v/%v", str, num, "Hi", 1)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a tuple tester contract and execute a structured call on it
+			_, _, getter, err := DeployGetter(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy getter contract: %v", err)
+			}
+			sim.Commit()
+
+			if str, num, _, err := getter.Getter(nil); err != nil {
+				t.Fatalf("Failed to call anonymous field retriever: %v", err)
+			} else if str != "Hi" || num.Cmp(big.NewInt(1)) != 0 {
+				t.Fatalf("Retrieved value mismatch: have %v/%v, want %v/%v", str, num, "Hi", 1)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -375,34 +375,34 @@ var bindTests = []struct {
 		[]string{`606060405260dc8060106000396000f3606060405260e060020a60003504633175aae28114601a575b005b600060605260c0604052600260809081527f486900000000000000000000000000000000000000000000000000000000000060a05260017fc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a47060e0829052610100819052606060c0908152600261012081905281906101409060a09080838184600060046012f1505081517fffff000000000000000000000000000000000000000000000000000000000000169091525050604051610160819003945092505050f3`},
 		[]string{`[{"constant":true,"inputs":[],"name":"tuple","outputs":[{"name":"a","type":"string"},{"name":"b","type":"int256"},{"name":"c","type":"bytes32"}],"type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a tuple tester contract and execute a structured call on it
-				_, _, tupler, err := DeployTupler(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy tupler contract: %v", err)
-				}
-				sim.Commit()
-	
-				if res, err := tupler.Tuple(nil); err != nil {
-					t.Fatalf("Failed to call structure retriever: %v", err)
-				} else if res.A != "Hi" || res.B.Cmp(big.NewInt(1)) != 0 {
-					t.Fatalf("Retrieved value mismatch: have %v/%v, want %v/%v", res.A, res.B, "Hi", 1)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a tuple tester contract and execute a structured call on it
+			_, _, tupler, err := DeployTupler(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy tupler contract: %v", err)
+			}
+			sim.Commit()
+
+			if res, err := tupler.Tuple(nil); err != nil {
+				t.Fatalf("Failed to call structure retriever: %v", err)
+			} else if res.A != "Hi" || res.B.Cmp(big.NewInt(1)) != 0 {
+				t.Fatalf("Retrieved value mismatch: have %v/%v, want %v/%v", res.A, res.B, "Hi", 1)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -431,36 +431,36 @@ var bindTests = []struct {
 		[]string{`606060405261015c806100126000396000f3606060405260e060020a6000350463be1127a3811461003c578063d88becc014610092578063e15a3db71461003c578063f637e5891461003c575b005b604080516020600480358082013583810285810185019096528085526100ee959294602494909392850192829185019084908082843750949650505050505050604080516020810190915260009052805b919050565b604080516102e0818101909252610138916004916102e491839060179083908390808284375090955050505050506102e0604051908101604052806017905b60008152602001906001900390816100d15790505081905061008d565b60405180806020018281038252838181518152602001915080519060200190602002808383829060006004602084601f0104600f02600301f1509050019250505060405180910390f35b60405180826102e0808381846000600461015cf15090500191505060405180910390f3`},
 		[]string{`[{"constant":true,"inputs":[{"name":"input","type":"address[]"}],"name":"echoAddresses","outputs":[{"name":"output","type":"address[]"}],"type":"function"},{"constant":true,"inputs":[{"name":"input","type":"uint24[23]"}],"name":"echoFancyInts","outputs":[{"name":"output","type":"uint24[23]"}],"type":"function"},{"constant":true,"inputs":[{"name":"input","type":"int256[]"}],"name":"echoInts","outputs":[{"name":"output","type":"int256[]"}],"type":"function"},{"constant":true,"inputs":[{"name":"input","type":"bool[]"}],"name":"echoBools","outputs":[{"name":"output","type":"bool[]"}],"type":"function"}]`},
 		`
-				"math/big"
-				"reflect"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/common"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+			"reflect"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/common"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a slice tester contract and execute a n array call on it
-				_, _, slicer, err := DeploySlicer(auth, sim)
-				if err != nil {
-						t.Fatalf("Failed to deploy slicer contract: %v", err)
-				}
-				sim.Commit()
-	
-				if out, err := slicer.EchoAddresses(nil, []common.Address{auth.From, common.Address{}}); err != nil {
-						t.Fatalf("Failed to call slice echoer: %v", err)
-				} else if !reflect.DeepEqual(out, []common.Address{auth.From, common.Address{}}) {
-						t.Fatalf("Slice return mismatch: have %v, want %v", out, []common.Address{auth.From, common.Address{}})
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a slice tester contract and execute a n array call on it
+			_, _, slicer, err := DeploySlicer(auth, sim)
+			if err != nil {
+					t.Fatalf("Failed to deploy slicer contract: %v", err)
+			}
+			sim.Commit()
+
+			if out, err := slicer.EchoAddresses(nil, []common.Address{auth.From, common.Address{}}); err != nil {
+					t.Fatalf("Failed to call slice echoer: %v", err)
+			} else if !reflect.DeepEqual(out, []common.Address{auth.From, common.Address{}}) {
+					t.Fatalf("Slice return mismatch: have %v, want %v", out, []common.Address{auth.From, common.Address{}})
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -481,38 +481,38 @@ var bindTests = []struct {
 		[]string{`6060604052606a8060106000396000f360606040523615601d5760e060020a6000350463fc9c8d3981146040575b605e6000805473ffffffffffffffffffffffffffffffffffffffff191633179055565b606060005473ffffffffffffffffffffffffffffffffffffffff1681565b005b6060908152602090f3`},
 		[]string{`[{"constant":true,"inputs":[],"name":"caller","outputs":[{"name":"","type":"address"}],"type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a default method invoker contract and execute its default method
-				_, _, defaulter, err := DeployDefaulter(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy defaulter contract: %v", err)
-				}
-				sim.Commit()
-				if _, err := (&DefaulterRaw{defaulter}).Transfer(auth); err != nil {
-					t.Fatalf("Failed to invoke default method: %v", err)
-				}
-				sim.Commit()
-	
-				if caller, err := defaulter.Caller(nil); err != nil {
-					t.Fatalf("Failed to call address retriever: %v", err)
-				} else if (caller != auth.From) {
-					t.Fatalf("Address mismatch: have %v, want %v", caller, auth.From)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a default method invoker contract and execute its default method
+			_, _, defaulter, err := DeployDefaulter(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy defaulter contract: %v", err)
+			}
+			sim.Commit()
+			if _, err := (&DefaulterRaw{defaulter}).Transfer(auth); err != nil {
+				t.Fatalf("Failed to invoke default method: %v", err)
+			}
+			sim.Commit()
+
+			if caller, err := defaulter.Caller(nil); err != nil {
+				t.Fatalf("Failed to call address retriever: %v", err)
+			} else if (caller != auth.From) {
+				t.Fatalf("Address mismatch: have %v, want %v", caller, auth.From)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -548,35 +548,35 @@ var bindTests = []struct {
 		[]string{`608060405234801561001057600080fd5b50610278806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806328811f591461003b5780636fecb6231461005b575b600080fd5b610043610070565b604051610052939291906101a0565b60405180910390f35b6100636100d6565b6040516100529190610186565b604080516002808252606082810190935282918291829190816020015b610095610131565b81526020019060019003908161008d575050805190915061026960611b9082906000906100be57fe5b60209081029190910101515293606093508392509050565b6040805160028082526060828101909352829190816020015b6100f7610131565b8152602001906001900390816100ef575050805190915061026960611b90829060009061012057fe5b602090810291909101015152905090565b60408051602081019091526000815290565b815260200190565b6000815180845260208085019450808401835b8381101561017b578151518752958201959082019060010161015e565b509495945050505050565b600060208252610199602083018461014b565b9392505050565b6000606082526101b3606083018661014b565b6020838203818501528186516101c98185610239565b91508288019350845b818110156101f3576101e5838651610143565b9484019492506001016101d2565b505084810360408601528551808252908201925081860190845b8181101561022b57825115158552938301939183019160010161020d565b509298975050505050505050565b9081526020019056fea2646970667358221220eb85327e285def14230424c52893aebecec1e387a50bb6b75fc4fdbed647f45f64736f6c63430006050033`},
 		[]string{`[{"inputs":[],"name":"F","outputs":[{"components":[{"internalType":"bytes32","name":"B","type":"bytes32"}],"internalType":"structStructs.A[]","name":"a","type":"tuple[]"},{"internalType":"uint256[]","name":"c","type":"uint256[]"},{"internalType":"bool[]","name":"d","type":"bool[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"G","outputs":[{"components":[{"internalType":"bytes32","name":"B","type":"bytes32"}],"internalType":"structStructs.A[]","name":"a","type":"tuple[]"}],"stateMutability":"view","type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a structs method invoker contract and execute its default method
-				_, _, structs, err := DeployStructs(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy defaulter contract: %v", err)
-				}
-				sim.Commit()
-				opts := bind.CallOpts{}
-				if _, err := structs.F(&opts); err != nil {
-					t.Fatalf("Failed to invoke F method: %v", err)
-				}
-				if _, err := structs.G(&opts); err != nil {
-					t.Fatalf("Failed to invoke G method: %v", err)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+		
+			// Deploy a structs method invoker contract and execute its default method
+			_, _, structs, err := DeployStructs(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy defaulter contract: %v", err)
+			}
+			sim.Commit()
+			opts := bind.CallOpts{}
+			if _, err := structs.F(&opts); err != nil {
+				t.Fatalf("Failed to invoke F method: %v", err)
+			}
+			if _, err := structs.G(&opts); err != nil {
+				t.Fatalf("Failed to invoke G method: %v", err)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -595,28 +595,28 @@ var bindTests = []struct {
 		[]string{`6060604052609f8060106000396000f3606060405260e060020a6000350463f97a60058114601a575b005b600060605260c0604052600d60809081527f4920646f6e27742065786973740000000000000000000000000000000000000060a052602060c0908152600d60e081905281906101009060a09080838184600060046012f15050815172ffffffffffffffffffffffffffffffffffffff1916909152505060405161012081900392509050f3`},
 		[]string{`[{"constant":true,"inputs":[],"name":"String","outputs":[{"name":"","type":"string"}],"type":"function"}]`},
 		`
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/common"
-				"github.com/ethereum/go-ethereum/core/types"
-			`,
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/common"
+			"github.com/ethereum/go-ethereum/core/types"
+		`,
 		`
-				// Create a simulator and wrap a non-deployed contract
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{}, uint64(10000000000))
-				defer sim.Close()
-	
-				nonexistent, err := NewNonExistent(common.Address{}, sim)
-				if err != nil {
-					t.Fatalf("Failed to access non-existent contract: %v", err)
-				}
-				// Ensure that contract calls fail with the appropriate error
-				if res, err := nonexistent.String(nil); err == nil {
-					t.Fatalf("Call succeeded on non-existent contract: %v", res)
-				} else if (err != bind.ErrNoCode) {
-					t.Fatalf("Error mismatch: have %v, want %v", err, bind.ErrNoCode)
-				}
-			`,
+			// Create a simulator and wrap a non-deployed contract
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{}, uint64(10000000000))
+			defer sim.Close()
+
+			nonexistent, err := NewNonExistent(common.Address{}, sim)
+			if err != nil {
+				t.Fatalf("Failed to access non-existent contract: %v", err)
+			}
+			// Ensure that contract calls fail with the appropriate error
+			if res, err := nonexistent.String(nil); err == nil {
+				t.Fatalf("Call succeeded on non-existent contract: %v", res)
+			} else if (err != bind.ErrNoCode) {
+				t.Fatalf("Error mismatch: have %v, want %v", err, bind.ErrNoCode)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -634,28 +634,28 @@ var bindTests = []struct {
 		[]string{`6080604052348015600f57600080fd5b5060888061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063d5f6622514602d575b600080fd5b6033604c565b6040805192835260208301919091528051918290030190f35b600a809156fea264697066735822beefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef64736f6c6343decafe0033`},
 		[]string{`[{"inputs":[],"name":"Struct","outputs":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256","name":"b","type":"uint256"}],"stateMutability":"pure","type":"function"}]`},
 		`
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/common"
-				"github.com/ethereum/go-ethereum/core/types"
-			`,
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/common"
+			"github.com/ethereum/go-ethereum/core/types"
+		`,
 		`
-				// Create a simulator and wrap a non-deployed contract
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{}, uint64(10000000000))
-				defer sim.Close()
-	
-				nonexistent, err := NewNonExistentStruct(common.Address{}, sim)
-				if err != nil {
-					t.Fatalf("Failed to access non-existent contract: %v", err)
-				}
-				// Ensure that contract calls fail with the appropriate error
-				if res, err := nonexistent.Struct(nil); err == nil {
-					t.Fatalf("Call succeeded on non-existent contract: %v", res)
-				} else if (err != bind.ErrNoCode) {
-					t.Fatalf("Error mismatch: have %v, want %v", err, bind.ErrNoCode)
-				}
-			`,
+			// Create a simulator and wrap a non-deployed contract
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{}, uint64(10000000000))
+			defer sim.Close()
+
+			nonexistent, err := NewNonExistentStruct(common.Address{}, sim)
+			if err != nil {
+				t.Fatalf("Failed to access non-existent contract: %v", err)
+			}
+			// Ensure that contract calls fail with the appropriate error
+			if res, err := nonexistent.Struct(nil); err == nil {
+				t.Fatalf("Call succeeded on non-existent contract: %v", res)
+			} else if (err != bind.ErrNoCode) {
+				t.Fatalf("Error mismatch: have %v, want %v", err, bind.ErrNoCode)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -680,38 +680,38 @@ var bindTests = []struct {
 		[]string{`606060405261021c806100126000396000f3606060405260e060020a600035046323fcf32a81146100265780634f28bf0e1461007b575b005b6040805160206004803580820135601f8101849004840285018401909552848452610024949193602493909291840191908190840183828082843750949650505050505050620186a05a101561014e57610002565b6100db60008054604080516020601f600260001961010060018816150201909516949094049384018190048102820181019092528281529291908301828280156102145780601f106101e957610100808354040283529160200191610214565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f16801561013b5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b505050565b8060006000509080519060200190828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106101b557805160ff19168380011785555b506101499291505b808211156101e557600081556001016101a1565b82800160010185558215610199579182015b828111156101995782518260005055916020019190600101906101c7565b5090565b820191906000526020600020905b8154815290600101906020018083116101f757829003601f168201915b50505050508156`},
 		[]string{`[{"constant":false,"inputs":[{"name":"value","type":"string"}],"name":"SetField","outputs":[],"type":"function"},{"constant":true,"inputs":[],"name":"field","outputs":[{"name":"","type":"string"}],"type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a funky gas pattern contract
-				_, _, limiter, err := DeployFunkyGasPattern(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy funky contract: %v", err)
-				}
-				sim.Commit()
-	
-				// Set the field with automatic estimation and check that it succeeds
-				if _, err := limiter.SetField(auth, "automatic"); err != nil {
-					t.Fatalf("Failed to call automatically gased transaction: %v", err)
-				}
-				sim.Commit()
-	
-				if field, _ := limiter.Field(nil); field != "automatic" {
-					t.Fatalf("Field mismatch: have %v, want %v", field, "automatic")
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a funky gas pattern contract
+			_, _, limiter, err := DeployFunkyGasPattern(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy funky contract: %v", err)
+			}
+			sim.Commit()
+
+			// Set the field with automatic estimation and check that it succeeds
+			if _, err := limiter.SetField(auth, "automatic"); err != nil {
+				t.Fatalf("Failed to call automatically gased transaction: %v", err)
+			}
+			sim.Commit()
+
+			if field, _ := limiter.Field(nil); field != "automatic" {
+				t.Fatalf("Field mismatch: have %v, want %v", field, "automatic")
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -729,26 +729,40 @@ var bindTests = []struct {
 			`, []string{`6060604052346000575b6086806100176000396000f300606060405263ffffffff60e060020a60003504166349f8e98281146022575b6000565b34600057602c6055565b6040805173ffffffffffffffffffffffffffffffffffffffff9092168252519081900360200190f35b335b905600a165627a7a72305820aef6b7685c0fa24ba6027e4870404a57df701473fe4107741805c19f5138417c0029`},
 		[]string{`[{"constant":true,"inputs":[],"name":"callFrom","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/common"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/common"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a sender tester contract and execute a structured call on it
-				_, _, callfrom, err := DeployCallFrom(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy sender contract: %v", err)
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a sender tester contract and execute a structured call on it
+			_, _, callfrom, err := DeployCallFrom(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy sender contract: %v", err)
+			}
+			sim.Commit()
+
+			if res, err := callfrom.CallFrom(nil); err != nil {
+				t.Errorf("Failed to call constant function: %v", err)
+			} else if res != (common.Address{}) {
+				t.Errorf("Invalid address returned, want: %x, got: %x", (common.Address{}), res)
+			}
+
+			for _, addr := range []common.Address{common.Address{}, common.Address{1}, common.Address{2}} {
+				if res, err := callfrom.CallFrom(&bind.CallOpts{From: addr}); err != nil {
+					t.Fatalf("Failed to call constant function: %v", err)
+				} else if res != addr {
+					t.Fatalf("Invalid address returned, want: %x, got: %x", addr, res)
 				}
 				sim.Commit()
 	
@@ -804,48 +818,48 @@ var bindTests = []struct {
 			`, []string{`6060604052341561000f57600080fd5b6103858061001e6000396000f30060606040526004361061008e576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806303a592131461009357806346546dbe146100c357806367e6633d146100ec5780639df4848514610181578063af7486ab146101b1578063b564b34d146101e1578063e02ab24d14610211578063e409ca4514610241575b600080fd5b341561009e57600080fd5b6100a6610271565b604051808381526020018281526020019250505060405180910390f35b34156100ce57600080fd5b6100d6610286565b6040518082815260200191505060405180910390f35b34156100f757600080fd5b6100ff61028e565b6040518083815260200180602001828103825283818151815260200191508051906020019080838360005b8381101561014557808201518184015260208101905061012a565b50505050905090810190601f1680156101725780820380516001836020036101000a031916815260200191505b50935050505060405180910390f35b341561018c57600080fd5b6101946102dc565b604051808381526020018281526020019250505060405180910390f35b34156101bc57600080fd5b6101c46102f1565b604051808381526020018281526020019250505060405180910390f35b34156101ec57600080fd5b6101f4610306565b604051808381526020018281526020019250505060405180910390f35b341561021c57600080fd5b61022461031b565b604051808381526020018281526020019250505060405180910390f35b341561024c57600080fd5b610254610330565b604051808381526020018281526020019250505060405180910390f35b60008060016002819150809050915091509091565b600080905090565b6000610298610345565b61013a8090506040805190810160405280600281526020017f7069000000000000000000000000000000000000000000000000000000000000815250915091509091565b60008060016002819150809050915091509091565b60008060016002819150809050915091509091565b60008060016002819150809050915091509091565b60008060016002819150809050915091509091565b60008060016002819150809050915091509091565b6020604051908101604052806000815250905600a165627a7a72305820d1a53d9de9d1e3d55cb3dc591900b63c4f1ded79114f7b79b332684840e186a40029`},
 		[]string{`[{"constant":true,"inputs":[],"name":"LowerUpperCollision","outputs":[{"name":"_res","type":"int256"},{"name":"Res","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"_under_scored_func","outputs":[{"name":"_int","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"UnderscoredOutput","outputs":[{"name":"_int","type":"int256"},{"name":"_string","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"PurelyUnderscoredOutput","outputs":[{"name":"_","type":"int256"},{"name":"res","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"UpperLowerCollision","outputs":[{"name":"_Res","type":"int256"},{"name":"res","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"AllPurelyUnderscoredOutput","outputs":[{"name":"_","type":"int256"},{"name":"__","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"UpperUpperCollision","outputs":[{"name":"_Res","type":"int256"},{"name":"Res","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"LowerLowerCollision","outputs":[{"name":"_res","type":"int256"},{"name":"res","type":"int256"}],"payable":false,"stateMutability":"view","type":"function"}]`},
 		`
-				"fmt"
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"fmt"
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a underscorer tester contract and execute a structured call on it
-				_, _, underscorer, err := DeployUnderscorer(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy underscorer contract: %v", err)
-				}
-				sim.Commit()
-	
-				// Verify that underscored return values correctly parse into structs
-				if res, err := underscorer.UnderscoredOutput(nil); err != nil {
-					t.Errorf("Failed to call constant function: %v", err)
-				} else if res.Int.Cmp(big.NewInt(314)) != 0 || res.String != "pi" {
-					t.Errorf("Invalid result, want: {314, \"pi\"}, got: %+v", res)
-				}
-				// Verify that underscored and non-underscored name collisions force tuple outputs
-				var a, b *big.Int
-	
-				a, b, _ = underscorer.LowerLowerCollision(nil)
-				a, b, _ = underscorer.LowerUpperCollision(nil)
-				a, b, _ = underscorer.UpperLowerCollision(nil)
-				a, b, _ = underscorer.UpperUpperCollision(nil)
-				a, b, _ = underscorer.PurelyUnderscoredOutput(nil)
-				a, b, _ = underscorer.AllPurelyUnderscoredOutput(nil)
-				a, _ = underscorer.UnderScoredFunc(nil)
-	
-				fmt.Println(a, b, err)
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a underscorer tester contract and execute a structured call on it
+			_, _, underscorer, err := DeployUnderscorer(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy underscorer contract: %v", err)
+			}
+			sim.Commit()
+
+			// Verify that underscored return values correctly parse into structs
+			if res, err := underscorer.UnderscoredOutput(nil); err != nil {
+				t.Errorf("Failed to call constant function: %v", err)
+			} else if res.Int.Cmp(big.NewInt(314)) != 0 || res.String != "pi" {
+				t.Errorf("Invalid result, want: {314, \"pi\"}, got: %+v", res)
+			}
+			// Verify that underscored and non-underscored name collisions force tuple outputs
+			var a, b *big.Int
+
+			a, b, _ = underscorer.LowerLowerCollision(nil)
+			a, b, _ = underscorer.LowerUpperCollision(nil)
+			a, b, _ = underscorer.UpperLowerCollision(nil)
+			a, b, _ = underscorer.UpperUpperCollision(nil)
+			a, b, _ = underscorer.PurelyUnderscoredOutput(nil)
+			a, b, _ = underscorer.AllPurelyUnderscoredOutput(nil)
+			a, _ = underscorer.UnderScoredFunc(nil)
+
+			fmt.Println(a, b, err)
+		`,
 		nil,
 		nil,
 		nil,
@@ -897,27 +911,36 @@ var bindTests = []struct {
 		[]string{`608060405234801561001057600080fd5b5061043f806100206000396000f3006080604052600436106100615763ffffffff7c0100000000000000000000000000000000000000000000000000000000600035041663528300ff8114610066578063630c31e2146100ff5780636cc6b94014610138578063c7d116dd1461015b575b600080fd5b34801561007257600080fd5b506040805160206004803580820135601f81018490048402850184019095528484526100fd94369492936024939284019190819084018382808284375050604080516020601f89358b018035918201839004830284018301909452808352979a9998810197919650918201945092508291508401838280828437509497506101829650505050505050565b005b34801561010b57600080fd5b506100fd73ffffffffffffffffffffffffffffffffffffffff60043516602435604435151560643561033c565b34801561014457600080fd5b506100fd67ffffffffffffffff1960043516610394565b34801561016757600080fd5b506100fd60043560243560010b63ffffffff604435166103d6565b806040518082805190602001908083835b602083106101b25780518252601f199092019160209182019101610193565b51815160209384036101000a6000190180199092169116179052604051919093018190038120875190955087945090928392508401908083835b6020831061020b5780518252601f1990920191602091820191016101ec565b6001836020036101000a03801982511681845116808217855250505050505090500191505060405180910390207f3281fd4f5e152dd3385df49104a3f633706e21c9e80672e88d3bcddf33101f008484604051808060200180602001838103835285818151815260200191508051906020019080838360005b8381101561029c578181015183820152602001610284565b50505050905090810190601f1680156102c95780820380516001836020036101000a031916815260200191505b50838103825284518152845160209182019186019080838360005b838110156102fc5781810151838201526020016102e4565b50505050905090810190601f1680156103295780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a35050565b60408051828152905183151591859173ffffffffffffffffffffffffffffffffffffffff8816917f1f097de4289df643bd9c11011cc61367aa12983405c021056e706eb5ba1250c8919081900360200190a450505050565b6040805167ffffffffffffffff19831680825291517fcdc4c1b1aed5524ffb4198d7a5839a34712baef5fa06884fac7559f4a5854e0a9181900360200190a250565b8063ffffffff168260010b847f3ca7f3a77e5e6e15e781850bc82e32adfa378a2a609370db24b4d0fae10da2c960405160405180910390a45050505600a165627a7a72305820468b5843bf653145bd924b323c64ef035d3dd922c170644b44d61aa666ea6eee0029`},
 		[]string{`[{"constant":false,"inputs":[{"name":"str","type":"string"},{"name":"blob","type":"bytes"}],"name":"raiseDynamicEvent","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"addr","type":"address"},{"name":"id","type":"bytes32"},{"name":"flag","type":"bool"},{"name":"value","type":"uint256"}],"name":"raiseSimpleEvent","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"blob","type":"bytes24"}],"name":"raiseFixedBytesEvent","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"number","type":"uint256"},{"name":"short","type":"int16"},{"name":"long","type":"uint32"}],"name":"raiseNodataEvent","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"Addr","type":"address"},{"indexed":true,"name":"Id","type":"bytes32"},{"indexed":true,"name":"Flag","type":"bool"},{"indexed":false,"name":"Value","type":"uint256"}],"name":"SimpleEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"Number","type":"uint256"},{"indexed":true,"name":"Short","type":"int16"},{"indexed":true,"name":"Long","type":"uint32"}],"name":"NodataEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"IndexedString","type":"string"},{"indexed":true,"name":"IndexedBytes","type":"bytes"},{"indexed":false,"name":"NonIndexedString","type":"string"},{"indexed":false,"name":"NonIndexedBytes","type":"bytes"}],"name":"DynamicEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"IndexedBytes","type":"bytes24"},{"indexed":false,"name":"NonIndexedBytes","type":"bytes24"}],"name":"FixedBytesEvent","type":"event"}]`},
 		`
-				"math/big"
-				"time"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/common"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+			"time"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/common"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy an eventer contract
-				_, _, eventer, err := DeployEventer(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy eventer contract: %v", err)
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy an eventer contract
+			_, _, eventer, err := DeployEventer(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy eventer contract: %v", err)
+			}
+			sim.Commit()
+
+			// Inject a few events into the contract, gradually more in each block
+			for i := 1; i <= 3; i++ {
+				for j := 1; j <= i; j++ {
+					if _, err := eventer.RaiseSimpleEvent(auth, common.Address{byte(j)}, [32]byte{byte(j)}, true, big.NewInt(int64(10*i+j))); err != nil {
+						t.Fatalf("block %d, event %d: raise failed: %v", i, j, err)
+					}
 				}
 				sim.Commit()
 	
@@ -1089,40 +1112,39 @@ var bindTests = []struct {
 		[]string{`6060604052341561000f57600080fd5b6106438061001e6000396000f300606060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063344248551461005c5780638ed4573a1461011457806398ed1856146101ab575b600080fd5b341561006757600080fd5b610112600480806107800190600580602002604051908101604052809291906000905b828210156101055783826101800201600480602002604051908101604052809291906000905b828210156100f25783826060020160038060200260405190810160405280929190826003602002808284378201915050505050815260200190600101906100b0565b505050508152602001906001019061008a565b5050505091905050610208565b005b341561011f57600080fd5b61012761021d565b604051808260056000925b8184101561019b578284602002015160046000925b8184101561018d5782846020020151600360200280838360005b8381101561017c578082015181840152602081019050610161565b505050509050019260010192610147565b925050509260010192610132565b9250505091505060405180910390f35b34156101b657600080fd5b6101de6004808035906020019091908035906020019091908035906020019091905050610309565b604051808267ffffffffffffffff1667ffffffffffffffff16815260200191505060405180910390f35b80600090600561021992919061035f565b5050565b6102256103b0565b6000600580602002604051908101604052809291906000905b8282101561030057838260040201600480602002604051908101604052809291906000905b828210156102ed578382016003806020026040519081016040528092919082600380156102d9576020028201916000905b82829054906101000a900467ffffffffffffffff1667ffffffffffffffff16815260200190600801906020826007010492830192600103820291508084116102945790505b505050505081526020019060010190610263565b505050508152602001906001019061023e565b50505050905090565b60008360058110151561031857fe5b600402018260048110151561032957fe5b018160038110151561033757fe5b6004918282040191900660080292509250509054906101000a900467ffffffffffffffff1681565b826005600402810192821561039f579160200282015b8281111561039e5782518290600461038e9291906103df565b5091602001919060040190610375565b5b5090506103ac919061042d565b5090565b610780604051908101604052806005905b6103c9610459565b8152602001906001900390816103c15790505090565b826004810192821561041c579160200282015b8281111561041b5782518290600361040b929190610488565b50916020019190600101906103f2565b5b5090506104299190610536565b5090565b61045691905b8082111561045257600081816104499190610562565b50600401610433565b5090565b90565b610180604051908101604052806004905b6104726105a7565b81526020019060019003908161046a5790505090565b82600380016004900481019282156105255791602002820160005b838211156104ef57835183826101000a81548167ffffffffffffffff021916908367ffffffffffffffff16021790555092602001926008016020816007010492830192600103026104a3565b80156105235782816101000a81549067ffffffffffffffff02191690556008016020816007010492830192600103026104ef565b505b50905061053291906105d9565b5090565b61055f91905b8082111561055b57600081816105529190610610565b5060010161053c565b5090565b90565b50600081816105719190610610565b50600101600081816105839190610610565b50600101600081816105959190610610565b5060010160006105a59190610610565b565b6060604051908101604052806003905b600067ffffffffffffffff168152602001906001900390816105b75790505090565b61060d91905b8082111561060957600081816101000a81549067ffffffffffffffff0219169055506001016105df565b5090565b90565b50600090555600a165627a7a7230582087e5a43f6965ab6ef7a4ff056ab80ed78fd8c15cff57715a1bf34ec76a93661c0029`},
 		[]string{`[{"constant":false,"inputs":[{"name":"arr","type":"uint64[3][4][5]"}],"name":"storeDeepUintArray","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"retrieveDeepArray","outputs":[{"name":"","type":"uint64[3][4][5]"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"}],"name":"deepUint64Array","outputs":[{"name":"","type":"uint64"}],"payable":false,"stateMutability":"view","type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				//deploy the test contract
-				_, _, testContract, err := DeployDeeplyNestedArray(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy test contract: %v", err)
-				}
-	
-				// Finish deploy.
-				sim.Commit()
-	
-				//Create coordinate-filled array, for testing purposes.
-				testArr := [5][4][3]uint64{}
-				for i := 0; i < 5; i++ {
-					testArr[i] = [4][3]uint64{}
-					for j := 0; j < 4; j++ {
-						testArr[i][j] = [3]uint64{}
-						for k := 0; k < 3; k++ {
-							//pack the coordinates, each array value will be unique, and can be validated easily.
-							testArr[i][j][k] = uint64(i) << 16 | uint64(j) << 8 | uint64(k)
-						}
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			//deploy the test contract
+			_, _, testContract, err := DeployDeeplyNestedArray(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy test contract: %v", err)
+			}
+
+			// Finish deploy.
+			sim.Commit()
+
+			//Create coordinate-filled array, for testing purposes.
+			testArr := [5][4][3]uint64{}
+			for i := 0; i < 5; i++ {
+				testArr[i] = [4][3]uint64{}
+				for j := 0; j < 4; j++ {
+					testArr[i][j] = [3]uint64{}
+					for k := 0; k < 3; k++ {
+						//pack the coordinates, each array value will be unique, and can be validated easily.
+						testArr[i][j][k] = uint64(i) << 16 | uint64(j) << 8 | uint64(k)
 					}
 				}
 	
@@ -1223,25 +1245,31 @@ var bindTests = []struct {
 	[{"anonymous":false,"inputs":[{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"indexed":false,"internalType":"struct Tuple.S","name":"a","type":"tuple"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"indexed":false,"internalType":"struct Tuple.T[2][]","name":"b","type":"tuple[2][]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"indexed":false,"internalType":"struct Tuple.T[][2]","name":"c","type":"tuple[][2]"},{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"indexed":false,"internalType":"struct Tuple.S[]","name":"d","type":"tuple[]"},{"indexed":false,"internalType":"uint256[]","name":"e","type":"uint256[]"}],"name":"TupleEvent","type":"event"},{"anonymous":false,"inputs":[{"components":[{"internalType":"uint8","name":"x","type":"uint8"},{"internalType":"uint8","name":"y","type":"uint8"}],"indexed":false,"internalType":"struct Tuple.P[]","name":"","type":"tuple[]"}],"name":"TupleEvent2","type":"event"},{"constant":true,"inputs":[{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S","name":"a","type":"tuple"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[2][]","name":"b","type":"tuple[2][]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[][2]","name":"c","type":"tuple[][2]"},{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S[]","name":"d","type":"tuple[]"},{"internalType":"uint256[]","name":"e","type":"uint256[]"}],"name":"func1","outputs":[{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S","name":"","type":"tuple"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[2][]","name":"","type":"tuple[2][]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[][2]","name":"","type":"tuple[][2]"},{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S[]","name":"","type":"tuple[]"},{"internalType":"uint256[]","name":"","type":"uint256[]"}],"payable":false,"stateMutability":"pure","type":"function"},{"constant":false,"inputs":[{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S","name":"a","type":"tuple"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[2][]","name":"b","type":"tuple[2][]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[][2]","name":"c","type":"tuple[][2]"},{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256[]","name":"b","type":"uint256[]"},{"components":[{"internalType":"uint256","name":"x","type":"uint256"},{"internalType":"uint256","name":"y","type":"uint256"}],"internalType":"struct Tuple.T[]","name":"c","type":"tuple[]"}],"internalType":"struct Tuple.S[]","name":"d","type":"tuple[]"},{"internalType":"uint256[]","name":"e","type":"uint256[]"}],"name":"func2","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"components":[{"internalType":"uint16","name":"x","type":"uint16"},{"internalType":"uint16","name":"y","type":"uint16"}],"internalType":"struct Tuple.Q[]","name":"","type":"tuple[]"}],"name":"func3","outputs":[],"payable":false,"stateMutability":"pure","type":"function"}]
 			`},
 		`
-				"math/big"
-				"reflect"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+			"reflect"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 
 		`
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				_, _, contract, err := DeployTuple(auth, sim)
-				if err != nil {
-					t.Fatalf("deploy contract failed %v", err)
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			_, _, contract, err := DeployTuple(auth, sim)
+			if err != nil {
+				t.Fatalf("deploy contract failed %v", err)
+			}
+			sim.Commit()
+
+			check := func(a, b interface{}, errMsg string) {
+				if !reflect.DeepEqual(a, b) {
+					t.Fatal(errMsg)
 				}
 				sim.Commit()
 	
@@ -1366,43 +1394,43 @@ var bindTests = []struct {
 			`[{"constant":true,"inputs":[{"name":"a","type":"uint256"},{"name":"b","type":"uint256"}],"name":"add","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]`,
 		},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				//deploy the test contract
-				_, _, testContract, err := DeployUseLibrary(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy test contract: %v", err)
-				}
-	
-				// Finish deploy.
-				sim.Commit()
-	
-				// Check that the library contract has been deployed
-				// by calling the contract's add function.
-				res, err := testContract.Add(&bind.CallOpts{
-					From: auth.From,
-					Pending: false,
-				}, big.NewInt(1), big.NewInt(2))
-				if err != nil {
-					t.Fatalf("Failed to call linked contract: %v", err)
-				}
-				if res.Cmp(big.NewInt(3)) != 0 {
-					t.Fatalf("Add did not return the correct result: %d != %d", res, 3)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			//deploy the test contract
+			_, _, testContract, err := DeployUseLibrary(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy test contract: %v", err)
+			}
+
+			// Finish deploy.
+			sim.Commit()
+
+			// Check that the library contract has been deployed
+			// by calling the contract's add function.
+			res, err := testContract.Add(&bind.CallOpts{
+				From: auth.From,
+				Pending: false,
+			}, big.NewInt(1), big.NewInt(2))
+			if err != nil {
+				t.Fatalf("Failed to call linked contract: %v", err)
+			}
+			if res.Cmp(big.NewInt(3)) != 0 {
+				t.Fatalf("Add did not return the correct result: %d != %d", res, 3)
+			}
+		`,
 		nil,
 		map[string]string{
 			"b98c933f0a6ececcd167bd4f9d3299b1a0": "Math",
@@ -1431,49 +1459,48 @@ var bindTests = []struct {
 		[]string{`608060405234801561001057600080fd5b50610153806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806304bc52f81461003b5780632fbebd3814610073575b600080fd5b6100716004803603604081101561005157600080fd5b8101908080359060200190929190803590602001909291905050506100a1565b005b61009f6004803603602081101561008957600080fd5b81019080803590602001909291905050506100e4565b005b7fae42e9514233792a47a1e4554624e83fe852228e1503f63cd383e8a431f4f46d8282604051808381526020018281526020019250505060405180910390a15050565b7f0423a1321222a0a8716c22b92fac42d85a45a612b696a461784d9fa537c81e5c816040518082815260200191505060405180910390a15056fea265627a7a72305820e22b049858b33291cbe67eeaece0c5f64333e439d27032ea8337d08b1de18fe864736f6c634300050a0032`},
 		[]string{`[{"constant":false,"inputs":[{"name":"i","type":"uint256"},{"name":"j","type":"uint256"}],"name":"foo","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"i","type":"uint256"}],"name":"foo","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"anonymous":false,"inputs":[{"indexed":false,"name":"i","type":"uint256"}],"name":"bar","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"i","type":"uint256"},{"indexed":false,"name":"j","type":"uint256"}],"name":"bar","type":"event"}]`},
 		`
-			"math/big"
-			"time"
-	
-			"github.com/ethereum/go-ethereum/accounts/abi/bind"
-			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/core/types"
-			"github.com/ethereum/go-ethereum/crypto"
-			`,
+		"math/big"
+		"time"
+
+		"github.com/ethereum/go-ethereum/accounts/abi/bind"
+		"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+		"github.com/ethereum/go-ethereum/core/types"
+		"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-			// Initialize test accounts
-			key, _ := crypto.GenerateKey()
-			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-			defer sim.Close()
-	
-			// deploy the test contract
-			_, _, contract, err := DeployOverload(auth, sim)
-			if err != nil {
-				t.Fatalf("Failed to deploy contract: %v", err)
-			}
-			// Finish deploy.
-			sim.Commit()
-	
-			resCh, stopCh := make(chan uint64), make(chan struct{})
-	
-			go func() {
-				barSink := make(chan *OverloadBar)
-				sub, _ := contract.WatchBar(nil, barSink)
-				defer sub.Unsubscribe()
-	
-				bar0Sink := make(chan *OverloadBar0)
-				sub0, _ := contract.WatchBar0(nil, bar0Sink)
-				defer sub0.Unsubscribe()
-	
-				for {
-					select {
-					case ev := <-barSink:
-						resCh <- ev.I.Uint64()
-					case ev := <-bar0Sink:
-						resCh <- ev.I.Uint64() + ev.J.Uint64()
-					case <-stopCh:
-						return
-					}
+		// Initialize test accounts
+		key, _ := crypto.GenerateKey()
+		auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+		defer sim.Close()
+
+		// deploy the test contract
+		_, _, contract, err := DeployOverload(auth, sim)
+		if err != nil {
+			t.Fatalf("Failed to deploy contract: %v", err)
+		}
+		// Finish deploy.
+		sim.Commit()
+
+		resCh, stopCh := make(chan uint64), make(chan struct{})
+
+		go func() {
+			barSink := make(chan *OverloadBar)
+			sub, _ := contract.WatchBar(nil, barSink)
+			defer sub.Unsubscribe()
+
+			bar0Sink := make(chan *OverloadBar0)
+			sub0, _ := contract.WatchBar0(nil, bar0Sink)
+			defer sub0.Unsubscribe()
+
+			for {
+				select {
+				case ev := <-barSink:
+					resCh <- ev.I.Uint64()
+				case ev := <-bar0Sink:
+					resCh <- ev.I.Uint64() + ev.J.Uint64()
+				case <-stopCh:
+					return
 				}
 			}()
 			contract.Foo(auth, big.NewInt(1), big.NewInt(2))
@@ -1520,28 +1547,28 @@ var bindTests = []struct {
 		[]string{"60806040523480156100115760006000fd5b50610017565b60c3806100256000396000f3fe608060405234801560105760006000fd5b506004361060365760003560e01c806301ad4d8714603c5780634ef1f0ad146058576036565b60006000fd5b60426074565b6040518082815260200191505060405180910390f35b605e607d565b6040518082815260200191505060405180910390f35b60006000505481565b60006000600050549050608b565b9056fea265627a7a7231582067c8d84688b01c4754ba40a2a871cede94ea1f28b5981593ab2a45b46ac43af664736f6c634300050c0032"},
 		[]string{`[{"constant":true,"inputs":[],"name":"MyVar","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"_myVar","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]`},
 		`
-			"math/big"
-	
-			"github.com/ethereum/go-ethereum/accounts/abi/bind"
-			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/crypto"
-			"github.com/ethereum/go-ethereum/core/types"
-			`,
+		"math/big"
+
+		"github.com/ethereum/go-ethereum/accounts/abi/bind"
+		"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+		"github.com/ethereum/go-ethereum/crypto"
+		"github.com/ethereum/go-ethereum/core/types"
+		`,
 		`
-			// Initialize test accounts
-			key, _ := crypto.GenerateKey()
-			addr := crypto.PubkeyToAddress(key.PublicKey)
-	
-			// Deploy registrar contract
-			sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-			defer sim.Close()
-	
-			transactOpts, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-			_, _, _, err := DeployIdentifierCollision(transactOpts, sim)
-			if err != nil {
-				t.Fatalf("failed to deploy contract: %v", err)
-			}
-			`,
+		// Initialize test accounts
+		key, _ := crypto.GenerateKey()
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+
+		// Deploy registrar contract
+		sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+		defer sim.Close()
+
+		transactOpts, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		_, _, _, err := DeployIdentifierCollision(transactOpts, sim)
+		if err != nil {
+			t.Fatalf("failed to deploy contract: %v", err)
+		}
+		`,
 		nil,
 		nil,
 		map[string]string{"_myVar": "pubVar"}, // alias MyVar to PubVar
@@ -1583,47 +1610,47 @@ var bindTests = []struct {
 			`[]`,
 		},
 		`
-			"math/big"
-	
-			"github.com/ethereum/go-ethereum/accounts/abi/bind"
-			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-			"github.com/ethereum/go-ethereum/crypto"
-			"github.com/ethereum/go-ethereum/core/types"
-	       `,
+		"math/big"
+
+		"github.com/ethereum/go-ethereum/accounts/abi/bind"
+		"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+		"github.com/ethereum/go-ethereum/crypto"
+		"github.com/ethereum/go-ethereum/core/types"
+        `,
 		`
-			key, _ := crypto.GenerateKey()
-			addr := crypto.PubkeyToAddress(key.PublicKey)
-	
-			// Deploy registrar contract
-			sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-			defer sim.Close()
-	
-			transactOpts, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-			_, _, c1, err := DeployContractOne(transactOpts, sim)
-			if err != nil {
-				t.Fatal("Failed to deploy contract")
-			}
-			sim.Commit()
-			err = c1.Foo(nil, ExternalLibSharedStruct{
-				F1: big.NewInt(100),
-				F2: [32]byte{0x01, 0x02, 0x03},
-			})
-			if err != nil {
-				t.Fatal("Failed to invoke function")
-			}
-			_, _, c2, err := DeployContractTwo(transactOpts, sim)
-			if err != nil {
-				t.Fatal("Failed to deploy contract")
-			}
-			sim.Commit()
-			err = c2.Bar(nil, ExternalLibSharedStruct{
-				F1: big.NewInt(100),
-				F2: [32]byte{0x01, 0x02, 0x03},
-			})
-			if err != nil {
-				t.Fatal("Failed to invoke function")
-			}
-	       `,
+		key, _ := crypto.GenerateKey()
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+
+		// Deploy registrar contract
+		sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+		defer sim.Close()
+
+		transactOpts, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		_, _, c1, err := DeployContractOne(transactOpts, sim)
+		if err != nil {
+			t.Fatal("Failed to deploy contract")
+		}
+		sim.Commit()
+		err = c1.Foo(nil, ExternalLibSharedStruct{
+			F1: big.NewInt(100),
+			F2: [32]byte{0x01, 0x02, 0x03},
+		})
+		if err != nil {
+			t.Fatal("Failed to invoke function")
+		}
+		_, _, c2, err := DeployContractTwo(transactOpts, sim)
+		if err != nil {
+			t.Fatal("Failed to deploy contract")
+		}
+		sim.Commit()
+		err = c2.Bar(nil, ExternalLibSharedStruct{
+			F1: big.NewInt(100),
+			F2: [32]byte{0x01, 0x02, 0x03},
+		})
+		if err != nil {
+			t.Fatal("Failed to invoke function")
+		}
+        `,
 		nil,
 		nil,
 		nil,
@@ -1645,40 +1672,40 @@ var bindTests = []struct {
 		[]string{`608060405234801561001057600080fd5b5060b68061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c806376b5686a146037578063bb38c66c146053575b600080fd5b603d606f565b6040518082815260200191505060405180910390f35b60596077565b6040518082815260200191505060405180910390f35b600043905090565b6000602a90509056fea2646970667358221220d158c2ab7fdfce366a7998ec79ab84edd43b9815630bbaede2c760ea77f29f7f64736f6c63430006000033`},
 		[]string{`[{"inputs": [],"name": "PureFunc","outputs": [{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "pure","type": "function"},{"inputs": [],"name": "ViewFunc","outputs": [{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-			`,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+		`,
 		`
-				// Generate a new random account and a funded simulator
-				key, _ := crypto.GenerateKey()
-				auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
-				defer sim.Close()
-	
-				// Deploy a tester contract and execute a structured call on it
-				_, _, pav, err := DeployPureAndView(auth, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy PureAndView contract: %v", err)
-				}
-				sim.Commit()
-	
-				// This test the existence of the free retriever call for view and pure functions
-				if num, err := pav.PureFunc(nil); err != nil {
-					t.Fatalf("Failed to call anonymous field retriever: %v", err)
-				} else if num.Cmp(big.NewInt(42)) != 0 {
-					t.Fatalf("Retrieved value mismatch: have %v, want %v", num, 42)
-				}
-				if num, err := pav.ViewFunc(nil); err != nil {
-					t.Fatalf("Failed to call anonymous field retriever: %v", err)
-				} else if num.Cmp(big.NewInt(1)) != 0 {
-					t.Fatalf("Retrieved value mismatch: have %v, want %v", num, 1)
-				}
-			`,
+			// Generate a new random account and a funded simulator
+			key, _ := crypto.GenerateKey()
+			auth, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000000000)}}, 10000000)
+			defer sim.Close()
+
+			// Deploy a tester contract and execute a structured call on it
+			_, _, pav, err := DeployPureAndView(auth, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy PureAndView contract: %v", err)
+			}
+			sim.Commit()
+
+			// This test the existence of the free retriever call for view and pure functions
+			if num, err := pav.PureFunc(nil); err != nil {
+				t.Fatalf("Failed to call anonymous field retriever: %v", err)
+			} else if num.Cmp(big.NewInt(42)) != 0 {
+				t.Fatalf("Retrieved value mismatch: have %v, want %v", num, 42)
+			}
+			if num, err := pav.ViewFunc(nil); err != nil {
+				t.Fatalf("Failed to call anonymous field retriever: %v", err)
+			} else if num.Cmp(big.NewInt(1)) != 0 {
+				t.Fatalf("Retrieved value mismatch: have %v, want %v", num, 1)
+			}
+		`,
 		nil,
 		nil,
 		nil,
@@ -1707,18 +1734,18 @@ var bindTests = []struct {
 		`
 				"bytes"
 				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-		   `,
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+	   `,
 		`
 				key, _ := crypto.GenerateKey()
 				addr := crypto.PubkeyToAddress(key.PublicKey)
-	
-				sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 1000000)
-				defer sim.Close()
+
+			sim := backends.NewSimulatedBackend(types.GenesisAlloc{addr: {Balance: big.NewInt(10000000000000000)}}, 1000000)
+			defer sim.Close()
 	
 				opts, _ := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 				_, _, c, err := DeployNewFallbacks(opts, sim)
@@ -1794,25 +1821,42 @@ var bindTests = []struct {
 		[]string{"608060405234801561001057600080fd5b50610113806100206000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806324ec1d3f14602d575b600080fd5b60336035565b005b7fb4b2ff75e30cb4317eaae16dd8a187dd89978df17565104caa6c2797caae27d460405180604001604052806001815260200160028152506040516078919060ba565b60405180910390a1565b6040820160008201516096600085018260ad565b50602082015160a7602085018260ad565b50505050565b60b48160d3565b82525050565b600060408201905060cd60008301846082565b92915050565b600081905091905056fea26469706673582212208823628796125bf9941ce4eda18da1be3cf2931b231708ab848e1bd7151c0c9a64736f6c63430008070033"},
 		[]string{`[{"anonymous":false,"inputs":[{"components":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256","name":"b","type":"uint256"}],"indexed":false,"internalType":"struct Test.MyStruct","name":"s","type":"tuple"}],"name":"StructEvent","type":"event"},{"inputs":[],"name":"TestEvent","outputs":[],"stateMutability":"nonpayable","type":"function"}]`},
 		`
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-				"github.com/ethereum/go-ethereum/eth/ethconfig"
-		   `,
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+			"github.com/ethereum/go-ethereum/eth/ethconfig"
+	   `,
 		`
-				var (
-					key, _  = crypto.GenerateKey()
-					user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-					sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
-				)
-				defer sim.Close()
-	
-				_, _, d, err := DeployNewSingleStructArgument(user, sim)
-				if err != nil {
-					t.Fatalf("Failed to deploy contract %v", err)
+			var (
+				key, _  = crypto.GenerateKey()
+				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+				sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+			)
+			defer sim.Close()
+
+			_, _, d, err := DeployNewSingleStructArgument(user, sim)
+			if err != nil {
+				t.Fatalf("Failed to deploy contract %v", err)
+			}
+			sim.Commit()
+
+			_, err = d.TestEvent(user)
+			if err != nil {
+				t.Fatalf("Failed to call contract %v", err)
+			}
+			sim.Commit()
+
+			it, err := d.FilterStructEvent(nil)
+			if err != nil {
+				t.Fatalf("Failed to filter contract event %v", err)
+			}
+			var count int
+			for it.Next() {
+				if it.Event.S.A.Cmp(big.NewInt(1)) != 0 {
+					t.Fatal("Unexpected contract event")
 				}
 				sim.Commit()
 	
@@ -1864,38 +1908,38 @@ var bindTests = []struct {
 		[]string{"0x6080604052348015600f57600080fd5b5060998061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063726c638214602d575b600080fd5b60336035565b005b60405163024876cd60e61b815260016004820152600260248201526003604482015260640160405180910390fdfea264697066735822122093f786a1bc60216540cd999fbb4a6109e0fef20abcff6e9107fb2817ca968f3c64736f6c63430008070033"},
 		[]string{`[{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"MyError","type":"error"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"MyError1","type":"error"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"name":"MyError2","type":"error"},{"inputs":[{"internalType":"uint256","name":"a","type":"uint256"},{"internalType":"uint256","name":"b","type":"uint256"},{"internalType":"uint256","name":"c","type":"uint256"}],"name":"MyError3","type":"error"},{"inputs":[],"name":"Error","outputs":[],"stateMutability":"pure","type":"function"}]`},
 		`
-				"context"
-				"math/big"
+			"context"
+			"math/big"
 	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-				"github.com/ethereum/go-ethereum/eth/ethconfig"
-		   `,
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+			"github.com/ethereum/go-ethereum/eth/ethconfig"
+	   `,
 		`
-				var (
-					key, _  = crypto.GenerateKey()
-					user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-					sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
-				)
-				defer sim.Close()
+			var (
+				key, _  = crypto.GenerateKey()
+				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+				sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+			)
+			defer sim.Close()
 	
-				_, tx, contract, err := DeployNewErrors(user, sim)
-				if err != nil {
-					t.Fatal(err)
-				}
-				sim.Commit()
-				_, err = bind.WaitDeployed(context.Background(), sim, tx)
-				if err != nil {
-					t.Error(err)
-				}
-				if err := contract.Error(new(bind.CallOpts)); err == nil {
-					t.Fatalf("expected contract to throw error")
-				}
-				// TODO (MariusVanDerWijden unpack error using abigen
-				// once that is implemented
-		   `,
+			_, tx, contract, err := DeployNewErrors(user, sim)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sim.Commit()
+			_, err = bind.WaitDeployed(context.Background(), sim, tx)
+			if err != nil {
+				t.Error(err)
+			}
+			if err := contract.Error(new(bind.CallOpts)); err == nil {
+				t.Fatalf("expected contract to throw error")
+			}
+			// TODO (MariusVanDerWijden unpack error using abigen
+			// once that is implemented
+	   `,
 		nil,
 		nil,
 		nil,
@@ -1917,34 +1961,34 @@ var bindTests = []struct {
 		bytecode: []string{`0x608060405234801561001057600080fd5b506040516101c43803806101c48339818101604052810190610032919061014a565b50610177565b6000604051905090565b600080fd5b600080fd5b6000601f19601f8301169050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6100958261004c565b810181811067ffffffffffffffff821117156100b4576100b361005d565b5b80604052505050565b60006100c7610038565b90506100d3828261008c565b919050565b6000819050919050565b6100eb816100d8565b81146100f657600080fd5b50565b600081519050610108816100e2565b92915050565b60006020828403121561012457610123610047565b5b61012e60206100bd565b9050600061013e848285016100f9565b60008301525092915050565b6000602082840312156101605761015f610042565b5b600061016e8482850161010e565b91505092915050565b603f806101856000396000f3fe6080604052600080fdfea2646970667358221220cdffa667affecefac5561f65f4a4ba914204a8d4eb859d8cd426fb306e5c12a364736f6c634300080a0033`},
 		abi:      []string{`[{"inputs":[{"components":[{"internalType":"uint256","name":"field","type":"uint256"}],"internalType":"struct ConstructorWithStructParam.StructType","name":"st","type":"tuple"}],"stateMutability":"nonpayable","type":"constructor"}]`},
 		imports: `
-				"context"
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-				"github.com/ethereum/go-ethereum/eth/ethconfig"
-			`,
+			"context"
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+			"github.com/ethereum/go-ethereum/eth/ethconfig"
+		`,
 		tester: `
-				var (
-					key, _  = crypto.GenerateKey()
-					user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-					sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
-				)
-				defer sim.Close()
-	
-				_, tx, _, err := DeployConstructorWithStructParam(user, sim, ConstructorWithStructParamStructType{Field: big.NewInt(42)})
-				if err != nil {
-					t.Fatalf("DeployConstructorWithStructParam() got err %v; want nil err", err)
-				}
-				sim.Commit()
-	
-				if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
-					t.Logf("Deployment tx: %+v", tx)
-					t.Errorf("bind.WaitDeployed(nil, %T, <deployment tx>) got err %v; want nil err", sim, err)
-				}
-			`,
+			var (
+				key, _  = crypto.GenerateKey()
+				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+				sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+			)
+			defer sim.Close()
+
+			_, tx, _, err := DeployConstructorWithStructParam(user, sim, ConstructorWithStructParamStructType{Field: big.NewInt(42)})
+			if err != nil {
+				t.Fatalf("DeployConstructorWithStructParam() got err %v; want nil err", err)
+			}
+			sim.Commit()
+			
+			if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
+				t.Logf("Deployment tx: %+v", tx)
+				t.Errorf("bind.WaitDeployed(nil, %T, <deployment tx>) got err %v; want nil err", sim, err)
+			}
+		`,
 	},
 	{
 		name: `NameConflict`,
@@ -1966,34 +2010,34 @@ var bindTests = []struct {
 		bytecode: []string{"0x608060405234801561001057600080fd5b5061042b806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c8063c2bb515f1461003b578063cce7b04814610059575b600080fd5b610043610075565b60405161005091906101af565b60405180910390f35b610073600480360381019061006e91906103ac565b6100b5565b005b61007d6100b8565b604051806040016040528060405180602001604052806000815250815260200160405180602001604052806000815250815250905090565b50565b604051806040016040528060608152602001606081525090565b600081519050919050565b600082825260208201905092915050565b60005b8381101561010c5780820151818401526020810190506100f1565b8381111561011b576000848401525b50505050565b6000601f19601f8301169050919050565b600061013d826100d2565b61014781856100dd565b93506101578185602086016100ee565b61016081610121565b840191505092915050565b600060408301600083015184820360008601526101888282610132565b915050602083015184820360208601526101a28282610132565b9150508091505092915050565b600060208201905081810360008301526101c9818461016b565b905092915050565b6000604051905090565b600080fd5b600080fd5b600080fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b61022282610121565b810181811067ffffffffffffffff82111715610241576102406101ea565b5b80604052505050565b60006102546101d1565b90506102608282610219565b919050565b600080fd5b600080fd5b600080fd5b600067ffffffffffffffff82111561028f5761028e6101ea565b5b61029882610121565b9050602081019050919050565b82818337600083830152505050565b60006102c76102c284610274565b61024a565b9050828152602081018484840111156102e3576102e261026f565b5b6102ee8482856102a5565b509392505050565b600082601f83011261030b5761030a61026a565b5b813561031b8482602086016102b4565b91505092915050565b60006040828403121561033a576103396101e5565b5b610344604061024a565b9050600082013567ffffffffffffffff81111561036457610363610265565b5b610370848285016102f6565b600083015250602082013567ffffffffffffffff81111561039457610393610265565b5b6103a0848285016102f6565b60208301525092915050565b6000602082840312156103c2576103c16101db565b5b600082013567ffffffffffffffff8111156103e0576103df6101e0565b5b6103ec84828501610324565b9150509291505056fea264697066735822122033bca1606af9b6aeba1673f98c52003cec19338539fb44b86690ce82c51483b564736f6c634300080e0033"},
 		abi:      []string{`[ { "anonymous": false, "inputs": [ { "indexed": false, "internalType": "int256", "name": "msg", "type": "int256" }, { "indexed": false, "internalType": "int256", "name": "_msg", "type": "int256" } ], "name": "log", "type": "event" }, { "inputs": [ { "components": [ { "internalType": "bytes", "name": "data", "type": "bytes" }, { "internalType": "bytes", "name": "_data", "type": "bytes" } ], "internalType": "struct oracle.request", "name": "req", "type": "tuple" } ], "name": "addRequest", "outputs": [], "stateMutability": "pure", "type": "function" }, { "inputs": [], "name": "getRequest", "outputs": [ { "components": [ { "internalType": "bytes", "name": "data", "type": "bytes" }, { "internalType": "bytes", "name": "_data", "type": "bytes" } ], "internalType": "struct oracle.request", "name": "", "type": "tuple" } ], "stateMutability": "pure", "type": "function" } ]`},
 		imports: `
-				"context"
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-				"github.com/ethereum/go-ethereum/eth/ethconfig"
-			`,
+			"context"
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+			"github.com/ethereum/go-ethereum/eth/ethconfig"
+		`,
 		tester: `
-				var (
-					key, _  = crypto.GenerateKey()
-					user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-					sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
-				)
-				defer sim.Close()
-	
-				_, tx, _, err := DeployNameConflict(user, sim)
-				if err != nil {
-					t.Fatalf("DeployNameConflict() got err %v; want nil err", err)
-				}
-				sim.Commit()
-	
-				if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
-					t.Logf("Deployment tx: %+v", tx)
-					t.Errorf("bind.WaitDeployed(nil, %T, <deployment tx>) got err %v; want nil err", sim, err)
-				}
-			`,
+			var (
+				key, _  = crypto.GenerateKey()
+				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+				sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+			)
+			defer sim.Close()
+
+			_, tx, _, err := DeployNameConflict(user, sim)
+			if err != nil {
+				t.Fatalf("DeployNameConflict() got err %v; want nil err", err)
+			}
+			sim.Commit()
+			
+			if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
+				t.Logf("Deployment tx: %+v", tx)
+				t.Errorf("bind.WaitDeployed(nil, %T, <deployment tx>) got err %v; want nil err", sim, err)
+			}
+		`,
 	},
 	{
 		name: "RangeKeyword",
@@ -2007,33 +2051,32 @@ var bindTests = []struct {
 		bytecode: []string{"0x608060405234801561001057600080fd5b5060dc8061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063527a119f14602d575b600080fd5b60436004803603810190603f9190605b565b6045565b005b50565b6000813590506055816092565b92915050565b600060208284031215606e57606d608d565b5b6000607a848285016048565b91505092915050565b6000819050919050565b600080fd5b6099816083565b811460a357600080fd5b5056fea2646970667358221220d4f4525e2615516394055d369fb17df41c359e5e962734f27fd683ea81fd9db164736f6c63430008070033"},
 		abi:      []string{`[{"inputs":[{"internalType":"uint256","name":"range","type":"uint256"}],"name":"functionWithKeywordParameter","outputs":[],"stateMutability":"pure","type":"function"}]`},
 		imports: `
-				"context"
-				"math/big"
-	
-				"github.com/ethereum/go-ethereum/accounts/abi/bind"
-				"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-				"github.com/ethereum/go-ethereum/core/types"
-				"github.com/ethereum/go-ethereum/crypto"
-				"github.com/ethereum/go-ethereum/eth/ethconfig"
-			`,
+			"context"
+			"math/big"
+
+			"github.com/ethereum/go-ethereum/accounts/abi/bind"
+			"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+			"github.com/ethereum/go-ethereum/core/types"
+			"github.com/ethereum/go-ethereum/crypto"
+			"github.com/ethereum/go-ethereum/eth/ethconfig"
+		`,
 		tester: `
-				var (
-					key, _  = crypto.GenerateKey()
-					user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
-					sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
-				)
-				_, tx, _, err := DeployRangeKeyword(user, sim)
-				if err != nil {
-					t.Fatalf("error deploying contract: %v", err)
-				}
-				sim.Commit()
-	
-				if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
-					t.Errorf("error deploying the contract: %v", err)
-				}
-			`,
-	},
-	{
+			var (
+				key, _  = crypto.GenerateKey()
+				user, _ = bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+				sim     = backends.NewSimulatedBackend(types.GenesisAlloc{user.From: {Balance: big.NewInt(1000000000000000000)}}, ethconfig.Defaults.Miner.GasCeil)
+			)
+			_, tx, _, err := DeployRangeKeyword(user, sim)
+			if err != nil {
+				t.Fatalf("error deploying contract: %v", err)
+			}
+			sim.Commit()
+
+			if _, err = bind.WaitDeployed(context.Background(), sim, tx); err != nil {
+				t.Errorf("error deploying the contract: %v", err)
+			}
+		`,
+	}, {
 		name: "NumericMethodName",
 		contract: `
 			// SPDX-License-Identifier: GPL-3.0
@@ -2059,6 +2102,7 @@ var bindTests = []struct {
 	},
 }
 
+//
 //// Tests that packages generated by the binder can be successfully compiled and
 //// the requested tester run against it.
 //func TestGolangBindings(t *testing.T) {
