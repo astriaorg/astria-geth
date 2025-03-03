@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/urfave/cli/v2"
 	"os"
 	"regexp"
 	"sort"
@@ -29,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/tests"
-	"github.com/urfave/cli/v2"
 )
 
 var RunFlag = &cli.StringFlag{
@@ -86,7 +86,7 @@ func blockTestCmd(ctx *cli.Context) error {
 			continue
 		}
 		test := tests[name]
-		if err := test.Run(false, rawdb.HashScheme, tracer, func(res error, chain *core.BlockChain) {
+		if err := test.Run(false, rawdb.HashScheme, false, tracer, func(res error, chain *core.BlockChain) {
 			if ctx.Bool(DumpFlag.Name) {
 				if state, _ := chain.State(); state != nil {
 					fmt.Println(string(state.Dump(nil)))
