@@ -107,16 +107,15 @@ func TestTransaction_RoundTripRpcJSON(t *testing.T) {
 	testTransactionMarshal(t, tests, config)
 }
 
-func TestTransactionBlobTx(t *testing.T) {
-	t.Parallel()
-
-	config := *params.TestChainConfig
-	config.ShanghaiTime = new(uint64)
-	config.CancunTime = new(uint64)
-	tests := allBlobTxs(common.Address{0xde, 0xad}, &config)
-
-	testTransactionMarshal(t, tests, &config)
-}
+// Blob submission disabled
+//func TestTransactionBlobTx(t *testing.T) {
+//	config := *params.TestChainConfig
+//	config.ShanghaiTime = new(uint64)
+//	config.CancunTime = new(uint64)
+//	tests := allBlobTxs(common.Address{0xde, 0xad}, &config)
+//
+//	testTransactionMarshal(t, tests, &config)
+//}
 
 type txData struct {
 	Tx   types.TxData
@@ -3096,20 +3095,6 @@ func setupReceiptBackend(t *testing.T, genBlocks int) (*testBackend, []common.Ha
 				StorageKeys: []common.Hash{{0}},
 			}}
 			tx, err = types.SignTx(types.NewTx(&types.AccessListTx{Nonce: uint64(i), To: nil, Gas: 58100, GasPrice: b.BaseFee(), Data: common.FromHex("0x60806040"), AccessList: accessList}), signer, acc1Key)
-		case 5:
-			// blob tx
-			fee := big.NewInt(500)
-			fee.Add(fee, b.BaseFee())
-			tx, err = types.SignTx(types.NewTx(&types.BlobTx{
-				Nonce:      uint64(i),
-				GasTipCap:  uint256.NewInt(1),
-				GasFeeCap:  uint256.MustFromBig(fee),
-				Gas:        params.TxGas,
-				To:         acc2Addr,
-				BlobFeeCap: uint256.NewInt(1),
-				BlobHashes: []common.Hash{{1}},
-				Value:      new(uint256.Int),
-			}), signer, acc1Key)
 		}
 		if err != nil {
 			t.Errorf("failed to sign tx: %v", err)

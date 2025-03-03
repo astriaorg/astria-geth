@@ -128,6 +128,7 @@ func testCallTracer(tracerName string, dirPath string, t *testing.T) {
 			if tracer.Hooks != nil {
 				logState = state.NewHookedState(st.StateDB, tracer.Hooks)
 			}
+			fmt.Printf("BHARATH: tx type is %d\n", tx.Type())
 			msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
