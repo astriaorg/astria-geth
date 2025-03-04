@@ -1,12 +1,16 @@
 package execution
 
 import (
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
-	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"math/big"
+	"testing"
+	"time"
+
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
+	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,9 +20,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"math/big"
-	"testing"
-	"time"
 )
 
 func TestExecutionService_GetGenesisInfo(t *testing.T) {
@@ -360,13 +361,11 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	require.NotNil(t, previousBlock, "Previous block not found")
 
 	// create 5 txs
-	txs := []*types.Transaction{}
 	marshalledTxs := []*sequencerblockv1.RollupData{}
 	for i := 0; i < 5; i++ {
 		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
 		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
 		require.Nil(t, err, "Failed to sign tx")
-		txs = append(txs, tx)
 
 		marshalledTx, err := tx.MarshalBinary()
 		require.Nil(t, err, "Failed to marshal tx")
@@ -417,8 +416,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 	}
 
 	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
-	require.Nil(t, err, "ExecuteBlock failed")
-
+	require.Nil(t, err)
 	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
 
 	// check if astria ordered txs are cleared

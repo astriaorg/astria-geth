@@ -37,6 +37,9 @@ var (
 
 func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
+	zero := uint64(0)
+	config.ShanghaiTime = &zero
+	config.CancunTime = &zero
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
 		config.TerminalTotalDifficulty = common.Big0
