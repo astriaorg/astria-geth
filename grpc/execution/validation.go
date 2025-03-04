@@ -116,7 +116,7 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 }
 
 // `validateStaticCommitment` validates the given commitment without regard to the current state of the system.
-func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState, softAsFirm bool) error {
+func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState) error {
 	if commitmentState == nil {
 		return fmt.Errorf("commitment state is nil")
 	}
@@ -126,21 +126,19 @@ func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState, so
 	if commitmentState.FirmExecutedBlockMetadata == nil {
 		return fmt.Errorf("FirmExecutedBlockMetadata cannot be nil")
 	}
-	if err := validateStaticExecutedBlockMetadata(commitmentState.SoftExecutedBlockMetadata); err != nil {
+	if err := validateStaticExecutedBlockMetadata(commitmentState.SoftExecutedBlockMetadata, false); err != nil {
 		return fmt.Errorf("soft block invalid: %w", err)
 	}
-	if !softAsFirm {
-		if err := validateStaticExecutedBlockMetadata(commitmentState.FirmExecutedBlockMetadata); err != nil {
-			return fmt.Errorf("firm block invalid: %w", err)
-		}
+	if err := validateStaticExecutedBlockMetadata(commitmentState.FirmExecutedBlockMetadata, true); err != nil {
+		return fmt.Errorf("firm block invalid: %w", err)
 	}
 
 	return nil
 }
 
 // `validateStaticExecutedBlockMetadata` validates the given block metadata without regard to the current state of the system.
-func validateStaticExecutedBlockMetadata(block *astriaPb.ExecutedBlockMetadata) error {
-	if block.Number == 0 {
+func validateStaticExecutedBlockMetadata(block *astriaPb.ExecutedBlockMetadata, firm bool) error {
+	if !firm && block.Number == 0 {
 		return fmt.Errorf("block number cannot be 0")
 	}
 	if block.ParentHash == "" {

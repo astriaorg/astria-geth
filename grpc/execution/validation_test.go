@@ -233,7 +233,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		LowestCelestiaSearchHeight: 100,
 	}
 
-	err := validateStaticCommitmentState(validState, false)
+	err := validateStaticCommitmentState(validState)
 	require.Nil(t, err, "Valid CommitmentState should pass validation")
 
 	// Test missing SoftExecutedBlockMetadata
@@ -242,7 +242,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState1, false)
+	err = validateStaticCommitmentState(invalidState1)
 	require.NotNil(t, err, "CommitmentState without SoftExecutedBlockMetadata should fail validation")
 	require.Contains(t, err.Error(), "SoftExecutedBlockMetadata cannot be nil", "Error should mention SoftExecutedBlockMetadata")
 
@@ -252,7 +252,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  nil,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState2, false)
+	err = validateStaticCommitmentState(invalidState2)
 	require.NotNil(t, err, "CommitmentState without FirmExecutedBlockMetadata should fail validation")
 	require.Contains(t, err.Error(), "FirmExecutedBlockMetadata cannot be nil", "Error should mention FirmExecutedBlockMetadata")
 
@@ -267,7 +267,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState3, false)
+	err = validateStaticCommitmentState(invalidState3)
 	require.NotNil(t, err, "CommitmentState with invalid SoftExecutedBlockMetadata should fail validation")
 
 }
@@ -281,7 +281,7 @@ func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
 		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
 	}
 
-	err := validateStaticExecutedBlockMetadata(validMetadata)
+	err := validateStaticExecutedBlockMetadata(validMetadata, false)
 	require.Nil(t, err, "Valid ExecutedBlockMetadata should pass validation")
 
 	// Test block number 0
@@ -291,7 +291,7 @@ func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
 		ParentHash: "0x654321",
 		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
 	}
-	err = validateStaticExecutedBlockMetadata(invalidMetadata1)
+	err = validateStaticExecutedBlockMetadata(invalidMetadata1, false)
 	require.NotNil(t, err, "ExecutedBlockMetadata with block number 0 should fail validation")
 	require.Contains(t, err.Error(), "block number cannot be 0", "Error should mention block number")
 
@@ -302,7 +302,7 @@ func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
 		ParentHash: "0x654321",
 		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
 	}
-	err = validateStaticExecutedBlockMetadata(invalidMetadata2)
+	err = validateStaticExecutedBlockMetadata(invalidMetadata2, false)
 	require.NotNil(t, err, "ExecutedBlockMetadata with empty hash should fail validation")
 	require.Contains(t, err.Error(), "block hash cannot be empty", "Error should mention block hash")
 
@@ -313,7 +313,7 @@ func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
 		ParentHash: "",
 		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
 	}
-	err = validateStaticExecutedBlockMetadata(invalidMetadata3)
+	err = validateStaticExecutedBlockMetadata(invalidMetadata3, false)
 	require.NotNil(t, err, "ExecutedBlockMetadata with empty parent hash should fail validation")
 	require.Contains(t, err.Error(), "parent hash cannot be empty", "Error should mention parent hash")
 
@@ -324,7 +324,7 @@ func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
 		ParentHash: "0x654321",
 		Timestamp:  nil,
 	}
-	err = validateStaticExecutedBlockMetadata(invalidMetadata4)
+	err = validateStaticExecutedBlockMetadata(invalidMetadata4, false)
 	require.NotNil(t, err, "ExecutedBlockMetadata with nil timestamp should fail validation")
 	require.Contains(t, err.Error(), "timestamp cannot be nil", "Error should mention timestamp")
 }
