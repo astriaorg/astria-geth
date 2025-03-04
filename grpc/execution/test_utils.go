@@ -91,7 +91,6 @@ func generateMergeChain(n int, merged bool, halted ...bool) (*core.Genesis, []*t
 				{
 					BridgeAddress:  bech32mBridgeAddress,
 					SenderAddress:  common.Address{},
-					StartHeight:    2,
 					AssetDenom:     "nria",
 					AssetPrecision: 18,
 					Erc20Asset:     nil,
