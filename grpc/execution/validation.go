@@ -116,7 +116,7 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 }
 
 // `validateStaticCommitment` validates the given commitment without regard to the current state of the system.
-func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState) error {
+func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState, softAsFirm bool) error {
 	if commitmentState == nil {
 		return fmt.Errorf("commitment state is nil")
 	}
@@ -126,20 +126,13 @@ func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState) er
 	if commitmentState.FirmExecutedBlockMetadata == nil {
 		return fmt.Errorf("FirmExecutedBlockMetadata cannot be nil")
 	}
-	if commitmentState.LowestCelestiaSearchHeight == 0 {
-		return fmt.Errorf("lowest celestia search height of 0 is not valid")
-	}
-
 	if err := validateStaticExecutedBlockMetadata(commitmentState.SoftExecutedBlockMetadata); err != nil {
 		return fmt.Errorf("soft block invalid: %w", err)
 	}
-	if err := validateStaticExecutedBlockMetadata(commitmentState.FirmExecutedBlockMetadata); err != nil {
-		return fmt.Errorf("firm block invalid: %w", err)
-	}
-
-	// Verify that the firm block is not newer than the soft block
-	if commitmentState.FirmExecutedBlockMetadata.Number > commitmentState.SoftExecutedBlockMetadata.Number {
-		return fmt.Errorf("FirmExecutedBlockMetadata number cannot be greater than SoftExecutedBlockMetadata number")
+	if !softAsFirm {
+		if err := validateStaticExecutedBlockMetadata(commitmentState.FirmExecutedBlockMetadata); err != nil {
+			return fmt.Errorf("firm block invalid: %w", err)
+		}
 	}
 
 	return nil

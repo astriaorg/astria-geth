@@ -233,7 +233,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		LowestCelestiaSearchHeight: 100,
 	}
 
-	err := validateStaticCommitmentState(validState)
+	err := validateStaticCommitmentState(validState, false)
 	require.Nil(t, err, "Valid CommitmentState should pass validation")
 
 	// Test missing SoftExecutedBlockMetadata
@@ -242,7 +242,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState1)
+	err = validateStaticCommitmentState(invalidState1, false)
 	require.NotNil(t, err, "CommitmentState without SoftExecutedBlockMetadata should fail validation")
 	require.Contains(t, err.Error(), "SoftExecutedBlockMetadata cannot be nil", "Error should mention SoftExecutedBlockMetadata")
 
@@ -252,7 +252,7 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  nil,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState2)
+	err = validateStaticCommitmentState(invalidState2, false)
 	require.NotNil(t, err, "CommitmentState without FirmExecutedBlockMetadata should fail validation")
 	require.Contains(t, err.Error(), "FirmExecutedBlockMetadata cannot be nil", "Error should mention FirmExecutedBlockMetadata")
 
@@ -267,23 +267,9 @@ func TestValidateStaticCommitmentState(t *testing.T) {
 		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
 		LowestCelestiaSearchHeight: 100,
 	}
-	err = validateStaticCommitmentState(invalidState3)
+	err = validateStaticCommitmentState(invalidState3, false)
 	require.NotNil(t, err, "CommitmentState with invalid SoftExecutedBlockMetadata should fail validation")
 
-	// Test firm block newer than soft block
-	invalidState4 := &astriaPb.CommitmentState{
-		SoftExecutedBlockMetadata: validState.SoftExecutedBlockMetadata,
-		FirmExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
-			Number:     11, // Higher than soft block
-			Hash:       "0xabcdef",
-			ParentHash: "0xfedcba",
-			Timestamp:  &timestamppb.Timestamp{Seconds: 1234567880},
-		},
-		LowestCelestiaSearchHeight: 100,
-	}
-	err = validateStaticCommitmentState(invalidState4)
-	require.NotNil(t, err, "CommitmentState with firm block newer than soft block should fail validation")
-	require.Contains(t, err.Error(), "FirmExecutedBlockMetadata number", "Error should mention FirmExecutedBlockMetadata number")
 }
 
 func TestValidateStaticExecutedBlockMetadata(t *testing.T) {

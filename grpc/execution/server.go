@@ -281,7 +281,7 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 	s.commitmentUpdateLock.Lock()
 	defer s.commitmentUpdateLock.Unlock()
 
-	if err := validateStaticCommitmentState(req.CommitmentState); err != nil {
+	if err := validateStaticCommitmentState(req.CommitmentState, s.softAsFirm); err != nil {
 		log.Error("UpdateCommitmentState called with invalid CommitmentState", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "CommitmentState is invalid")
 	}
