@@ -393,15 +393,4 @@ func TestValidateStaticExecuteBlockRequest(t *testing.T) {
 	err = validateStaticExecuteBlockRequest(invalidRequest3)
 	require.NotNil(t, err, "ExecuteBlockRequest with nil timestamp should fail validation")
 	require.Contains(t, err.Error(), "timestamp cannot be nil", "Error should mention timestamp")
-
-	// Test nil transactions
-	invalidRequest4 := &astriaPb.ExecuteBlockRequest{
-		SessionId:    "valid-session-id",
-		ParentHash:   "0x123456",
-		Timestamp:    &timestamppb.Timestamp{Seconds: 1234567890},
-		Transactions: nil,
-	}
-	err = validateStaticExecuteBlockRequest(invalidRequest4)
-	require.NotNil(t, err, "ExecuteBlockRequest with nil transactions should fail validation")
-	require.Contains(t, err.Error(), "transactions cannot be nil", "Error should mention transactions")
 }

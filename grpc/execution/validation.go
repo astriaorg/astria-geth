@@ -111,9 +111,6 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 	if req.Timestamp == nil {
 		return fmt.Errorf("timestamp cannot be nil")
 	}
-	if req.Transactions == nil {
-		return fmt.Errorf("transactions cannot be nil")
-	}
 
 	return nil
 }
