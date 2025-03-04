@@ -298,8 +298,14 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 
 	// Firm commitment is out of range
 	// If StopHeight is 0, there is no upper limit
-	if !s.softAsFirm && ((s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight) || req.CommitmentState.FirmExecutedBlockMetadata.Number < s.activeFork.Height) {
-		return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+	if !s.softAsFirm {
+		if s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight {
+			return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+		}
+		// If the fork is not genesis, the firm commitment must be greater than the fork height
+		if s.activeFork.Height > 1 && req.CommitmentState.FirmExecutedBlockMetadata.Number < s.activeFork.Height {
+			return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+		}
 	}
 
 	commitmentUpdateStart := time.Now()
