@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/btcsuite/btcd/btcutil/bech32"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func testBlobTx() *types.Transaction {
@@ -212,4 +214,195 @@ func TestSequenceTxValidation(t *testing.T) {
 			require.Contains(t, err.Error(), test.wantErr)
 		})
 	}
+}
+
+func TestValidateStaticCommitmentState(t *testing.T) {
+	// Valid CommitmentState
+	validState := &astriaPb.CommitmentState{
+		SoftExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+			Number:     10,
+			Hash:       "0x123456",
+			ParentHash: "0x654321",
+			Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+		},
+		FirmExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+			Number:     9,
+			Hash:       "0xabcdef",
+			ParentHash: "0xfedcba",
+			Timestamp:  &timestamppb.Timestamp{Seconds: 1234567880},
+		},
+		LowestCelestiaSearchHeight: 100,
+	}
+
+	err := validateStaticCommitmentState(validState)
+	require.Nil(t, err, "Valid CommitmentState should pass validation")
+
+	// Test missing SoftExecutedBlockMetadata
+	invalidState1 := &astriaPb.CommitmentState{
+		SoftExecutedBlockMetadata:  nil,
+		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
+		LowestCelestiaSearchHeight: 100,
+	}
+	err = validateStaticCommitmentState(invalidState1)
+	require.NotNil(t, err, "CommitmentState without SoftExecutedBlockMetadata should fail validation")
+	require.Contains(t, err.Error(), "SoftExecutedBlockMetadata cannot be nil", "Error should mention SoftExecutedBlockMetadata")
+
+	// Test missing FirmExecutedBlockMetadata
+	invalidState2 := &astriaPb.CommitmentState{
+		SoftExecutedBlockMetadata:  validState.SoftExecutedBlockMetadata,
+		FirmExecutedBlockMetadata:  nil,
+		LowestCelestiaSearchHeight: 100,
+	}
+	err = validateStaticCommitmentState(invalidState2)
+	require.NotNil(t, err, "CommitmentState without FirmExecutedBlockMetadata should fail validation")
+	require.Contains(t, err.Error(), "FirmExecutedBlockMetadata cannot be nil", "Error should mention FirmExecutedBlockMetadata")
+
+	// Test invalid SoftExecutedBlockMetadata
+	invalidState3 := &astriaPb.CommitmentState{
+		SoftExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+			Number:     0, // Invalid number
+			Hash:       "0x123456",
+			ParentHash: "0x654321",
+			Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+		},
+		FirmExecutedBlockMetadata:  validState.FirmExecutedBlockMetadata,
+		LowestCelestiaSearchHeight: 100,
+	}
+	err = validateStaticCommitmentState(invalidState3)
+	require.NotNil(t, err, "CommitmentState with invalid SoftExecutedBlockMetadata should fail validation")
+
+	// Test firm block newer than soft block
+	invalidState4 := &astriaPb.CommitmentState{
+		SoftExecutedBlockMetadata: validState.SoftExecutedBlockMetadata,
+		FirmExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+			Number:     11, // Higher than soft block
+			Hash:       "0xabcdef",
+			ParentHash: "0xfedcba",
+			Timestamp:  &timestamppb.Timestamp{Seconds: 1234567880},
+		},
+		LowestCelestiaSearchHeight: 100,
+	}
+	err = validateStaticCommitmentState(invalidState4)
+	require.NotNil(t, err, "CommitmentState with firm block newer than soft block should fail validation")
+	require.Contains(t, err.Error(), "FirmExecutedBlockMetadata number", "Error should mention FirmExecutedBlockMetadata number")
+}
+
+func TestValidateStaticExecutedBlockMetadata(t *testing.T) {
+	// Valid ExecutedBlockMetadata
+	validMetadata := &astriaPb.ExecutedBlockMetadata{
+		Number:     10,
+		Hash:       "0x123456",
+		ParentHash: "0x654321",
+		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+	}
+
+	err := validateStaticExecutedBlockMetadata(validMetadata)
+	require.Nil(t, err, "Valid ExecutedBlockMetadata should pass validation")
+
+	// Test block number 0
+	invalidMetadata1 := &astriaPb.ExecutedBlockMetadata{
+		Number:     0,
+		Hash:       "0x123456",
+		ParentHash: "0x654321",
+		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+	}
+	err = validateStaticExecutedBlockMetadata(invalidMetadata1)
+	require.NotNil(t, err, "ExecutedBlockMetadata with block number 0 should fail validation")
+	require.Contains(t, err.Error(), "block number cannot be 0", "Error should mention block number")
+
+	// Test empty hash
+	invalidMetadata2 := &astriaPb.ExecutedBlockMetadata{
+		Number:     10,
+		Hash:       "",
+		ParentHash: "0x654321",
+		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+	}
+	err = validateStaticExecutedBlockMetadata(invalidMetadata2)
+	require.NotNil(t, err, "ExecutedBlockMetadata with empty hash should fail validation")
+	require.Contains(t, err.Error(), "block hash cannot be empty", "Error should mention block hash")
+
+	// Test empty parent hash
+	invalidMetadata3 := &astriaPb.ExecutedBlockMetadata{
+		Number:     10,
+		Hash:       "0x123456",
+		ParentHash: "",
+		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+	}
+	err = validateStaticExecutedBlockMetadata(invalidMetadata3)
+	require.NotNil(t, err, "ExecutedBlockMetadata with empty parent hash should fail validation")
+	require.Contains(t, err.Error(), "parent hash cannot be empty", "Error should mention parent hash")
+
+	// Test missing timestamp
+	invalidMetadata4 := &astriaPb.ExecutedBlockMetadata{
+		Number:     10,
+		Hash:       "0x123456",
+		ParentHash: "0x654321",
+		Timestamp:  nil,
+	}
+	err = validateStaticExecutedBlockMetadata(invalidMetadata4)
+	require.NotNil(t, err, "ExecutedBlockMetadata with nil timestamp should fail validation")
+	require.Contains(t, err.Error(), "timestamp cannot be nil", "Error should mention timestamp")
+}
+
+func TestValidateStaticExecuteBlockRequest(t *testing.T) {
+	// Valid ExecuteBlockRequest
+	validRequest := &astriaPb.ExecuteBlockRequest{
+		SessionId:  "valid-session-id",
+		ParentHash: "0x123456",
+		Timestamp:  &timestamppb.Timestamp{Seconds: 1234567890},
+		Transactions: []*sequencerblockv1.RollupData{
+			{
+				Value: &sequencerblockv1.RollupData_SequencedData{
+					SequencedData: []byte("valid-data"),
+				},
+			},
+		},
+	}
+
+	err := validateStaticExecuteBlockRequest(validRequest)
+	require.Nil(t, err, "Valid ExecuteBlockRequest should pass validation")
+
+	// Test empty session ID
+	invalidRequest1 := &astriaPb.ExecuteBlockRequest{
+		SessionId:    "",
+		ParentHash:   "0x123456",
+		Timestamp:    &timestamppb.Timestamp{Seconds: 1234567890},
+		Transactions: validRequest.Transactions,
+	}
+	err = validateStaticExecuteBlockRequest(invalidRequest1)
+	require.NotNil(t, err, "ExecuteBlockRequest with empty session ID should fail validation")
+	require.Contains(t, err.Error(), "session_id cannot be empty", "Error should mention session_id")
+
+	// Test empty parent hash
+	invalidRequest2 := &astriaPb.ExecuteBlockRequest{
+		SessionId:    "valid-session-id",
+		ParentHash:   "",
+		Timestamp:    &timestamppb.Timestamp{Seconds: 1234567890},
+		Transactions: validRequest.Transactions,
+	}
+	err = validateStaticExecuteBlockRequest(invalidRequest2)
+	require.NotNil(t, err, "ExecuteBlockRequest with empty parent hash should fail validation")
+	require.Contains(t, err.Error(), "parent_hash cannot be empty", "Error should mention parent_hash")
+
+	// Test nil timestamp
+	invalidRequest3 := &astriaPb.ExecuteBlockRequest{
+		SessionId:    "valid-session-id",
+		ParentHash:   "0x123456",
+		Timestamp:    nil,
+		Transactions: validRequest.Transactions,
+	}
+	err = validateStaticExecuteBlockRequest(invalidRequest3)
+	require.NotNil(t, err, "ExecuteBlockRequest with nil timestamp should fail validation")
+	require.Contains(t, err.Error(), "timestamp cannot be nil", "Error should mention timestamp")
+
+	// Test nil transactions
+	invalidRequest4 := &astriaPb.ExecuteBlockRequest{
+		SessionId:    "valid-session-id",
+		ParentHash:   "0x123456",
+		Timestamp:    &timestamppb.Timestamp{Seconds: 1234567890},
+		Transactions: nil,
+	}
+	err = validateStaticExecuteBlockRequest(invalidRequest4)
+	require.NotNil(t, err, "ExecuteBlockRequest with nil transactions should fail validation")
+	require.Contains(t, err.Error(), "transactions cannot be nil", "Error should mention transactions")
 }

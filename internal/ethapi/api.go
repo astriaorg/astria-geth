@@ -2200,11 +2200,11 @@ func checkTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
 }
 
 func checkTxBaseFee(chainConfig *params.ChainConfig, blockNum uint64, tx *types.Transaction) error {
-	if chainConfig.AstriaEIP1559Params == nil {
+	if chainConfig.AstriaForks == nil {
 		return nil
 	}
 
-	baseFee := chainConfig.AstriaEIP1559Params.MinBaseFeeAt(blockNum)
+	baseFee := chainConfig.GetAstriaForks().MinBaseFeeAt(blockNum)
 	_, err := tx.EffectiveGasTip(baseFee)
 
 	return err

@@ -35,7 +35,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
+func generateMergeChain(n int, merged bool, halted ...bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -65,20 +65,27 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 	}
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
 
+	// Check if halted parameter was provided
+	isHalted := false
+	if len(halted) > 0 {
+		isHalted = halted[0]
+	}
+
 	config.AstriaRollupName = "astria"
 	config.AstriaForks, _ = params.NewAstriaForks(map[string]params.AstriaForkConfig{
 		"genesis": {
 			Height:       1,
 			FeeCollector: &feeCollector,
+			Halt:         isHalted, // Set the halt flag based on the parameter
 			Sequencer: &params.AstriaSequencerConfig{
 				ChainID:       "astria",
 				AddressPrefix: "astria",
 				StartHeight:   10,
 			},
 			Celestia: &params.AstriaCelestiaConfig{
-				ChainID:        "celestia",
-				StartHeight:    10,
-				HeightVariance: 10,
+				ChainID:                  "celestia",
+				StartHeight:              10,
+				SearchHeightMaxLookAhead: 10,
 			},
 			BridgeAddresses: []params.AstriaBridgeAddressConfig{
 				{
@@ -138,18 +145,31 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	return ethservice
 }
 
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1) {
+// setupExecutionService creates an execution service for testing
+func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, halted ...bool) (*eth.Ethereum, *ExecutionServiceServerV2) {
 	t.Helper()
-	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
+
+	// Check if halted parameter was provided
+	isHalted := false
+	if len(halted) > 0 {
+		isHalted = halted[0]
+	}
+
+	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true, isHalted)
 	ethservice := startEthService(t, genesis)
 
-	serviceV1Alpha1, err := NewExecutionServiceServerV1(ethservice)
+	serviceV2, err := NewExecutionServiceServerV2(ethservice, false)
 	require.Nil(t, err, "can't create execution service")
 
 	fork := genesis.Config.AstriaForks.GetForkAtHeight(1)
 
 	feeCollector := crypto.PubkeyToAddress(feeCollectorKey.PublicKey)
 	require.Equal(t, feeCollector, fork.FeeCollector, "feeCollector not set correctly")
+
+	// If the fork is expected to be halted, verify it
+	if isHalted {
+		require.True(t, fork.Halt, "fork should be halted")
+	}
 
 	bridgeCfg, ok := fork.BridgeAddresses[bridgeAddress]
 	require.True(t, ok, "bridgeAddress not set correctly")
@@ -161,5 +181,10 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereu
 	_, err = ethservice.BlockChain().InsertChain(blocks)
 	require.Nil(t, err, "can't insert blocks")
 
-	return ethservice, serviceV1Alpha1
+	return ethservice, serviceV2
+}
+
+// setupExecutionServiceWithHaltedFork sets up an execution service with a halted fork
+func setupExecutionServiceWithHaltedFork(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV2) {
+	return setupExecutionService(t, noOfBlocksToGenerate, true)
 }

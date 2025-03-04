@@ -21,7 +21,7 @@
             "testLaunch": {
                 "height": 1,
                 "feeCollector": "0xaC21B97d35Bf75A7dAb16f35b111a50e78A72F30",
-                "eip1559Params": { "minBaseFee": 0, "elasticityMultiplier": 2, "BaseFeeChangeDenominator": 8 },
+                "eip1559Params": { "minBaseFee": 0, "elasticityMultiplier": 2, "baseFeeChangeDenominator": 8 },
                 "sequencer": {
                     "chainId": "sequencer-test-chain-0",
                     "addressPrefix": "astria",
@@ -30,7 +30,7 @@
                 "celestia": {
                     "chainId": "mocha-4",
                     "startHeight": 2,
-                    "heightVariance": 10
+                    "searchHeightMaxLookAhead": 10
                 }
             }
         }

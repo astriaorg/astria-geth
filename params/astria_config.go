@@ -51,13 +51,13 @@ type AstriaForkData struct {
 type AstriaSequencerConfig struct {
 	ChainID       string `json:"chainId"`
 	AddressPrefix string `json:"addressPrefix,omitempty"`
-	StartHeight   uint32 `json:"startHeight"`
+	StartHeight   uint64 `json:"startHeight"`
 }
 
 type AstriaCelestiaConfig struct {
-	ChainID        string `json:"chainId"`
-	StartHeight    uint64 `json:"startHeight"`
-	HeightVariance uint64 `json:"heightVariance"`
+	ChainID                  string `json:"chainId"`
+	StartHeight              uint64 `json:"startHeight"`
+	SearchHeightMaxLookAhead uint64 `json:"searchHeightMaxLookAhead"`
 }
 
 type AstriaEIP1559Params struct {
@@ -68,11 +68,15 @@ type AstriaEIP1559Params struct {
 
 func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
 	fork := c.GetAstriaForks().GetForkAtHeight(height)
-	if fork.ExtraDataOverride != nil {
-		return fork.ExtraDataOverride
+	return fork.ExtraData()
+}
+
+func (f *AstriaForkData) ExtraData() []byte {
+	if f.ExtraDataOverride != nil {
+		return f.ExtraDataOverride
 	}
 
-	forkJSON, err := json.Marshal(fork)
+	forkJSON, err := json.Marshal(f)
 	if err != nil {
 		log.Error("failed to marshal astria forks", "error", err)
 		return nil
@@ -163,7 +167,7 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		if currentFork.Sequencer != nil {
 			orderedForks[i].Sequencer = *currentFork.Sequencer
 		} else {
-			orderedForks[i].Sequencer.StartHeight = orderedForks[i-1].Sequencer.StartHeight + uint32(currentFork.Height-orderedForks[i-1].Height)
+			orderedForks[i].Sequencer.StartHeight = orderedForks[i-1].Sequencer.StartHeight + currentFork.Height - orderedForks[i-1].Height
 		}
 
 		if currentFork.Celestia != nil {
@@ -241,8 +245,8 @@ func validateAstriaForks(forks []AstriaForkData) error {
 				return fmt.Errorf("fork %s: celestia initial height not set", fork.Name)
 			}
 
-			if fork.Celestia.HeightVariance == 0 {
-				return fmt.Errorf("fork %s: celestia height variance not set", fork.Name)
+			if fork.Celestia.SearchHeightMaxLookAhead == 0 {
+				return fmt.Errorf("fork %s: celestia search height max lookahead not set", fork.Name)
 			}
 
 			if fork.FeeCollector == (common.Address{}) {

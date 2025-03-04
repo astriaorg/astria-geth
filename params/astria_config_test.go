@@ -21,9 +21,9 @@ func TestAstriaEIP1559Params(t *testing.T) {
 				StartHeight: 2,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "mocha-4",
-				StartHeight:    2,
-				HeightVariance: 10,
+				ChainID:                  "mocha-4",
+				StartHeight:              2,
+				SearchHeightMaxLookAhead: 10,
 			},
 			EIP1559Params: &AstriaEIP1559Params{
 				MinBaseFee:               45000000000,
@@ -263,9 +263,9 @@ func TestGetForkAtHeight(t *testing.T) {
 				StartHeight: 1,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "celestia1",
-				StartHeight:    1,
-				HeightVariance: 100,
+				ChainID:                  "celestia1",
+				StartHeight:              1,
+				SearchHeightMaxLookAhead: 100,
 			},
 		},
 		"fork2": {
@@ -275,9 +275,9 @@ func TestGetForkAtHeight(t *testing.T) {
 				StartHeight: 2,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "celestia2",
-				StartHeight:    2,
-				HeightVariance: 200,
+				ChainID:                  "celestia2",
+				StartHeight:              2,
+				SearchHeightMaxLookAhead: 200,
 			},
 		},
 		"fork3": {
@@ -287,9 +287,9 @@ func TestGetForkAtHeight(t *testing.T) {
 				StartHeight: 3,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "celestia3",
-				StartHeight:    3,
-				HeightVariance: 300,
+				ChainID:                  "celestia3",
+				StartHeight:              3,
+				SearchHeightMaxLookAhead: 300,
 			},
 		},
 	}
@@ -355,9 +355,9 @@ func TestGetNextForkAtHeight(t *testing.T) {
 				StartHeight: 1,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "celestia1",
-				StartHeight:    1,
-				HeightVariance: 100,
+				ChainID:                  "celestia1",
+				StartHeight:              1,
+				SearchHeightMaxLookAhead: 100,
 			},
 		},
 		"fork2": {
@@ -453,9 +453,9 @@ func TestAstriaForksInheritance(t *testing.T) {
 				StartHeight: 100,
 			},
 			Celestia: &AstriaCelestiaConfig{
-				ChainID:        "celestia1",
-				StartHeight:    1,
-				HeightVariance: 100,
+				ChainID:                  "celestia1",
+				StartHeight:              1,
+				SearchHeightMaxLookAhead: 100,
 			},
 		},
 		"fork2": {
@@ -510,16 +510,16 @@ func TestAstriaForksInheritance(t *testing.T) {
 	}
 
 	type testCheck struct {
-		stopHeight               uint64
-		minBaseFee               uint64
-		elasticityMultiplier     uint64
-		baseFeeChangeDenominator uint64
-		sequencerChainID         string
-		sequencerStartHeight     uint32
-		celestiaChainID          string
-		celestiaStartHeight      uint64
-		celestiaHeightVariance   uint64
-		precompiles              map[common.Address]PrecompileType
+		stopHeight                       uint64
+		minBaseFee                       uint64
+		elasticityMultiplier             uint64
+		baseFeeChangeDenominator         uint64
+		sequencerChainID                 string
+		sequencerStartHeight             uint64
+		celestiaChainID                  string
+		celestiaStartHeight              uint64
+		celestiaSearchHeightMaxLookAhead uint64
+		precompiles                      map[common.Address]PrecompileType
 	}
 
 	tests := []struct {
@@ -531,31 +531,31 @@ func TestAstriaForksInheritance(t *testing.T) {
 			description: "fork1 sets initial values",
 			height:      150,
 			checks: testCheck{
-				stopHeight:               199,
-				minBaseFee:               1000,
-				elasticityMultiplier:     2,
-				baseFeeChangeDenominator: 8,
-				sequencerChainID:         "chain1",
-				sequencerStartHeight:     100,
-				celestiaChainID:          "celestia1",
-				celestiaStartHeight:      1,
-				celestiaHeightVariance:   100,
-				precompiles:              map[common.Address]PrecompileType{},
+				stopHeight:                       199,
+				minBaseFee:                       1000,
+				elasticityMultiplier:             2,
+				baseFeeChangeDenominator:         8,
+				sequencerChainID:                 "chain1",
+				sequencerStartHeight:             100,
+				celestiaChainID:                  "celestia1",
+				celestiaStartHeight:              1,
+				celestiaSearchHeightMaxLookAhead: 100,
+				precompiles:                      map[common.Address]PrecompileType{},
 			},
 		},
 		{
 			description: "fork2 inherits everything but EIP1559Params",
 			height:      250,
 			checks: testCheck{
-				stopHeight:               250,
-				minBaseFee:               2000,
-				elasticityMultiplier:     4,
-				baseFeeChangeDenominator: 16,
-				sequencerChainID:         "chain1",
-				sequencerStartHeight:     299,
-				celestiaChainID:          "celestia1",
-				celestiaStartHeight:      1,
-				celestiaHeightVariance:   100,
+				stopHeight:                       250,
+				minBaseFee:                       2000,
+				elasticityMultiplier:             4,
+				baseFeeChangeDenominator:         16,
+				sequencerChainID:                 "chain1",
+				sequencerStartHeight:             299,
+				celestiaChainID:                  "celestia1",
+				celestiaStartHeight:              1,
+				celestiaSearchHeightMaxLookAhead: 100,
 				precompiles: map[common.Address]PrecompileType{
 					common.HexToAddress("0x01"): PrecompileBase64,
 				},
@@ -565,15 +565,15 @@ func TestAstriaForksInheritance(t *testing.T) {
 			description: "fork3 inherits everything but EIP1559Params",
 			height:      251,
 			checks: testCheck{
-				stopHeight:               299,
-				minBaseFee:               1000,
-				elasticityMultiplier:     4,
-				baseFeeChangeDenominator: 16,
-				sequencerChainID:         "chain1",
-				sequencerStartHeight:     350,
-				celestiaChainID:          "celestia1",
-				celestiaStartHeight:      1,
-				celestiaHeightVariance:   100,
+				stopHeight:                       299,
+				minBaseFee:                       1000,
+				elasticityMultiplier:             4,
+				baseFeeChangeDenominator:         16,
+				sequencerChainID:                 "chain1",
+				sequencerStartHeight:             350,
+				celestiaChainID:                  "celestia1",
+				celestiaStartHeight:              1,
+				celestiaSearchHeightMaxLookAhead: 100,
 				precompiles: map[common.Address]PrecompileType{
 					common.HexToAddress("0x01"): PrecompileBase64,
 				},
@@ -583,15 +583,15 @@ func TestAstriaForksInheritance(t *testing.T) {
 			description: "fork4 inherits EIP1559Params but changes sequencer",
 			height:      350,
 			checks: testCheck{
-				stopHeight:               0,
-				minBaseFee:               1000,
-				elasticityMultiplier:     4,
-				baseFeeChangeDenominator: 16,
-				sequencerChainID:         "chain3",
-				sequencerStartHeight:     325,
-				celestiaChainID:          "celestia1",
-				celestiaStartHeight:      1,
-				celestiaHeightVariance:   100,
+				stopHeight:                       0,
+				minBaseFee:                       1000,
+				elasticityMultiplier:             4,
+				baseFeeChangeDenominator:         16,
+				sequencerChainID:                 "chain3",
+				sequencerStartHeight:             325,
+				celestiaChainID:                  "celestia1",
+				celestiaStartHeight:              1,
+				celestiaSearchHeightMaxLookAhead: 100,
 				precompiles: map[common.Address]PrecompileType{
 					common.HexToAddress("0x01"): PrecompileBase64,
 					common.HexToAddress("0x02"): PrecompileBase64,
@@ -628,8 +628,8 @@ func TestAstriaForksInheritance(t *testing.T) {
 			if got := fork.Celestia.StartHeight; got != test.checks.celestiaStartHeight {
 				t.Errorf("Celestia.StartHeight = %v, want %v", got, test.checks.celestiaStartHeight)
 			}
-			if got := fork.Celestia.HeightVariance; got != test.checks.celestiaHeightVariance {
-				t.Errorf("Celestia.HeightVariance = %v, want %v", got, test.checks.celestiaHeightVariance)
+			if got := fork.Celestia.SearchHeightMaxLookAhead; got != test.checks.celestiaSearchHeightMaxLookAhead {
+				t.Errorf("Celestia.SearchHeightMaxLookAhead = %v, want %v", got, test.checks.celestiaSearchHeightMaxLookAhead)
 			}
 			if !reflect.DeepEqual(fork.Precompiles, test.checks.precompiles) {
 				t.Errorf("Precompiles = %v, want %v", fork.Precompiles, test.checks.precompiles)

@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v2/executionv2grpc"
 	"github.com/ethereum/go-ethereum/log"
 	"google.golang.org/grpc"
 )
@@ -14,9 +14,9 @@ import (
 type GRPCServerHandler struct {
 	mu sync.Mutex
 
-	endpoint                   string
-	server                     *grpc.Server
-	executionServiceServerV1a2 *astriaGrpc.ExecutionServiceServer
+	endpoint                 string
+	server                   *grpc.Server
+	executionServiceServerV2 *astriaGrpc.ExecutionServiceServer
 }
 
 // NewServer creates a new gRPC server.
@@ -28,9 +28,9 @@ func NewGRPCServerHandler(node *Node, execServ astriaGrpc.ExecutionServiceServer
 	log.Info("gRPC server enabled", "endpoint", cfg.GRPCEndpoint())
 
 	serverHandler := &GRPCServerHandler{
-		endpoint:                   cfg.GRPCEndpoint(),
-		server:                     server,
-		executionServiceServerV1a2: &execServ,
+		endpoint:                 cfg.GRPCEndpoint(),
+		server:                   server,
+		executionServiceServerV2: &execServ,
 	}
 
 	astriaGrpc.RegisterExecutionServiceServer(server, execServ)

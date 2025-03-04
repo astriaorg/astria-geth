@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v2/executionv2grpc"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,14 +24,16 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/google/uuid"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ExecutionServiceServerV1 is the implementation of the
+// ExecutionServiceServerV2 is the implementation of the
 // ExecutionServiceServer interface.
-type ExecutionServiceServerV1 struct {
+type ExecutionServiceServerV2 struct {
 	// NOTE - from the generated code: All implementations must embed
 	// UnimplementedExecutionServiceServer for forward compatibility
 	astriaGrpc.UnimplementedExecutionServiceServer
@@ -42,23 +44,21 @@ type ExecutionServiceServerV1 struct {
 	commitmentUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock   sync.Mutex // Lock for the NewPayload method
 
-	genesisInfoCalled        bool
-	getCommitmentStateCalled bool
+	softAsFirm bool
+
+	activeSessionId string
+	activeFork      *params.AstriaForkData
 }
 
 var (
-	getGenesisInfoRequestCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_requests", nil)
-	getGenesisInfoSuccessCount        = metrics.GetOrRegisterCounter("astria/execution/get_genesis_info_success", nil)
-	getBlockRequestCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_requests", nil)
-	getBlockSuccessCount              = metrics.GetOrRegisterCounter("astria/execution/get_block_success", nil)
-	batchGetBlockRequestCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_requests", nil)
-	batchGetBlockSuccessCount         = metrics.GetOrRegisterCounter("astria/execution/batch_get_block_success", nil)
-	executeBlockRequestCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_requests", nil)
-	executeBlockSuccessCount          = metrics.GetOrRegisterCounter("astria/execution/execute_block_success", nil)
-	getCommitmentStateRequestCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_requests", nil)
-	getCommitmentStateSuccessCount    = metrics.GetOrRegisterCounter("astria/execution/get_commitment_state_success", nil)
-	updateCommitmentStateRequestCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_requests", nil)
-	updateCommitmentStateSuccessCount = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_success", nil)
+	createExecutionSessionRequestCount   = metrics.GetOrRegisterCounter("astria/execution/create_execution_session_requests", nil)
+	createExecutionSessionSuccessCount   = metrics.GetOrRegisterCounter("astria/execution/create_execution_session_success", nil)
+	getExecutedBlockMetadataRequestCount = metrics.GetOrRegisterCounter("astria/execution/get_executed_block_metadata_requests", nil)
+	getExecutedBlockMetadataSuccessCount = metrics.GetOrRegisterCounter("astria/execution/get_executed_block_metadata_success", nil)
+	executeBlockRequestCount             = metrics.GetOrRegisterCounter("astria/execution/execute_block_requests", nil)
+	executeBlockSuccessCount             = metrics.GetOrRegisterCounter("astria/execution/execute_block_success", nil)
+	updateCommitmentStateRequestCount    = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_requests", nil)
+	updateCommitmentStateSuccessCount    = metrics.GetOrRegisterCounter("astria/execution/update_commitment_state_success", nil)
 
 	softCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/soft_commitment_height", nil)
 	firmCommitmentHeight = metrics.GetOrRegisterGauge("astria/execution/firm_commitment_height", nil)
@@ -68,121 +68,91 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, error) {
+func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool) (*ExecutionServiceServerV2, error) {
 	bc := eth.BlockChain()
 
 	if bc.Config().AstriaRollupName == "" {
 		return nil, errors.New("rollup name not set")
 	}
 
-	fork := bc.Config().GetAstriaForks().GetForkAtHeight(max(bc.CurrentSafeBlock().Number.Uint64(), 1))
-
-	if fork.Sequencer.ChainID == "" {
-		return nil, errors.New("sequencer chain ID not set")
-	}
-
-	if fork.Sequencer.StartHeight == 0 {
-		return nil, errors.New("sequencer initial height not set")
-	}
-
-	if fork.Celestia.ChainID == "" {
-		return nil, errors.New("celestia chain ID not set")
-	}
-
-	if fork.Celestia.StartHeight == 0 {
-		return nil, errors.New("celestia initial height not set")
-	}
-
-	if fork.Celestia.HeightVariance == 0 {
-		return nil, errors.New("celestia height variance not set")
-	}
-
-	if fork.FeeCollector == (common.Address{}) {
-		log.Warn("fee asset collectors not set, assets will be burned")
-	}
-
-	return &ExecutionServiceServerV1{
+	return &ExecutionServiceServerV2{
 		eth: eth,
 		bc:  bc,
+
+		softAsFirm: softAsFirm,
 	}, nil
 }
 
-func (s *ExecutionServiceServerV1) GetGenesisInfo(ctx context.Context, req *astriaPb.GetGenesisInfoRequest) (*astriaPb.GenesisInfo, error) {
-	log.Debug("GetGenesisInfo called")
-	getGenesisInfoRequestCount.Inc(1)
+func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, req *astriaPb.CreateExecutionSessionRequest) (*astriaPb.ExecutionSession, error) {
+	log.Debug("CreateExecutionSession called")
+	createExecutionSessionRequestCount.Inc(1)
 
 	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
 	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
 
-	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
-	nextFork := s.bc.Config().GetAstriaForks().GetNextForkAtHeight(s.bc.CurrentSafeBlock().Number.Uint64() + 1)
+	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(s.bc.CurrentFinalBlock().Number.Uint64() + 1)
 
-	res := &astriaPb.GenesisInfo{
-		RollupId:               &rollupId,
-		SequencerChainId:       fork.Sequencer.ChainID,
-		SequencerStartHeight:   fork.Sequencer.StartHeight,
-		CelestiaChainId:        fork.Celestia.ChainID,
-		CelestiaBlockVariance:  fork.Celestia.HeightVariance,
-		RollupStartBlockNumber: fork.Height,
-		RollupStopBlockNumber:  fork.StopHeight,
-		HaltAtRollupStopNumber: nextFork != nil && nextFork.Halt,
+	if fork.Halt {
+		log.Error("CreateExecutionSession called at halted fork", "fork", fork.Name)
+		return nil, status.Error(codes.FailedPrecondition, "Execution session cannot be created at halted fork")
 	}
 
-	log.Info("GetGenesisInfo completed", "response", res)
-	getGenesisInfoSuccessCount.Inc(1)
-	s.genesisInfoCalled = true
+	s.activeSessionId = uuid.NewString()
+	s.activeFork = &fork
+
+	softBlock, err := ethHeaderToExecutedBlockMetadata(s.bc.CurrentSafeBlock())
+	if err != nil {
+		log.Error("error finding safe block", err)
+		return nil, status.Error(codes.Internal, "Could not locate soft block")
+	}
+
+	firmBlock, err := ethHeaderToExecutedBlockMetadata(s.bc.CurrentFinalBlock())
+	if err != nil {
+		log.Error("error finding final block", err)
+		return nil, status.Error(codes.Internal, "Could not locate firm block")
+	}
+
+	res := &astriaPb.ExecutionSession{
+		SessionId: s.activeSessionId,
+		ExecutionSessionParameters: &astriaPb.ExecutionSessionParameters{
+			RollupId:                         &rollupId,
+			RollupStartBlockNumber:           fork.Height,
+			RollupEndBlockNumber:             fork.StopHeight,
+			SequencerChainId:                 fork.Sequencer.ChainID,
+			SequencerStartBlockHeight:        fork.Sequencer.StartHeight,
+			CelestiaChainId:                  fork.Celestia.ChainID,
+			CelestiaSearchHeightMaxLookAhead: fork.Celestia.SearchHeightMaxLookAhead,
+		},
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  softBlock,
+			FirmExecutedBlockMetadata:  firmBlock,
+			LowestCelestiaSearchHeight: s.bc.CurrentBaseCelestiaHeight(),
+		},
+	}
+
+	log.Info("CreateExecutionSession completed", "response", res)
+	createExecutionSessionSuccessCount.Inc(1)
+
 	return res, nil
 }
 
-// GetBlock will return a block given an identifier.
-func (s *ExecutionServiceServerV1) GetBlock(ctx context.Context, req *astriaPb.GetBlockRequest) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV2) GetExecutedBlockMetadata(ctx context.Context, req *astriaPb.GetExecutedBlockMetadataRequest) (*astriaPb.ExecutedBlockMetadata, error) {
+	log.Debug("GetExecutedBlockMetadata called", "request", req)
+	getExecutedBlockMetadataRequestCount.Inc(1)
+
 	if req.GetIdentifier() == nil {
-		return nil, status.Error(codes.InvalidArgument, "identifier cannot be empty")
+		return nil, status.Error(codes.InvalidArgument, "block identifier cannot be empty")
 	}
 
-	log.Debug("GetBlock called", "request", req)
-	getBlockRequestCount.Inc(1)
-
-	res, err := s.getBlockFromIdentifier(req.GetIdentifier())
+	res, err := s.getExecutedBlockMetadataFromIdentifier(req.GetIdentifier())
 	if err != nil {
 		log.Error("failed finding block", err)
 		return nil, err
 	}
 
-	log.Debug("GetBlock completed", "request", req, "response", res)
-	getBlockSuccessCount.Inc(1)
-	return res, nil
-}
+	log.Debug("GetExecutedBlockMetadata completed", "request", req, "response", res)
+	getExecutedBlockMetadataSuccessCount.Inc(1)
 
-// BatchGetBlocks will return an array of Blocks given an array of block
-// identifiers.
-func (s *ExecutionServiceServerV1) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
-	if req.Identifiers == nil || len(req.Identifiers) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "identifiers cannot be empty")
-	}
-
-	batchGetBlockRequestCount.Inc(1)
-	log.Debug("BatchGetBlocks called", "num blocks requested", len(req.Identifiers))
-
-	var blocks []*astriaPb.Block
-
-	ids := req.GetIdentifiers()
-	for _, id := range ids {
-		block, err := s.getBlockFromIdentifier(id)
-		if err != nil {
-			log.Error("failed finding block with id", id, "error", err)
-			return nil, err
-		}
-
-		blocks = append(blocks, block)
-	}
-
-	res := &astriaPb.BatchGetBlocksResponse{
-		Blocks: blocks,
-	}
-
-	log.Info("BatchGetBlocks completed")
-	batchGetBlockSuccessCount.Inc(1)
 	return res, nil
 }
 
@@ -195,12 +165,8 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
-func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
-	if err := validateStaticExecuteBlockRequest(req); err != nil {
-		log.Error("ExecuteBlock called with invalid ExecuteBlockRequest", "err", err)
-		return nil, status.Error(codes.InvalidArgument, "ExecuteBlockRequest is invalid")
-	}
-	log.Debug("ExecuteBlock called", "prevBlockHash", common.BytesToHash(req.PrevBlockHash), "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
+func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.ExecuteBlockResponse, error) {
+	log.Debug("ExecuteBlock called", "parentHash", req.ParentHash, "tx_count", len(req.Transactions), "timestamp", req.Timestamp)
 	executeBlockRequestCount.Inc(1)
 
 	s.blockExecutionLock.Lock()
@@ -210,22 +176,33 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	executionStart := time.Now()
 	defer executeBlockTimer.UpdateSince(executionStart)
 
-	if !s.syncMethodsCalled() {
-		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until GetGenesisInfo && GetCommitmentState methods are called")
+	// Check for valid session first
+	if s.activeSessionId == "" || req.GetSessionId() != s.activeSessionId {
+		return nil, status.Error(codes.PermissionDenied, "Cannot execute block until a valid ExecutionSession is created")
+	}
+
+	// Then validate the details of the request
+	if err := validateStaticExecuteBlockRequest(req); err != nil {
+		log.Error("ExecuteBlock called with invalid ExecuteBlockRequest", "err", err)
+		return nil, status.Error(codes.InvalidArgument, "ExecuteBlockRequest is invalid")
+	}
+
+	// this fork halts the chain
+	if s.activeFork.Halt {
+		return nil, status.Error(codes.FailedPrecondition, "Block cannot be created at halted fork")
 	}
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 
-	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(height)
-
-	// this fork halts the chain
-	if fork.Halt {
-		return nil, status.Error(codes.FailedPrecondition, "Block cannot be created at halted fork")
+	// Session is out of range
+	// If StopHeight is 0, there is no upper limit
+	if (s.activeFork.StopHeight > 0 && height > s.activeFork.StopHeight) || height < s.activeFork.Height {
+		return nil, status.Error(codes.OutOfRange, "Session is out of range")
 	}
 
 	// Validate block being created has valid previous hash
-	prevHeadHash := common.BytesToHash(req.PrevBlockHash)
+	prevHeadHash := common.HexToHash(req.ParentHash)
 	softHash := s.bc.CurrentSafeBlock().Hash()
 	if prevHeadHash != softHash {
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
@@ -233,7 +210,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, fork.BridgeAddresses, fork.BridgeAllowedAssets)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.activeFork.BridgeAddresses, s.activeFork.BridgeAllowedAssets)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
@@ -246,14 +223,14 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
 	// set extra data
-	s.eth.Miner().SetExtra(s.bc.Config().AstriaExtraData(height))
+	s.eth.Miner().SetExtra(s.activeFork.ExtraData())
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
 		Parent:       prevHeadHash,
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
-		FeeRecipient: s.bc.Config().GetAstriaForks().GetForkAtHeight(height).FeeCollector,
+		FeeRecipient: s.activeFork.FeeCollector,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -268,95 +245,86 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
+
 	err = s.bc.InsertBlockWithoutSetHead(block)
 	if err != nil {
-		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
+		log.Error("failed to insert block to chain", "hash", block.Hash(), "parentHash", req.ParentHash, "err", err)
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
 	}
 
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &astriaPb.Block{
-		Number:          uint32(block.NumberU64()),
-		Hash:            block.Hash().Bytes(),
-		ParentBlockHash: block.ParentHash().Bytes(),
-		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(block.Time()),
+	res := &astriaPb.ExecuteBlockResponse{
+		ExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+			Number:     block.NumberU64(),
+			Hash:       block.Hash().Hex(),
+			ParentHash: block.ParentHash().Hex(),
+			Timestamp: &timestamppb.Timestamp{
+				Seconds: int64(block.Time()),
+			},
 		},
 	}
 
-	log.Info("ExecuteBlock completed", "block_num", res.Number, "timestamp", res.Timestamp)
+	log.Info("ExecuteBlock completed", "block_num", res.ExecutedBlockMetadata.Number, "timestamp", res.ExecutedBlockMetadata.Timestamp)
 	totalExecutedTxCount.Inc(int64(len(block.Transactions())))
 	executeBlockSuccessCount.Inc(1)
 	return res, nil
 }
 
-// GetCommitmentState fetches the current CommitmentState of the chain.
-func (s *ExecutionServiceServerV1) GetCommitmentState(ctx context.Context, req *astriaPb.GetCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
-	log.Info("GetCommitmentState called")
-	getCommitmentStateRequestCount.Inc(1)
-
-	softBlock, err := ethHeaderToExecutionBlock(s.bc.CurrentSafeBlock())
-	if err != nil {
-		log.Error("error finding safe block", err)
-		return nil, status.Error(codes.Internal, "could not locate soft block")
-	}
-	firmBlock, err := ethHeaderToExecutionBlock(s.bc.CurrentFinalBlock())
-	if err != nil {
-		log.Error("error finding final block", err)
-		return nil, status.Error(codes.Internal, "could not locate firm block")
-	}
-
-	celestiaBlock := s.bc.CurrentBaseCelestiaHeight()
-
-	fork := s.bc.Config().GetAstriaForks().GetForkAtHeight(uint64(softBlock.Number))
-
-	res := &astriaPb.CommitmentState{
-		Soft:               softBlock,
-		Firm:               firmBlock,
-		BaseCelestiaHeight: max(celestiaBlock, fork.Celestia.StartHeight),
-	}
-
-	log.Info("GetCommitmentState completed", "soft_height", res.Soft.Number, "firm_height", res.Firm.Number, "base_celestia_height", res.BaseCelestiaHeight)
-	getCommitmentStateSuccessCount.Inc(1)
-	s.getCommitmentStateCalled = true
-	return res, nil
-}
-
 // UpdateCommitmentState replaces the whole CommitmentState with a new
 // CommitmentState.
-func (s *ExecutionServiceServerV1) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
+func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, req *astriaPb.UpdateCommitmentStateRequest) (*astriaPb.CommitmentState, error) {
+	log.Debug("UpdateCommitmentState called", "request_soft_height", req.CommitmentState.SoftExecutedBlockMetadata.Number, "request_firm_height", req.CommitmentState.FirmExecutedBlockMetadata.Number)
+	updateCommitmentStateRequestCount.Inc(1)
+
+	s.commitmentUpdateLock.Lock()
+	defer s.commitmentUpdateLock.Unlock()
+
 	if err := validateStaticCommitmentState(req.CommitmentState); err != nil {
 		log.Error("UpdateCommitmentState called with invalid CommitmentState", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "CommitmentState is invalid")
 	}
 
-	log.Debug("UpdateCommitmentState called", "request_soft_height", req.CommitmentState.Soft.Number, "request_firm_height", req.CommitmentState.Firm.Number)
-	updateCommitmentStateRequestCount.Inc(1)
+	if s.activeSessionId == "" || req.GetSessionId() != s.activeSessionId {
+		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until a valid ExecutionSession is created")
+	}
+
+	// Soft commitment is out of range
+	// If StopHeight is 0, there is no upper limit
+	if (s.activeFork.StopHeight > 0 && req.CommitmentState.SoftExecutedBlockMetadata.Number > s.activeFork.StopHeight) || req.CommitmentState.SoftExecutedBlockMetadata.Number < s.activeFork.Height {
+		return nil, status.Error(codes.OutOfRange, "Soft commitment is out of range")
+	}
+
+	// Firm commitment is out of range
+	// If StopHeight is 0, there is no upper limit
+	if !s.softAsFirm && ((s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight) || req.CommitmentState.FirmExecutedBlockMetadata.Number < s.activeFork.Height) {
+		return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+	}
+
 	commitmentUpdateStart := time.Now()
 	defer commitmentStateUpdateTimer.UpdateSince(commitmentUpdateStart)
 
-	s.commitmentUpdateLock.Lock()
-	defer s.commitmentUpdateLock.Unlock()
-
-	if !s.syncMethodsCalled() {
-		return nil, status.Error(codes.PermissionDenied, "Cannot update commitment state until GetGenesisInfo && GetCommitmentState methods are called")
-	}
-
-	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.BaseCelestiaHeight {
-		errStr := fmt.Sprintf("Base Celestia height cannot be decreased, current_base_celestia_height: %d, new_base_celestia_height: %d", s.bc.CurrentBaseCelestiaHeight(), req.CommitmentState.BaseCelestiaHeight)
+	if s.bc.CurrentBaseCelestiaHeight() > req.CommitmentState.LowestCelestiaSearchHeight {
+		errStr := fmt.Sprintf("Base Celestia height cannot be decreased, current_base_celestia_height: %d, new_base_celestia_height: %d", s.bc.CurrentBaseCelestiaHeight(), req.CommitmentState.LowestCelestiaSearchHeight)
 		return nil, status.Error(codes.InvalidArgument, errStr)
 	}
 
-	softEthHash := common.BytesToHash(req.CommitmentState.Soft.Hash)
-	firmEthHash := common.BytesToHash(req.CommitmentState.Firm.Hash)
+	softEthHash := common.HexToHash(req.CommitmentState.SoftExecutedBlockMetadata.Hash)
+
+	var firmEthHash common.Hash
+	if s.softAsFirm {
+		firmEthHash = softEthHash
+	} else {
+		firmEthHash = common.HexToHash(req.CommitmentState.FirmExecutedBlockMetadata.Hash)
+	}
 
 	// Validate that the firm and soft blocks exist before going further
 	softBlock := s.bc.GetBlockByHash(softEthHash)
 	if softBlock == nil {
 		return nil, status.Error(codes.InvalidArgument, "Soft block specified does not exist")
 	}
+
 	firmBlock := s.bc.GetBlockByHash(firmEthHash)
 	if firmBlock == nil {
 		return nil, status.Error(codes.InvalidArgument, "Firm block specified does not exist")
@@ -396,7 +364,7 @@ func (s *ExecutionServiceServerV1) UpdateCommitmentState(ctx context.Context, re
 
 	currentFirm := s.bc.CurrentFinalBlock().Hash()
 	if currentFirm != firmEthHash {
-		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.BaseCelestiaHeight)
+		s.bc.SetCelestiaFinalized(firmBlock.Header(), req.CommitmentState.LowestCelestiaSearchHeight)
 	}
 
 	log.Info("UpdateCommitmentState completed", "soft_height", softBlock.NumberU64(), "firm_height", firmBlock.NumberU64())
@@ -406,15 +374,15 @@ func (s *ExecutionServiceServerV1) UpdateCommitmentState(ctx context.Context, re
 	return req.CommitmentState, nil
 }
 
-func (s *ExecutionServiceServerV1) getBlockFromIdentifier(identifier *astriaPb.BlockIdentifier) (*astriaPb.Block, error) {
+func (s *ExecutionServiceServerV2) getExecutedBlockMetadataFromIdentifier(identifier *astriaPb.ExecutedBlockIdentifier) (*astriaPb.ExecutedBlockMetadata, error) {
 	var header *types.Header
 
 	// Grab the header based on the identifier provided
 	switch idType := identifier.Identifier.(type) {
-	case *astriaPb.BlockIdentifier_BlockNumber:
-		header = s.bc.GetHeaderByNumber(uint64(identifier.GetBlockNumber()))
-	case *astriaPb.BlockIdentifier_BlockHash:
-		header = s.bc.GetHeaderByHash(common.BytesToHash(identifier.GetBlockHash()))
+	case *astriaPb.ExecutedBlockIdentifier_Number:
+		header = s.bc.GetHeaderByNumber(uint64(identifier.GetNumber()))
+	case *astriaPb.ExecutedBlockIdentifier_Hash:
+		header = s.bc.GetHeaderByHash(common.HexToHash(identifier.GetHash()))
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "identifier has unexpected type %T", idType)
 	}
@@ -423,7 +391,7 @@ func (s *ExecutionServiceServerV1) getBlockFromIdentifier(identifier *astriaPb.B
 		return nil, status.Errorf(codes.NotFound, "Couldn't locate block with identifier %s", identifier.Identifier)
 	}
 
-	res, err := ethHeaderToExecutionBlock(header)
+	res, err := ethHeaderToExecutedBlockMetadata(header)
 	if err != nil {
 		// This should never happen since we validate header exists above.
 		return nil, status.Error(codes.Internal, "internal error")
@@ -432,21 +400,17 @@ func (s *ExecutionServiceServerV1) getBlockFromIdentifier(identifier *astriaPb.B
 	return res, nil
 }
 
-func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
+func ethHeaderToExecutedBlockMetadata(header *types.Header) (*astriaPb.ExecutedBlockMetadata, error) {
 	if header == nil {
-		return nil, fmt.Errorf("cannot convert nil header to execution block")
+		return nil, fmt.Errorf("cannot convert nil header to executed block metadata")
 	}
 
-	return &astriaPb.Block{
-		Number:          uint32(header.Number.Int64()),
-		Hash:            header.Hash().Bytes(),
-		ParentBlockHash: header.ParentHash.Bytes(),
+	return &astriaPb.ExecutedBlockMetadata{
+		Number:     header.Number.Uint64(),
+		Hash:       header.Hash().Hex(),
+		ParentHash: header.ParentHash.Hex(),
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
 	}, nil
-}
-
-func (s *ExecutionServiceServerV1) syncMethodsCalled() bool {
-	return s.genesisInfoCalled && s.getCommitmentStateCalled
 }
