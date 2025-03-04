@@ -90,8 +90,7 @@ func TestSequenceTxValidation(t *testing.T) {
 	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
 	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
 	fork.BridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
-		AssetDenom:  invalidHeightBridgeAssetDenom,
-		StartHeight: 100,
+		AssetDenom: invalidHeightBridgeAssetDenom,
 	}
 
 	tests := []struct {
@@ -206,7 +205,7 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
-			_, err := validateAndUnmarshalSequencerTx(2, test.sequencerTx, fork.BridgeAddresses, fork.BridgeAllowedAssets)
+			_, err := validateAndUnmarshalSequencerTx(test.sequencerTx, &fork)
 			if test.wantErr == "" && err == nil {
 				return
 			}

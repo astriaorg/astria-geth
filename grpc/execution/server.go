@@ -210,7 +210,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.activeFork.BridgeAddresses, s.activeFork.BridgeAllowedAssets)
+		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.activeFork)
 		if err != nil {
 			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue

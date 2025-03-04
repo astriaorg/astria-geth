@@ -18,24 +18,15 @@ import (
 // If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
 // If the sequencer transaction is not a deposit tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
 // tx is not a blob tx or a deposit tx.
-func validateAndUnmarshalSequencerTx(
-	height uint64,
-	tx *sequencerblockv1.RollupData,
-	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{},
-) (*types.Transaction, error) {
+func validateAndUnmarshalSequencerTx(tx *sequencerblockv1.RollupData, fork *params.AstriaForkData) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := deposit.BridgeAddress.GetBech32M()
-		bac, ok := bridgeAddresses[bridgeAddress]
+		bac, ok := fork.BridgeAddresses[bridgeAddress]
 		if !ok {
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
 		}
 
-		if height < uint64(bac.StartHeight) {
-			return nil, fmt.Errorf("bridging asset %s from bridge %s not allowed before height %d", bac.AssetDenom, bridgeAddress, bac.StartHeight)
-		}
-
-		if _, ok := bridgeAllowedAssets[deposit.Asset]; !ok {
+		if _, ok := fork.BridgeAllowedAssets[deposit.Asset]; !ok {
 			return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
 		}
 

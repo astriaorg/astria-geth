@@ -347,7 +347,6 @@ func (c *ChainConfig) GetAstriaForks() *AstriaForks {
 type AstriaBridgeAddressConfig struct {
 	BridgeAddress  string                  `json:"bridgeAddress"`
 	SenderAddress  common.Address          `json:"senderAddress,omitempty"`
-	StartHeight    uint32                  `json:"startHeight"`
 	AssetDenom     string                  `json:"assetDenom"`
 	AssetPrecision uint16                  `json:"assetPrecision"`
 	Erc20Asset     *AstriaErc20AssetConfig `json:"erc20Asset,omitempty"`
@@ -372,9 +371,6 @@ func (abc *AstriaBridgeAddressConfig) Validate(expectedPrefix string) error {
 	}
 	if len(byteAddress) != 20 {
 		return fmt.Errorf("bridge address must have resolve to 20 byte address, got %d", len(byteAddress))
-	}
-	if abc.StartHeight == 0 {
-		return fmt.Errorf("start height must be greater than 0")
 	}
 	if abc.AssetDenom == "" {
 		return fmt.Errorf("asset denom must be set")

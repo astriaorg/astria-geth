@@ -134,7 +134,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid bridge address, non bech32m",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  "rand address",
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
@@ -145,7 +144,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid bridge address, invalid prefix",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  "badprefix1u54zke43yc2tpaecvjqj4uy7d3mdmkrj4vch35",
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
@@ -156,7 +154,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid bridge address",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  "astria1u54zke43yc2tpaecvjqj4uy7d3mdmkqjjq96x",
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
@@ -167,7 +164,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid start height",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    0,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
@@ -178,7 +174,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid asset denom",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    2,
 				AssetDenom:     "",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
@@ -189,7 +184,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid asset precision",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 22,
 				Erc20Asset:     nil,
@@ -200,7 +194,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "invalid contract precision",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 22,
 				Erc20Asset: &AstriaErc20AssetConfig{
@@ -214,7 +207,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "erc20 assets supported",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset: &AstriaErc20AssetConfig{
@@ -228,7 +220,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			description: "valid config",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
-				StartHeight:    2,
 				AssetDenom:     "nria",
 				AssetPrecision: 18,
 				Erc20Asset:     nil,
