@@ -473,7 +473,10 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 	if header == nil {
 		return nil, fmt.Errorf("cannot convert nil header to execution block")
 	}
-
+	var sequencerHashBytes []byte
+	if header.ParentBeaconRoot != nil {
+		sequencerHashBytes = header.ParentBeaconRoot.Bytes()
+	}
 	return &astriaPb.Block{
 		Number:          uint32(header.Number.Int64()),
 		Hash:            header.Hash().Bytes(),
@@ -481,7 +484,7 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
-		SequencerBlockHash: header.ParentBeaconRoot.Bytes(),
+		SequencerBlockHash: sequencerHashBytes,
 	}, nil
 }
 
