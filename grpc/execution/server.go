@@ -298,7 +298,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, &sequencerHashRoot)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
@@ -312,14 +312,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &astriaPb.Block{
-		Number:          uint32(block.NumberU64()),
-		Hash:            block.Hash().Bytes(),
-		ParentBlockHash: block.ParentHash().Bytes(),
-		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(block.Time()),
-		},
-	}
+	res, _ := ethHeaderToExecutionBlock(block.Header())
 
 	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
 		s.nextFeeRecipient = next
