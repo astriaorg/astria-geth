@@ -259,6 +259,14 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
+	blockTimestamp := uint64(req.GetTimestamp().GetSeconds())
+	var sequencerHashRoot common.Hash
+	if s.bc.Config().IsCancun(big.NewInt(int64(height)), blockTimestamp) {
+		if req.SequencerBlockHash == nil {
+			return nil, status.Error(codes.InvalidArgument, "Sequencer block hash must be set for Cancun block")
+		}
+		sequencerHashRoot = common.BytesToHash(req.SequencerBlockHash)
+	}
 
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
@@ -280,6 +288,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
+		BeaconRoot:   &sequencerHashRoot,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -472,6 +481,7 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
+		SequencerBlockHash: header.ParentBeaconRoot.Bytes(),
 	}, nil
 }
 
