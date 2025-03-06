@@ -260,12 +260,13 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
 	blockTimestamp := uint64(req.GetTimestamp().GetSeconds())
-	var sequencerHashRoot common.Hash
+	var sequencerHashRef *common.Hash
 	if s.bc.Config().IsCancun(big.NewInt(int64(height)), blockTimestamp) {
 		if req.SequencerBlockHash == nil {
 			return nil, status.Error(codes.InvalidArgument, "Sequencer block hash must be set for Cancun block")
 		}
-		sequencerHashRoot = common.BytesToHash(req.SequencerBlockHash)
+		sequencerHash := common.BytesToHash(req.SequencerBlockHash)
+		sequencerHashRef = &sequencerHash
 	}
 
 	txsToProcess := types.Transactions{}
@@ -288,7 +289,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
-		BeaconRoot:   &sequencerHashRoot,
+		BeaconRoot:   sequencerHashRef,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -298,7 +299,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, &sequencerHashRoot)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
