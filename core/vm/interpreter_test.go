@@ -17,13 +17,12 @@
 package vm
 
 import (
+	"math"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
@@ -40,12 +39,12 @@ var loopInterruptTests = []string{
 func TestLoopInterrupt(t *testing.T) {
 	address := common.BytesToAddress([]byte("contract"))
 	vmctx := BlockContext{
-		Transfer:    func(StateDB, common.Address, common.Address, *uint256.Int) {},
 		BlockNumber: big.NewInt(0),
+		Transfer:    func(StateDB, common.Address, common.Address, *uint256.Int) {},
 	}
 
 	for i, tt := range loopInterruptTests {
-		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 		statedb.CreateAccount(address)
 		statedb.SetCode(address, common.Hex2Bytes(tt))
 		statedb.Finalise(true)

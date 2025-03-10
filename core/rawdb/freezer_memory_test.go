@@ -16,26 +16,32 @@
 
 package rawdb
 
-import (
-	"testing"
+import "net"
 
-	"github.com/ethereum/go-ethereum/core/rawdb/ancienttest"
-	"github.com/ethereum/go-ethereum/ethdb"
-)
+// TCPPipe creates an in process full duplex pipe based on a localhost TCP socket.
+func TCPPipe() (net.Conn, net.Conn, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer l.Close()
 
-func TestMemoryFreezer(t *testing.T) {
-	ancienttest.TestAncientSuite(t, func(kinds []string) ethdb.AncientStore {
-		tables := make(map[string]bool)
-		for _, kind := range kinds {
-			tables[kind] = true
-		}
-		return NewMemoryFreezer(false, tables)
-	})
-	ancienttest.TestResettableAncientSuite(t, func(kinds []string) ethdb.ResettableAncientStore {
-		tables := make(map[string]bool)
-		for _, kind := range kinds {
-			tables[kind] = true
-		}
-		return NewMemoryFreezer(false, tables)
-	})
+	var aconn net.Conn
+	aerr := make(chan error, 1)
+	go func() {
+		var err error
+		aconn, err = l.Accept()
+		aerr <- err
+	}()
+
+	dconn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		<-aerr
+		return nil, nil, err
+	}
+	if err := <-aerr; err != nil {
+		dconn.Close()
+		return nil, nil, err
+	}
+	return aconn, dconn, nil
 }

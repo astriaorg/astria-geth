@@ -21,14 +21,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"slices"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie/triestate"
+	"golang.org/x/exp/maps"
 )
 
 // State history records the state changes involved in executing a block. The
@@ -242,21 +242,15 @@ type history struct {
 }
 
 // newHistory constructs the state history object with provided state change set.
-func newHistory(root common.Hash, parent common.Hash, block uint64, states *triestate.Set) *history {
+func newHistory(root common.Hash, parent common.Hash, block uint64, accounts map[common.Address][]byte, storages map[common.Address]map[common.Hash][]byte) *history {
 	var (
-		accountList []common.Address
+		accountList = maps.Keys(accounts)
 		storageList = make(map[common.Address][]common.Hash)
 	)
-	for addr := range states.Accounts {
-		accountList = append(accountList, addr)
-	}
 	slices.SortFunc(accountList, common.Address.Cmp)
 
-	for addr, slots := range states.Storages {
-		slist := make([]common.Hash, 0, len(slots))
-		for slotHash := range slots {
-			slist = append(slist, slotHash)
-		}
+	for addr, slots := range storages {
+		slist := maps.Keys(slots)
 		slices.SortFunc(slist, common.Hash.Cmp)
 		storageList[addr] = slist
 	}
@@ -267,9 +261,9 @@ func newHistory(root common.Hash, parent common.Hash, block uint64, states *trie
 			root:    root,
 			block:   block,
 		},
-		accounts:    states.Accounts,
+		accounts:    accounts,
 		accountList: accountList,
-		storages:    states.Storages,
+		storages:    storages,
 		storageList: storageList,
 	}
 }
@@ -384,10 +378,11 @@ func (r *decoder) readAccount(pos int) (accountIndex, []byte, error) {
 func (r *decoder) readStorage(accIndex accountIndex) ([]common.Hash, map[common.Hash][]byte, error) {
 	var (
 		last    common.Hash
-		list    []common.Hash
-		storage = make(map[common.Hash][]byte)
+		count   = int(accIndex.storageSlots)
+		list    = make([]common.Hash, 0, count)
+		storage = make(map[common.Hash][]byte, count)
 	)
-	for j := 0; j < int(accIndex.storageSlots); j++ {
+	for j := 0; j < count; j++ {
 		var (
 			index slotIndex
 			start = (accIndex.storageOffset + uint32(j)) * uint32(slotIndexSize)
@@ -430,9 +425,10 @@ func (r *decoder) readStorage(accIndex accountIndex) ([]common.Hash, map[common.
 // decode deserializes the account and storage data from the provided byte stream.
 func (h *history) decode(accountData, storageData, accountIndexes, storageIndexes []byte) error {
 	var (
-		accounts    = make(map[common.Address][]byte)
+		count       = len(accountIndexes) / accountIndexSize
+		accounts    = make(map[common.Address][]byte, count)
 		storages    = make(map[common.Address]map[common.Hash][]byte)
-		accountList []common.Address
+		accountList = make([]common.Address, 0, count)
 		storageList = make(map[common.Address][]common.Hash)
 
 		r = &decoder{
@@ -445,7 +441,7 @@ func (h *history) decode(accountData, storageData, accountIndexes, storageIndexe
 	if err := r.verify(); err != nil {
 		return err
 	}
-	for i := 0; i < len(accountIndexes)/accountIndexSize; i++ {
+	for i := 0; i < count; i++ {
 		// Resolve account first
 		accIndex, accData, err := r.readAccount(i)
 		if err != nil {
@@ -502,7 +498,7 @@ func writeHistory(writer ethdb.AncientWriter, dl *diffLayer) error {
 	}
 	var (
 		start   = time.Now()
-		history = newHistory(dl.rootHash(), dl.parentLayer().rootHash(), dl.block, dl.states)
+		history = newHistory(dl.rootHash(), dl.parentLayer().rootHash(), dl.block, dl.states.accountOrigin, dl.states.storageOrigin)
 	)
 	accountData, storageData, accountIndex, storageIndex := history.encode()
 	dataSize := common.StorageSize(len(accountData) + len(storageData))
