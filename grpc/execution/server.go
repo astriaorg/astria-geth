@@ -291,7 +291,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		FeeRecipient: s.nextFeeRecipient,
 		BeaconRoot:   sequencerHashRef,
 	}
-	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
+	payload, err := s.eth.Miner().BuildPayload(payloadAttributes, false)
 	if err != nil {
 		log.Error("failed to build payload", "err", err)
 		return nil, status.Error(codes.InvalidArgument, "Could not build block with provided txs")
@@ -299,12 +299,12 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
 	}
-	err = s.bc.InsertBlockWithoutSetHead(block)
+	_, err = s.bc.InsertBlockWithoutSetHead(block, false)
 	if err != nil {
 		log.Error("failed to insert block to chain", "hash", block.Hash(), "prevHash", req.PrevBlockHash, "err", err)
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
