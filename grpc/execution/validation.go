@@ -71,7 +71,7 @@ func validateAndUnmarshalSequencerTx(
 				Gas:                    64000,
 				To:                     &bac.Erc20Asset.ContractAddress,
 				Data:                   calldata,
-				SourceTransactionId:    *deposit.SourceTransactionId,
+				SourceTransactionId:    deposit.SourceTransactionId.Inner,
 				SourceTransactionIndex: deposit.SourceActionIndex,
 			}
 
@@ -84,7 +84,7 @@ func validateAndUnmarshalSequencerTx(
 			To:                     &recipient,
 			Value:                  amount,
 			Gas:                    0,
-			SourceTransactionId:    *deposit.SourceTransactionId,
+			SourceTransactionId:    deposit.SourceTransactionId.Inner,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 		return types.NewTx(&txdata), nil
