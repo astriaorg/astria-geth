@@ -299,7 +299,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil, nil)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef, nil)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
