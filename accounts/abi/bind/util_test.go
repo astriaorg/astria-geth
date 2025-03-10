@@ -16,6 +16,11 @@
 
 package bind_test
 
+// TODO(bharath) - These tests are failing because of the simulated backend. Prior to geth 1.14.3, the simulated backend
+// mocked the rpc methods rather than spinning up an rpc server. astria-geth requires to launch conductor to drive execution
+// of blocks which is not spun by the simulated backend. As a result all of these tests fail because we do not have any
+// of driving execution of the transactions sent via these tests.
+
 //
 //import (
 //	"context"
