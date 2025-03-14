@@ -4,12 +4,16 @@ buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-00000000000000-38df36d65d4
 buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-00000000000000-38df36d65d40.2/go.mod h1:E6LpLVbNfib51EIhJ3HfkZljhrAS16jgkyAODe7qG90=
 buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20250226175104-f767d74e0c4b.2 h1:vYvjOfLm3pTUs2Ax5Mwdr5FRIDlHgkybX18zIQQjsRE=
 buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20250226175104-f767d74e0c4b.2/go.mod h1:pPz4yIKymVyJydPAabgDpSSrMJrDgRNP3SPJ9/r4OrY=
+buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20250306201235-9269467a6daf.2 h1:8OfHySf8z13Lc4CSlc4QhD8fLzVk5uAy1Y+yu2TTD3I=
+buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20250306201235-9269467a6daf.2/go.mod h1:7OFLKVBcD/tDILpR3+VobJexaSvxKJta/Vkpnq81cGc=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-00000000000000-000acc99835d.1 h1:H59mAQwZWpL09jtRy8X1ZiIVHT8xy78E/G9MqK2U8oI=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-00000000000000-000acc99835d.1/go.mod h1:qRn+inLSaOctJRFezWQNhWVtJUD+v92SqW7wBcIAraQ=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-00000000000000-38df36d65d40.1 h1:ahL5zKQmUHuwLu2EdDagzSmftZ8gbR3refGAaI0fG2c=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-00000000000000-38df36d65d40.1/go.mod h1:3xoZizCqbe2u23E0HMvNaDgwPAwY+MLsp4Sv29xCIrI=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-20250226175104-f767d74e0c4b.1 h1:OyJWVmXDjkUHBOWb6QEVEHN1XSz2jtTaYfQeE0l62Oo=
 buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-20250226175104-f767d74e0c4b.1/go.mod h1:GN0tQ/QFTGpUk0QBJGnRndF1qBMvFIEJ9Ng4qzvCXE8=
+buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-20250306201235-9269467a6daf.1 h1:1R1faHFyi37nVDxgUsWhOZeZ3RiF/iWYnN7Qw4x1UnE=
+buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.5-20250306201235-9269467a6daf.1/go.mod h1:GN0tQ/QFTGpUk0QBJGnRndF1qBMvFIEJ9Ng4qzvCXE8=
 buf.build/gen/go/astria/primitives/protocolbuffers/go v1.36.5-00000000000000-43fac4060faa.1 h1:+ujbh3s70Q8Ol38rh4ypZU0K24xUExjOri28WBRvYRs=
 buf.build/gen/go/astria/primitives/protocolbuffers/go v1.36.5-00000000000000-43fac4060faa.1/go.mod h1:1Yy42OW1qdHTCWq9sfiJD8ZJCRqEL6xc2fBppEyNF0k=
 buf.build/gen/go/astria/primitives/protocolbuffers/go v1.36.5-20240911152449-eeebd3decdce.1 h1:u/+bxYTPNFvhSZN1lCirgi8qlkw6Df+FNAksJcLCxkA=

@@ -208,6 +208,16 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		return nil, status.Error(codes.FailedPrecondition, "Block can only be created on top of soft block.")
 	}
 
+	blockTimestamp := uint64(req.GetTimestamp().GetSeconds())
+	var sequencerHashRef *common.Hash
+	if s.bc.Config().IsCancun(big.NewInt(int64(height)), blockTimestamp) {
+		if req.SequencerBlockHash == "" {
+			return nil, status.Error(codes.InvalidArgument, "Sequencer block hash must be set for Cancun block")
+		}
+		sequencerHash := common.HexToHash(req.SequencerBlockHash)
+		sequencerHashRef = &sequencerHash
+	}
+
 	txsToProcess := types.Transactions{}
 	for _, tx := range req.Transactions {
 		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.activeFork)
@@ -231,6 +241,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
 		FeeRecipient: s.activeFork.FeeCollector,
+		BeaconRoot:   sequencerHashRef,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -240,7 +251,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
@@ -255,15 +266,9 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
+	resBlockMetadata, _ := ethHeaderToExecutedBlockMetadata(block.Header())
 	res := &astriaPb.ExecuteBlockResponse{
-		ExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
-			Number:     block.NumberU64(),
-			Hash:       block.Hash().Hex(),
-			ParentHash: block.ParentHash().Hex(),
-			Timestamp: &timestamppb.Timestamp{
-				Seconds: int64(block.Time()),
-			},
-		},
+		ExecutedBlockMetadata: resBlockMetadata,
 	}
 
 	log.Info("ExecuteBlock completed", "block_num", res.ExecutedBlockMetadata.Number, "timestamp", res.ExecutedBlockMetadata.Timestamp)
@@ -411,10 +416,16 @@ func ethHeaderToExecutedBlockMetadata(header *types.Header) (*astriaPb.ExecutedB
 		return nil, fmt.Errorf("cannot convert nil header to executed block metadata")
 	}
 
+	var sequencerHash common.Hash
+	if header.ParentBeaconRoot != nil {
+		sequencerHash = *header.ParentBeaconRoot
+	}
+
 	return &astriaPb.ExecutedBlockMetadata{
-		Number:     header.Number.Uint64(),
-		Hash:       header.Hash().Hex(),
-		ParentHash: header.ParentHash.Hex(),
+		Number:             header.Number.Uint64(),
+		Hash:               header.Hash().Hex(),
+		ParentHash:         header.ParentHash.Hex(),
+		SequencerBlockHash: sequencerHash.Hex(),
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
