@@ -429,7 +429,7 @@ func (g *Genesis) ToBlock() *types.Block {
 
 	extraData := g.ExtraData
 	if g.Config.AstriaOverrideGenesisExtraData {
-		extraData = g.Config.AstriaExtraData()
+		extraData = g.Config.AstriaExtraData(1)
 	}
 
 	head := &types.Header{
