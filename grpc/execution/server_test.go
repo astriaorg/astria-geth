@@ -6,43 +6,45 @@ import (
 	"crypto/sha256"
 	"math/big"
 	"testing"
-	"time"
 
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestExecutionService_GetGenesisInfo(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+func TestExecutionServiceServerV2_CreateExecutionSession(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
 
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
-	require.Nil(t, err, "GetGenesisInfo failed")
+	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.Nil(t, err, "CreateExecutionSession failed")
+	require.NotEmpty(t, serviceV2.activeSessionId, "Active session ID should not be empty")
+	require.NotNil(t, serviceV2.activeFork, "Active fork should not be nil")
 
-	hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
+	bc := ethservice.BlockChain()
+	hashedRollupId := sha256.Sum256([]byte(bc.Config().AstriaRollupName))
 
-	require.True(t, bytes.Equal(genesisInfo.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
-	require.Equal(t, genesisInfo.GetSequencerStartHeight(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Sequencer.StartHeight, "SequencerInitialHeight is not correct")
-	require.Equal(t, genesisInfo.GetCelestiaBlockVariance(), ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.HeightVariance, "CelestiaHeightVariance is not correct")
-	require.True(t, serviceV1Alpha1.genesisInfoCalled, "GetGenesisInfo should be called")
-}
+	require.NotEmpty(t, session.SessionId, "SessionId should not be empty")
+	require.Equal(t, session.SessionId, serviceV2.activeSessionId, "Active session ID is not set correctly")
 
-func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	activeFork := bc.Config().AstriaForks.GetForkAtHeight(1)
 
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-	require.Nil(t, err, "GetCommitmentState failed")
+	require.True(t, bytes.Equal(session.ExecutionSessionParameters.RollupId.Inner, hashedRollupId[:]), "RollupId is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.RollupStartBlockNumber, activeFork.Height, "RollupStartBlockNumber is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.RollupEndBlockNumber, activeFork.StopHeight, "RollupEndBlockNumber is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.SequencerStartBlockHeight, activeFork.Sequencer.StartHeight, "SequencerStartBlockHeight is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.SequencerChainId, activeFork.Sequencer.ChainID, "SequencerChainId is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.CelestiaChainId, activeFork.Celestia.ChainID, "CelestiaChainId is not correct")
+	require.Equal(t, session.ExecutionSessionParameters.CelestiaSearchHeightMaxLookAhead, activeFork.Celestia.SearchHeightMaxLookAhead, "CelestiaSearchHeightMaxLookAhead is not correct")
 
-	require.NotNil(t, commitmentState, "CommitmentState is nil")
+	require.NotNil(t, session.CommitmentState, "CommitmentState is nil")
 
 	softBlock := ethservice.BlockChain().CurrentSafeBlock()
 	require.NotNil(t, softBlock, "SoftBlock is nil")
@@ -50,44 +52,42 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 	firmBlock := ethservice.BlockChain().CurrentFinalBlock()
 	require.NotNil(t, firmBlock, "FirmBlock is nil")
 
-	require.True(t, bytes.Equal(commitmentState.Soft.Hash, softBlock.Hash().Bytes()), "Soft Block Hashes do not match")
-	require.True(t, bytes.Equal(commitmentState.Soft.ParentBlockHash, softBlock.ParentHash.Bytes()), "Soft Block Parent Hash do not match")
-	require.Equal(t, uint64(commitmentState.Soft.Number), softBlock.Number.Uint64(), "Soft Block Number do not match")
+	require.Equal(t, softBlock.Hash().Hex(), session.CommitmentState.SoftExecutedBlockMetadata.Hash, "Soft Block Hashes do not match")
+	require.Equal(t, softBlock.ParentHash.Hex(), session.CommitmentState.SoftExecutedBlockMetadata.ParentHash, "Soft Block Parent Hash do not match")
+	require.Equal(t, softBlock.Number.Uint64(), session.CommitmentState.SoftExecutedBlockMetadata.Number, "Soft Block Number do not match")
 
-	require.True(t, bytes.Equal(commitmentState.Firm.Hash, firmBlock.Hash().Bytes()), "Firm Block Hashes do not match")
-	require.True(t, bytes.Equal(commitmentState.Firm.ParentBlockHash, firmBlock.ParentHash.Bytes()), "Firm Block Parent Hash do not match")
-	require.Equal(t, uint64(commitmentState.Firm.Number), firmBlock.Number.Uint64(), "Firm Block Number do not match")
-	require.Equal(t, commitmentState.BaseCelestiaHeight, ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.StartHeight, "BaseCelestiaHeight is not correct")
-
-	require.True(t, serviceV1Alpha1.getCommitmentStateCalled, "GetCommitmentState should be called")
+	require.Equal(t, firmBlock.Hash().Hex(), session.CommitmentState.FirmExecutedBlockMetadata.Hash, "Firm Block Hashes do not match")
+	require.Equal(t, firmBlock.ParentHash.Hex(), session.CommitmentState.FirmExecutedBlockMetadata.ParentHash, "Firm Block Parent Hash do not match")
+	require.Equal(t, firmBlock.Number.Uint64(), session.CommitmentState.FirmExecutedBlockMetadata.Number, "Firm Block Number do not match")
+	require.Equal(t, session.CommitmentState.LowestCelestiaSearchHeight, ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1).Celestia.StartHeight, "LowestCelestiaSearchHeight is not correct")
 }
 
-func TestExecutionService_GetBlock(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+func TestExecutionServiceServerV2_GetExecutedBlockMetadata(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
 
 	tests := []struct {
 		description        string
-		getBlockRequst     *astriaPb.GetBlockRequest
+		request            *astriaPb.GetExecutedBlockMetadataRequest
 		expectedReturnCode codes.Code
 	}{
 		{
 			description: "Get block by block number 1",
-			getBlockRequst: &astriaPb.GetBlockRequest{
-				Identifier: &astriaPb.BlockIdentifier{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 1}},
+			request: &astriaPb.GetExecutedBlockMetadataRequest{
+				Identifier: &astriaPb.ExecutedBlockIdentifier{Identifier: &astriaPb.ExecutedBlockIdentifier_Number{Number: 1}},
 			},
 			expectedReturnCode: 0,
 		},
 		{
 			description: "Get block by block hash",
-			getBlockRequst: &astriaPb.GetBlockRequest{
-				Identifier: &astriaPb.BlockIdentifier{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(4).Hash().Bytes()}},
+			request: &astriaPb.GetExecutedBlockMetadataRequest{
+				Identifier: &astriaPb.ExecutedBlockIdentifier{Identifier: &astriaPb.ExecutedBlockIdentifier_Hash{Hash: ethservice.BlockChain().GetBlockByNumber(4).Hash().Hex()}},
 			},
 			expectedReturnCode: 0,
 		},
 		{
 			description: "Get block which is not present",
-			getBlockRequst: &astriaPb.GetBlockRequest{
-				Identifier: &astriaPb.BlockIdentifier{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 100}},
+			request: &astriaPb.GetExecutedBlockMetadataRequest{
+				Identifier: &astriaPb.ExecutedBlockIdentifier{Identifier: &astriaPb.ExecutedBlockIdentifier_Number{Number: 100}},
 			},
 			expectedReturnCode: codes.NotFound,
 		},
@@ -95,156 +95,78 @@ func TestExecutionService_GetBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			blockInfo, err := serviceV1Alpha1.GetBlock(context.Background(), tt.getBlockRequst)
+			blockMetadata, err := serviceV2.GetExecutedBlockMetadata(context.Background(), tt.request)
 			if tt.expectedReturnCode > 0 {
-				require.NotNil(t, err, "GetBlock should return an error")
-				require.Equal(t, tt.expectedReturnCode, status.Code(err), "GetBlock failed")
+				require.NotNil(t, err, "GetExecutedBlockMetadata should return an error")
+				require.Equal(t, tt.expectedReturnCode, status.Code(err), "GetExecutedBlockMetadata failed")
 			}
 			if err == nil {
-				require.NotNil(t, blockInfo, "Block not found")
+				require.NotNil(t, blockMetadata, "Block metadata not found")
 				var block *types.Block
-				if tt.getBlockRequst.Identifier.GetBlockNumber() != 0 {
+				if tt.request.Identifier.GetNumber() != 0 {
 					// get block by number
-					block = ethservice.BlockChain().GetBlockByNumber(uint64(tt.getBlockRequst.Identifier.GetBlockNumber()))
+					block = ethservice.BlockChain().GetBlockByNumber(uint64(tt.request.Identifier.GetNumber()))
 				}
-				if tt.getBlockRequst.Identifier.GetBlockHash() != nil {
-					block = ethservice.BlockChain().GetBlockByHash(common.Hash(tt.getBlockRequst.Identifier.GetBlockHash()))
+				if tt.request.Identifier.GetHash() != "" {
+					block = ethservice.BlockChain().GetBlockByHash(common.HexToHash(tt.request.Identifier.GetHash()))
 				}
 				require.NotNil(t, block, "Block not found")
 
-				require.Equal(t, uint64(blockInfo.Number), block.NumberU64(), "Block number is not correct")
-				require.Equal(t, block.ParentHash().Bytes(), blockInfo.ParentBlockHash, "Parent Block Hash is not correct")
-				require.Equal(t, block.Hash().Bytes(), blockInfo.Hash, "BlockHash is not correct")
-			}
-		})
-
-	}
-}
-
-func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
-
-	tests := []struct {
-		description          string
-		batchGetBlockRequest *astriaPb.BatchGetBlocksRequest
-		expectedReturnCode   codes.Code
-	}{
-		{
-			description: "BatchGetBlocks with block hashes",
-			batchGetBlockRequest: &astriaPb.BatchGetBlocksRequest{
-				Identifiers: []*astriaPb.BlockIdentifier{
-					{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(1).Hash().Bytes()}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes()}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(3).Hash().Bytes()}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(4).Hash().Bytes()}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockHash{BlockHash: ethservice.BlockChain().GetBlockByNumber(5).Hash().Bytes()}},
-				},
-			},
-			expectedReturnCode: 0,
-		},
-		{
-			description: "BatchGetBlocks with block numbers",
-			batchGetBlockRequest: &astriaPb.BatchGetBlocksRequest{
-				Identifiers: []*astriaPb.BlockIdentifier{
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 1}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 2}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 3}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 4}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 5}},
-				},
-			},
-			expectedReturnCode: 0,
-		},
-		{
-			description: "BatchGetBlocks block not found",
-			batchGetBlockRequest: &astriaPb.BatchGetBlocksRequest{
-				Identifiers: []*astriaPb.BlockIdentifier{
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 1}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 2}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 3}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 4}},
-					{Identifier: &astriaPb.BlockIdentifier_BlockNumber{BlockNumber: 100}},
-				},
-			},
-			expectedReturnCode: codes.NotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			batchBlocksRes, err := serviceV1Alpha1.BatchGetBlocks(context.Background(), tt.batchGetBlockRequest)
-			if tt.expectedReturnCode > 0 {
-				require.NotNil(t, err, "BatchGetBlocks should return an error")
-				require.Equal(t, tt.expectedReturnCode, status.Code(err), "BatchGetBlocks failed")
-			}
-
-			for _, batchBlock := range batchBlocksRes.GetBlocks() {
-				require.NotNil(t, batchBlock, "Block not found in batch blocks response")
-
-				block := ethservice.BlockChain().GetBlockByNumber(uint64(batchBlock.Number))
-				require.NotNil(t, block, "Block not found in blockchain")
-
-				require.Equal(t, uint64(batchBlock.Number), block.NumberU64(), "Block number is not correct")
-				require.Equal(t, block.ParentHash().Bytes(), batchBlock.ParentBlockHash, "Parent Block Hash is not correct")
-				require.Equal(t, block.Hash().Bytes(), batchBlock.Hash, "BlockHash is not correct")
+				require.Equal(t, uint64(blockMetadata.Number), block.NumberU64(), "Block number is not correct")
+				require.Equal(t, block.ParentHash().Hex(), blockMetadata.ParentHash, "Parent Block Hash is not correct")
+				require.Equal(t, block.Hash().Hex(), blockMetadata.Hash, "BlockHash is not correct")
 			}
 		})
 	}
 }
 
-func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
-	lo := i.Uint64()
-	hi := new(big.Int).Rsh(i, 64).Uint64()
-	return &primitivev1.Uint128{Lo: lo, Hi: hi}
-}
-
-func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
+func TestExecutionServiceServerV2_ExecuteBlock(t *testing.T) {
 	ethservice, _ := setupExecutionService(t, 10)
 
 	tests := []struct {
-		description                          string
-		callGenesisInfoAndGetCommitmentState bool
-		numberOfTxs                          int
-		prevBlockHash                        []byte
-		timestamp                            uint64
-		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
-		expectedReturnCode                   codes.Code
+		description        string
+		createSessionFirst bool
+		numberOfTxs        int
+		prevBlockHash      string
+		timestamp          uint64
+		depositTxAmount    *big.Int // if this is non zero then we send a deposit tx
+		expectedReturnCode codes.Code
 	}{
 		{
-			description:                          "ExecuteBlock without calling GetGenesisInfo and GetCommitmentState",
-			callGenesisInfoAndGetCommitmentState: false,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   codes.PermissionDenied,
+			description:        "ExecuteBlock without creating session first",
+			createSessionFirst: false,
+			numberOfTxs:        5,
+			prevBlockHash:      ethservice.BlockChain().GetBlockByNumber(2).Hash().Hex(),
+			timestamp:          ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
+			depositTxAmount:    big.NewInt(0),
+			expectedReturnCode: codes.PermissionDenied,
 		},
 		{
-			description:                          "ExecuteBlock with 5 txs and no deposit tx",
-			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   0,
+			description:        "ExecuteBlock with 5 txs and no deposit tx",
+			createSessionFirst: true,
+			numberOfTxs:        5,
+			prevBlockHash:      ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(),
+			timestamp:          ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:    big.NewInt(0),
+			expectedReturnCode: 0,
 		},
 		{
-			description:                          "ExecuteBlock with 5 txs and a deposit tx",
-			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
-			depositTxAmount:                      big.NewInt(1000000000000000000),
-			expectedReturnCode:                   0,
+			description:        "ExecuteBlock with 5 txs and a deposit tx",
+			createSessionFirst: true,
+			numberOfTxs:        5,
+			prevBlockHash:      ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(),
+			timestamp:          ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:    big.NewInt(1000000000000000000),
+			expectedReturnCode: 0,
 		},
 		{
-			description:                          "ExecuteBlock with incorrect previous block hash",
-			callGenesisInfoAndGetCommitmentState: true,
-			numberOfTxs:                          5,
-			prevBlockHash:                        ethservice.BlockChain().GetBlockByNumber(2).Hash().Bytes(),
-			timestamp:                            ethservice.BlockChain().GetBlockByNumber(2).Time() + 2,
-			depositTxAmount:                      big.NewInt(0),
-			expectedReturnCode:                   codes.FailedPrecondition,
+			description:        "ExecuteBlock with incorrect previous block hash",
+			createSessionFirst: true,
+			numberOfTxs:        5,
+			prevBlockHash:      common.BytesToHash([]byte("incorrect_hash")).Hex(),
+			timestamp:          ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:    big.NewInt(0),
+			expectedReturnCode: codes.FailedPrecondition,
 		},
 	}
 
@@ -258,24 +180,30 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
-			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+			ethservice, serviceV2 := setupExecutionService(t, 10)
 
-			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
-			var genesisInfo *astriaPb.GenesisInfo
-			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
-			if tt.callGenesisInfoAndGetCommitmentState {
-				// call getGenesisInfo and getCommitmentState before calling executeBlock
-				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
-				require.Nil(t, err, "GetGenesisInfo failed")
-				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+			var err error
+			var session *astriaPb.ExecutionSession
+			if tt.createSessionFirst {
+				// Create execution session before calling executeBlock
+				session, err = serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+				require.Nil(t, err, "CreateExecutionSession failed")
+				require.NotNil(t, session, "ExecutionSession is nil")
 
-				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-				require.Nil(t, err, "GetCommitmentState failed")
-				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
+				// Debug information for the "incorrect previous block hash" test
+				if tt.description == "ExecuteBlock with incorrect previous block hash" {
+					currentBlock := ethservice.BlockChain().CurrentBlock()
+					currentHeight := currentBlock.Number.Uint64() + 1
+					currentFork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(currentHeight)
+
+					t.Logf("Debug - Current height: %d, Fork height: %d, Fork stop height: %d",
+						currentHeight, currentFork.Height, currentFork.StopHeight)
+					t.Logf("Debug - Current safe block hash: %s, Test previous hash: %s",
+						ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(), tt.prevBlockHash)
+				}
 			}
 
 			// create the txs to send
-			// create 5 txs
 			txs := []*types.Transaction{}
 			marshalledTxs := []*sequencerblockv1.RollupData{}
 			for i := 0; i < 5; i++ {
@@ -292,7 +220,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 			}
 
 			// create deposit tx if depositTxAmount is non zero
-			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
+			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 && tt.createSessionFirst {
 				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
 				bridgeAddress := bridgeConfig.BridgeAddress
 				bridgeAssetDenom := bridgeConfig.AssetDenom
@@ -303,13 +231,18 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
 
+				hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
+				rollupId := primitivev1.RollupId{
+					Inner: hashedRollupId[:],
+				}
+
 				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
 					BridgeAddress: &primitivev1.Address{
 						Bech32M: bridgeAddress,
 					},
 					Asset:                   bridgeAssetDenom,
 					Amount:                  depositAmount,
-					RollupId:                genesisInfo.RollupId,
+					RollupId:                &rollupId,
 					DestinationChainAddress: chainDestinationAddress.String(),
 					SourceTransactionId: &primitivev1.TransactionId{
 						Inner: "test_tx_hash",
@@ -320,15 +253,21 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 				marshalledTxs = append(marshalledTxs, depositTx)
 			}
 
+			sessionId := ""
+			if session != nil {
+				sessionId = session.SessionId
+			}
+
 			executeBlockReq := &astriaPb.ExecuteBlockRequest{
-				PrevBlockHash: tt.prevBlockHash,
+				SessionId:  sessionId,
+				ParentHash: tt.prevBlockHash,
 				Timestamp: &timestamppb.Timestamp{
 					Seconds: int64(tt.timestamp),
 				},
 				Transactions: marshalledTxs,
 			}
 
-			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
+			executeBlockRes, err := serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
 			if tt.expectedReturnCode > 0 {
 				require.NotNil(t, err, "ExecuteBlock should return an error")
 				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
@@ -338,292 +277,339 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 
 				astriaOrdered := ethservice.TxPool().AstriaOrdered()
 				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
-
-				// check if commitment state is not updated
-				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-				require.Nil(t, err, "GetCommitmentState failed")
-
-				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
 			}
-
 		})
 	}
 }
 
-func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+func TestExecutionServiceServerV2_UpdateCommitmentState(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
 
-	// call genesis info
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
-	require.Nil(t, err, "GetGenesisInfo failed")
-	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+	// Create execution session
+	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.Nil(t, err, "CreateExecutionSession failed")
+	require.NotNil(t, session, "ExecutionSession is nil")
 
-	// call get commitment state
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-	require.Nil(t, err, "GetCommitmentState failed")
-	require.NotNil(t, commitmentState, "CommitmentState is nil")
-
-	// get previous block hash
-	previousBlock := ethservice.BlockChain().CurrentSafeBlock()
-	require.NotNil(t, previousBlock, "Previous block not found")
-
-	// create 5 txs
-	txs := []*types.Transaction{}
-	marshalledTxs := []*sequencerblockv1.RollupData{}
-	for i := 0; i < 5; i++ {
-		unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
-		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
-		require.Nil(t, err, "Failed to sign tx")
-		txs = append(txs, tx)
-
-		marshalledTx, err := tx.MarshalBinary()
-		require.Nil(t, err, "Failed to marshal tx")
-		marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
-			Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
-		})
+	// Execute a block
+	softBlock := ethservice.BlockChain().CurrentSafeBlock()
+	executeBlockReq := &astriaPb.ExecuteBlockRequest{
+		SessionId:  session.SessionId,
+		ParentHash: softBlock.Hash().Hex(),
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(softBlock.Time + 2),
+		},
+		Transactions: []*sequencerblockv1.RollupData{},
 	}
+
+	executeBlockRes, err := serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+	require.Nil(t, err, "ExecuteBlock failed")
+	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
+
+	// Test invalid session ID
+	invalidSessionReq := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: "invalid-session-id",
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			FirmExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight + 1,
+		},
+	}
+
+	_, err = serviceV2.UpdateCommitmentState(context.Background(), invalidSessionReq)
+	require.NotNil(t, err, "UpdateCommitmentState should fail with invalid session ID")
+	require.Equal(t, codes.PermissionDenied, status.Code(err), "Should get PermissionDenied error")
+
+	// Test decreasing Celestia height
+	decreasedHeightReq := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: session.SessionId,
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			FirmExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight - 1, // Decrease height
+		},
+	}
+
+	_, err = serviceV2.UpdateCommitmentState(context.Background(), decreasedHeightReq)
+	require.NotNil(t, err, "UpdateCommitmentState should fail with decreased Celestia height")
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "Should get InvalidArgument error")
+	require.Contains(t, err.Error(), "Base Celestia height cannot be decreased")
+
+	// Test block hash that doesn't exist
+	nonExistentBlockReq := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: session.SessionId,
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata: &astriaPb.ExecutedBlockMetadata{
+				Number:     100,
+				Hash:       common.BytesToHash([]byte("non-existent-hash")).Hex(),
+				ParentHash: common.BytesToHash([]byte("non-existent-parent")).Hex(),
+				Timestamp:  &timestamppb.Timestamp{Seconds: int64(softBlock.Time + 10)},
+			},
+			FirmExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight + 1,
+		},
+	}
+
+	_, err = serviceV2.UpdateCommitmentState(context.Background(), nonExistentBlockReq)
+	require.NotNil(t, err, "UpdateCommitmentState should fail with non-existent block hash")
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "Should get InvalidArgument error")
+	require.Contains(t, err.Error(), "Soft block specified does not exist")
+
+	// Test basic successful case
+	updateCommitmentStateReq := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: session.SessionId,
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			FirmExecutedBlockMetadata:  executeBlockRes.ExecutedBlockMetadata,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight + 1,
+		},
+	}
+
+	commitmentStateRes, err := serviceV2.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
+	require.Nil(t, err, "UpdateCommitmentState failed")
+	require.NotNil(t, commitmentStateRes, "UpdateCommitmentState response is nil")
+
+	// Verify commitment state
+	softBlockAfter := ethservice.BlockChain().CurrentSafeBlock()
+	firmBlockAfter := ethservice.BlockChain().CurrentFinalBlock()
+
+	require.Equal(t, executeBlockRes.ExecutedBlockMetadata.Hash, softBlockAfter.Hash().Hex(), "Soft block hash incorrect")
+	require.Equal(t, executeBlockRes.ExecutedBlockMetadata.Hash, firmBlockAfter.Hash().Hex(), "Firm block hash incorrect")
+
+	// Check celestia height
+	celestiaHeight := ethservice.BlockChain().CurrentBaseCelestiaHeight()
+	require.Equal(t, updateCommitmentStateReq.CommitmentState.LowestCelestiaSearchHeight, celestiaHeight, "Celestia height not updated correctly")
+}
+
+func TestEthHeaderToExecutedBlockMetadata(t *testing.T) {
+	ethservice, _ := setupExecutionService(t, 10)
+
+	// Test with valid header
+	header := ethservice.BlockChain().CurrentBlock()
+	metadata, err := ethHeaderToExecutedBlockMetadata(header)
+	require.Nil(t, err, "ethHeaderToExecutedBlockMetadata should not fail with valid header")
+	require.Equal(t, header.Number.Uint64(), metadata.Number, "Block number doesn't match")
+	require.Equal(t, header.Hash().Hex(), metadata.Hash, "Block hash doesn't match")
+	require.Equal(t, header.ParentHash.Hex(), metadata.ParentHash, "Parent hash doesn't match")
+	require.Equal(t, int64(header.Time), metadata.Timestamp.Seconds, "Timestamp doesn't match")
+
+	// Test with nil header
+	metadata, err = ethHeaderToExecutedBlockMetadata(nil)
+	require.NotNil(t, err, "ethHeaderToExecutedBlockMetadata should fail with nil header")
+	require.Nil(t, metadata, "Metadata should be nil when header is nil")
+}
+
+func TestGetExecutedBlockMetadataFromIdentifier(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
+	bc := ethservice.BlockChain()
+
+	// Get a block by number
+	block2 := bc.GetBlockByNumber(2)
+	require.NotNil(t, block2, "Test setup should have a block at number 2")
+
+	identifier1 := &astriaPb.ExecutedBlockIdentifier{
+		Identifier: &astriaPb.ExecutedBlockIdentifier_Number{
+			Number: 2,
+		},
+	}
+
+	metadata1, err := serviceV2.getExecutedBlockMetadataFromIdentifier(identifier1)
+	require.Nil(t, err, "Should successfully get metadata by block number")
+	require.Equal(t, uint64(2), metadata1.Number, "Block number should match")
+	require.Equal(t, block2.Hash().Hex(), metadata1.Hash, "Block hash should match")
+
+	// Get a block by hash
+	block3 := bc.GetBlockByNumber(3)
+	require.NotNil(t, block3, "Test setup should have a block at number 3")
+
+	identifier2 := &astriaPb.ExecutedBlockIdentifier{
+		Identifier: &astriaPb.ExecutedBlockIdentifier_Hash{
+			Hash: block3.Hash().Hex(),
+		},
+	}
+
+	metadata2, err := serviceV2.getExecutedBlockMetadataFromIdentifier(identifier2)
+	require.Nil(t, err, "Should successfully get metadata by block hash")
+	require.Equal(t, uint64(3), metadata2.Number, "Block number should match")
+	require.Equal(t, block3.Hash().Hex(), metadata2.Hash, "Block hash should match")
+
+	// non-existent block by number
+	identifier3 := &astriaPb.ExecutedBlockIdentifier{
+		Identifier: &astriaPb.ExecutedBlockIdentifier_Number{
+			Number: 100,
+		},
+	}
+
+	metadata3, err := serviceV2.getExecutedBlockMetadataFromIdentifier(identifier3)
+	require.NotNil(t, err, "Should fail for non-existent block")
+	require.Nil(t, metadata3, "Metadata should be nil for non-existent block")
+	require.Equal(t, codes.NotFound, status.Code(err), "Should return NotFound error")
+
+	// non-existent block by hash
+	identifier4 := &astriaPb.ExecutedBlockIdentifier{
+		Identifier: &astriaPb.ExecutedBlockIdentifier_Hash{
+			Hash: common.BytesToHash([]byte("non-existent-hash")).Hex(),
+		},
+	}
+
+	metadata4, err := serviceV2.getExecutedBlockMetadataFromIdentifier(identifier4)
+	require.NotNil(t, err, "Should fail for non-existent block")
+	require.Nil(t, metadata4, "Metadata should be nil for non-existent block")
+	require.Equal(t, codes.NotFound, status.Code(err), "Should return NotFound error")
+}
+
+func TestExecutionServiceServerV2_CreateExecutionSession_HaltedFork(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionServiceWithHaltedFork(t, 10)
+
+	currentFork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	require.True(t, currentFork.Halt, "Fork should be halted")
+
+	_, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.NotNil(t, err, "CreateExecutionSession should fail with halted fork")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err), "Should get FailedPrecondition error")
+}
+
+func TestExecutionServiceServerV2_ExecuteBlock_InvalidSession(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
+
+	softBlock := ethservice.BlockChain().CurrentSafeBlock()
+	executeBlockReq := &astriaPb.ExecuteBlockRequest{
+		SessionId:  "invalid-session-id",
+		ParentHash: softBlock.Hash().Hex(),
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(softBlock.Time + 2),
+		},
+		Transactions: []*sequencerblockv1.RollupData{},
+	}
+
+	_, err := serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+	require.NotNil(t, err, "ExecuteBlock should fail without a valid session")
+	require.Equal(t, codes.PermissionDenied, status.Code(err), "Should get PermissionDenied error")
+}
+
+func TestExecutionServiceServerV2_ExecuteBlock_HaltedFork(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionServiceWithHaltedFork(t, 10)
+
+	currentFork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+	require.True(t, currentFork.Halt, "Fork should be halted")
+
+	_, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.NotNil(t, err, "CreateExecutionSession should fail with halted fork")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err), "Should get FailedPrecondition error for halted fork")
+
+	// Directly set the activeSessionId and activeFork to simulate a session that was created
+	// before the fork was halted
+	serviceV2.activeSessionId = "simulated-session-id"
+	serviceV2.activeFork = &currentFork
+
+	softBlock := ethservice.BlockChain().CurrentSafeBlock()
+	executeBlockReq := &astriaPb.ExecuteBlockRequest{
+		SessionId:  serviceV2.activeSessionId,
+		ParentHash: softBlock.Hash().Hex(),
+		Timestamp: &timestamppb.Timestamp{
+			Seconds: int64(softBlock.Time + 2),
+		},
+		Transactions: []*sequencerblockv1.RollupData{},
+	}
+
+	_, err = serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+	require.NotNil(t, err, "ExecuteBlock should fail with halted fork")
+	require.Equal(t, codes.FailedPrecondition, status.Code(err), "Should get FailedPrecondition error")
+}
+
+func TestExecutionServiceServerV2_ExecuteBlock_OutOfRange(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
+
+	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.Nil(t, err, "CreateExecutionSession failed")
+	require.NotNil(t, session, "Session should not be nil")
 
 	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
-	var bridgeConfig params.AstriaBridgeAddressConfig
-	for _, cfg := range fork.BridgeAddresses {
-		bridgeConfig = *cfg
-		break
-	}
 
-	amountToDeposit := big.NewInt(1000000000000000000)
-	depositAmount := bigIntToProtoU128(amountToDeposit)
-	bridgeAddress := bridgeConfig.BridgeAddress
-	bridgeAssetDenom := bridgeConfig.AssetDenom
+	fork.StopHeight = 5
+	serviceV2.activeFork = &fork
 
-	// create new chain destination address for better testing
-	chainDestinationAddressPrivKey, err := crypto.GenerateKey()
-	require.Nil(t, err, "Failed to generate chain destination address")
-
-	chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
-
-	stateDb, err := ethservice.BlockChain().State()
-	require.Nil(t, err, "Failed to get state db")
-	require.NotNil(t, stateDb, "State db is nil")
-
-	chainDestinationAddressBalanceBefore := stateDb.GetBalance(chainDestinationAddress)
-
-	depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-		BridgeAddress: &primitivev1.Address{
-			Bech32M: bridgeAddress,
-		},
-		Asset:                   bridgeAssetDenom,
-		Amount:                  depositAmount,
-		RollupId:                genesisInfo.RollupId,
-		DestinationChainAddress: chainDestinationAddress.String(),
-		SourceTransactionId: &primitivev1.TransactionId{
-			Inner: "test_tx_hash",
-		},
-		SourceActionIndex: 0,
-	}}}
-
-	marshalledTxs = append(marshalledTxs, depositTx)
-
+	softBlock := ethservice.BlockChain().GetBlockByNumber(6)
 	executeBlockReq := &astriaPb.ExecuteBlockRequest{
-		PrevBlockHash: previousBlock.Hash().Bytes(),
+		SessionId:  session.SessionId,
+		ParentHash: softBlock.Hash().Hex(),
 		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(previousBlock.Time + 2),
+			Seconds: int64(softBlock.Time() + 2),
 		},
-		Transactions: marshalledTxs,
+		Transactions: []*sequencerblockv1.RollupData{},
 	}
 
-	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
-	require.Nil(t, err, "ExecuteBlock failed")
-
-	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
-
-	// check if astria ordered txs are cleared
-	astriaOrdered := ethservice.TxPool().AstriaOrdered()
-	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
-
-	// call update commitment state to set the block we executed as soft and firm
-	updateCommitmentStateReq := &astriaPb.UpdateCommitmentStateRequest{
-		CommitmentState: &astriaPb.CommitmentState{
-			Soft: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
-			},
-			Firm: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
-			},
-			BaseCelestiaHeight: commitmentState.BaseCelestiaHeight + 1,
-		},
-	}
-
-	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
-	require.Nil(t, err, "UpdateCommitmentState failed")
-	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
-	require.Equal(t, updateCommitmentStateRes, updateCommitmentStateReq.CommitmentState, "CommitmentState response should match request")
-
-	// get the soft and firm block
-	softBlock := ethservice.BlockChain().CurrentSafeBlock()
-	require.NotNil(t, softBlock, "SoftBlock is nil")
-	firmBlock := ethservice.BlockChain().CurrentFinalBlock()
-	require.NotNil(t, firmBlock, "FirmBlock is nil")
-
-	// check if the soft and firm block are set correctly
-	require.True(t, bytes.Equal(softBlock.Hash().Bytes(), updateCommitmentStateRes.Soft.Hash), "Soft Block Hashes do not match")
-	require.True(t, bytes.Equal(softBlock.ParentHash.Bytes(), updateCommitmentStateRes.Soft.ParentBlockHash), "Soft Block Parent Hash do not match")
-	require.Equal(t, softBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Soft.Number), "Soft Block Number do not match")
-
-	require.True(t, bytes.Equal(firmBlock.Hash().Bytes(), updateCommitmentStateRes.Firm.Hash), "Firm Block Hashes do not match")
-	require.True(t, bytes.Equal(firmBlock.ParentHash.Bytes(), updateCommitmentStateRes.Firm.ParentBlockHash), "Firm Block Parent Hash do not match")
-	require.Equal(t, firmBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Firm.Number), "Firm Block Number do not match")
-
-	celestiaBaseHeight := ethservice.BlockChain().CurrentBaseCelestiaHeight()
-	require.Equal(t, celestiaBaseHeight, updateCommitmentStateRes.BaseCelestiaHeight, "BaseCelestiaHeight should be updated in db")
-
-	// check the difference in balances after deposit tx
-	stateDb, err = ethservice.BlockChain().State()
-	require.Nil(t, err, "Failed to get state db")
-	require.NotNil(t, stateDb, "State db is nil")
-	chainDestinationAddressBalanceAfter := stateDb.GetBalance(chainDestinationAddress)
-
-	balanceDiff := new(uint256.Int).Sub(chainDestinationAddressBalanceAfter, chainDestinationAddressBalanceBefore)
-	require.True(t, balanceDiff.Cmp(uint256.NewInt(1000000000000000000)) == 0, "Chain destination address balance is not correct")
+	_, err = serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+	require.NotNil(t, err, "ExecuteBlock should fail with out-of-range fork")
+	require.Equal(t, codes.OutOfRange, status.Code(err), "Should get OutOfRange error")
 }
 
-// Check that invalid transactions are not added into a block and are removed from the mempool
-func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInvalidTransactions(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+func TestExecutionServiceServerV2_UpdateCommitmentState_OutOfRange(t *testing.T) {
+	ethservice, serviceV2 := setupExecutionService(t, 10)
 
-	// call genesis info
-	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
-	require.Nil(t, err, "GetGenesisInfo failed")
-	require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.Nil(t, err, "CreateExecutionSession failed")
+	require.NotNil(t, session, "ExecutionSession is nil")
 
-	// call get commitment state
-	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
-	require.Nil(t, err, "GetCommitmentState failed")
-	require.NotNil(t, commitmentState, "CommitmentState is nil")
+	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
 
-	ethservice.BlockChain().SetSafe(ethservice.BlockChain().CurrentBlock())
+	fork.StopHeight = 5
+	serviceV2.activeFork = &fork
 
-	// get previous block hash
-	previousBlock := ethservice.BlockChain().CurrentSafeBlock()
-	require.NotNil(t, previousBlock, "Previous block not found")
+	outOfRangeBlock := ethservice.BlockChain().GetBlockByNumber(9)
+	require.NotNil(t, outOfRangeBlock, "Block 9 should exist")
 
-	gasLimit := ethservice.BlockChain().GasLimit()
+	outOfRangeSoftBlockMetadata, err := ethHeaderToExecutedBlockMetadata(outOfRangeBlock.Header())
+	require.Nil(t, err, "Failed to convert block header to metadata")
 
-	stateDb, err := ethservice.BlockChain().StateAt(previousBlock.Root)
-	require.Nil(t, err, "Failed to get state db")
-
-	latestNonce := stateDb.GetNonce(testAddr)
-
-	// create 5 txs
-	txs := []*types.Transaction{}
-	marshalledTxs := []*sequencerblockv1.RollupData{}
-	for i := 0; i < 5; i++ {
-		unsignedTx := types.NewTransaction(latestNonce+uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
-		tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
-		require.Nil(t, err, "Failed to sign tx")
-		txs = append(txs, tx)
-
-		marshalledTx, err := tx.MarshalBinary()
-		require.Nil(t, err, "Failed to marshal tx")
-		marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
-			Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
-		})
-	}
-
-	// add a tx with lesser gas than the base gas
-	unsignedTx := types.NewTransaction(latestNonce+uint64(5), testToAddress, big.NewInt(1), gasLimit, big.NewInt(params.InitialBaseFee*2), nil)
-	tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
-	require.Nil(t, err, "Failed to sign tx")
-	txs = append(txs, tx)
-
-	marshalledTx, err := tx.MarshalBinary()
-	require.Nil(t, err, "Failed to marshal tx")
-	marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
-		Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
-	})
-
-	errors := ethservice.TxPool().Add(txs, true, false)
-	for _, err := range errors {
-		require.Nil(t, err, "Failed to add tx to pool")
-	}
-
-	pending, queued := ethservice.TxPool().Stats()
-	require.Equal(t, 6, pending, "Pending txs should be 6")
-	require.Equal(t, 0, queued, "Queued txs should be 0")
-
-	executeBlockReq := &astriaPb.ExecuteBlockRequest{
-		PrevBlockHash: previousBlock.Hash().Bytes(),
-		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(previousBlock.Time + 2),
-		},
-		Transactions: marshalledTxs,
-	}
-
-	executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
-	require.Nil(t, err, "ExecuteBlock failed")
-
-	require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
-
-	// check if astria ordered txs are cleared
-	astriaOrdered := ethservice.TxPool().AstriaOrdered()
-	require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
-
-	// call update commitment state to set the block we executed as soft and firm
-	updateCommitmentStateReq := &astriaPb.UpdateCommitmentStateRequest{
-		CommitmentState: &astriaPb.CommitmentState{
-			Soft: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
-			},
-			Firm: &astriaPb.Block{
-				Hash:            executeBlockRes.Hash,
-				ParentBlockHash: executeBlockRes.ParentBlockHash,
-				Number:          executeBlockRes.Number,
-				Timestamp:       executeBlockRes.Timestamp,
-			},
-			BaseCelestiaHeight: commitmentState.BaseCelestiaHeight + 1,
-		},
-	}
-
-	updateCommitmentStateRes, err := serviceV1Alpha1.UpdateCommitmentState(context.Background(), updateCommitmentStateReq)
-	require.Nil(t, err, "UpdateCommitmentState failed")
-	require.NotNil(t, updateCommitmentStateRes, "UpdateCommitmentState response should not be nil")
-	require.Equal(t, updateCommitmentStateRes, updateCommitmentStateReq.CommitmentState, "CommitmentState response should match request")
-
-	// get the soft and firm block
-	softBlock := ethservice.BlockChain().CurrentSafeBlock()
-	require.NotNil(t, softBlock, "SoftBlock is nil")
 	firmBlock := ethservice.BlockChain().CurrentFinalBlock()
-	require.NotNil(t, firmBlock, "FirmBlock is nil")
+	firmBlockMetadata, err := ethHeaderToExecutedBlockMetadata(firmBlock)
+	require.Nil(t, err, "Failed to convert firm block header to metadata")
 
-	block := ethservice.BlockChain().GetBlockByNumber(softBlock.Number.Uint64())
-	require.NotNil(t, block, "Soft Block not found")
-	require.Equal(t, block.Transactions().Len(), 5, "Soft Block should have 5 txs")
+	updateReq1 := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: session.SessionId,
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  outOfRangeSoftBlockMetadata,
+			FirmExecutedBlockMetadata:  firmBlockMetadata,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight + 1,
+		},
+	}
 
-	// give the tx loop time to run
-	time.Sleep(1 * time.Millisecond)
+	_, err = serviceV2.UpdateCommitmentState(context.Background(), updateReq1)
+	require.NotNil(t, err, "UpdateCommitmentState should fail with soft block out of range")
+	require.Equal(t, codes.OutOfRange, status.Code(err), "Should get OutOfRange error")
+}
 
-	// after the tx loop is run, all pending txs should be removed
-	pending, queued = ethservice.TxPool().Stats()
-	require.Equal(t, 0, pending, "Pending txs should be 0")
-	require.Equal(t, 0, queued, "Queued txs should be 0")
+func TestExecutionServiceServerV2_UpdateCommitmentState_NonCanonicalBlocks(t *testing.T) {
+	_, serviceV2 := setupExecutionService(t, 10)
 
-	// check if the soft and firm block are set correctly
-	require.True(t, bytes.Equal(softBlock.Hash().Bytes(), updateCommitmentStateRes.Soft.Hash), "Soft Block Hashes do not match")
-	require.True(t, bytes.Equal(softBlock.ParentHash.Bytes(), updateCommitmentStateRes.Soft.ParentBlockHash), "Soft Block Parent Hash do not match")
-	require.Equal(t, softBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Soft.Number), "Soft Block Number do not match")
+	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+	require.Nil(t, err, "CreateExecutionSession failed")
+	require.NotNil(t, session, "ExecutionSession is nil")
 
-	require.True(t, bytes.Equal(firmBlock.Hash().Bytes(), updateCommitmentStateRes.Firm.Hash), "Firm Block Hashes do not match")
-	require.True(t, bytes.Equal(firmBlock.ParentHash.Bytes(), updateCommitmentStateRes.Firm.ParentBlockHash), "Firm Block Parent Hash do not match")
-	require.Equal(t, firmBlock.Number.Uint64(), uint64(updateCommitmentStateRes.Firm.Number), "Firm Block Number do not match")
+	nonExistentSoftBlock := &astriaPb.ExecutedBlockMetadata{
+		Number:     100,
+		Hash:       common.BytesToHash([]byte("non-existent-hash-1")).Hex(),
+		ParentHash: common.BytesToHash([]byte("non-existent-parent-1")).Hex(),
+		Timestamp:  &timestamppb.Timestamp{Seconds: int64(1000)},
+	}
 
-	celestiaBaseHeight := ethservice.BlockChain().CurrentBaseCelestiaHeight()
-	require.Equal(t, celestiaBaseHeight, updateCommitmentStateRes.BaseCelestiaHeight, "BaseCelestiaHeight should be updated in db")
+	nonExistentFirmBlock := &astriaPb.ExecutedBlockMetadata{
+		Number:     99,
+		Hash:       common.BytesToHash([]byte("non-existent-hash-2")).Hex(),
+		ParentHash: common.BytesToHash([]byte("non-existent-parent-2")).Hex(),
+		Timestamp:  &timestamppb.Timestamp{Seconds: int64(990)},
+	}
+
+	updateReq := &astriaPb.UpdateCommitmentStateRequest{
+		SessionId: session.SessionId,
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  nonExistentSoftBlock,
+			FirmExecutedBlockMetadata:  nonExistentFirmBlock,
+			LowestCelestiaSearchHeight: session.CommitmentState.LowestCelestiaSearchHeight + 1,
+		},
+	}
+
+	_, err = serviceV2.UpdateCommitmentState(context.Background(), updateReq)
+	require.NotNil(t, err, "UpdateCommitmentState should fail with non-existent blocks")
+	require.Equal(t, codes.InvalidArgument, status.Code(err), "Should get InvalidArgument error")
 }

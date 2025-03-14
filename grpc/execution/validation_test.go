@@ -87,12 +87,6 @@ func TestSequenceTxValidation(t *testing.T) {
 
 	invalidBridgeAssetDenom := "invalid-asset-denom"
 
-	invalidHeightBridgeAssetDenom := "invalid-height-asset-denom"
-	invalidHeightBridgeAddressBech32m := generateBech32MAddress()
-	fork.BridgeAddresses[invalidHeightBridgeAddressBech32m] = &params.AstriaBridgeAddressConfig{
-		AssetDenom: invalidHeightBridgeAssetDenom,
-	}
-
 	tests := []struct {
 		description string
 		sequencerTx *sequencerblockv1.RollupData
@@ -159,23 +153,6 @@ func TestSequenceTxValidation(t *testing.T) {
 				SourceActionIndex: 0,
 			}}},
 			wantErr: "disallowed asset",
-		},
-		{
-			description: "deposit tx with a height and asset below the bridge start height",
-			sequencerTx: &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
-				BridgeAddress: &primitivev1.Address{
-					Bech32M: invalidHeightBridgeAddressBech32m,
-				},
-				Asset:                   invalidHeightBridgeAssetDenom,
-				Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
-				RollupId:                &primitivev1.RollupId{Inner: make([]byte, 0)},
-				DestinationChainAddress: chainDestinationAddress.String(),
-				SourceTransactionId: &primitivev1.TransactionId{
-					Inner: "test_tx_hash",
-				},
-				SourceActionIndex: 0,
-			}}},
-			wantErr: "not allowed before height",
 		},
 		{
 			description: "valid deposit tx",

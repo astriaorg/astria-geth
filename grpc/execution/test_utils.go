@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -34,6 +35,12 @@ var (
 
 	testBalance = big.NewInt(2e18)
 )
+
+func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
+	lo := i.Uint64()
+	hi := new(big.Int).Rsh(i, 64).Uint64()
+	return &primitivev1.Uint128{Lo: lo, Hi: hi}
+}
 
 func generateMergeChain(n int, merged bool, halted ...bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
