@@ -161,16 +161,6 @@ func TestAstriaBridgeConfigValidation(t *testing.T) {
 			wantErr: fmt.Errorf("bridge address must have resolve to 20 byte address, got 19"),
 		},
 		{
-			description: "invalid start height",
-			config: AstriaBridgeAddressConfig{
-				BridgeAddress:  bridgeAddressBech32,
-				AssetDenom:     "nria",
-				AssetPrecision: 18,
-				Erc20Asset:     nil,
-			},
-			wantErr: fmt.Errorf("start height must be greater than 0"),
-		},
-		{
 			description: "invalid asset denom",
 			config: AstriaBridgeAddressConfig{
 				BridgeAddress:  bridgeAddressBech32,
