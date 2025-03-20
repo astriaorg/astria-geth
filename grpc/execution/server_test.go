@@ -22,7 +22,7 @@ import (
 )
 
 func TestExecutionService_GetGenesisInfo(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
 	require.Nil(t, err, "GetGenesisInfo failed")
@@ -36,7 +36,7 @@ func TestExecutionService_GetGenesisInfo(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	commitmentState, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
 	require.Nil(t, err, "GetCommitmentState failed")
@@ -62,7 +62,7 @@ func TestExecutionServiceServerV1Alpha2_GetCommitmentState(t *testing.T) {
 }
 
 func TestExecutionService_GetBlock(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	tests := []struct {
 		description        string
@@ -121,7 +121,7 @@ func TestExecutionService_GetBlock(t *testing.T) {
 }
 
 func TestExecutionServiceServerV1Alpha2_BatchGetBlocks(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	tests := []struct {
 		description          string
@@ -198,7 +198,7 @@ func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
 }
 
 func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
-	ethservice, _ := setupExecutionService(t, 10)
+	ethservice, _ := setupExecutionService(t, 10, false)
 
 	tests := []struct {
 		description                          string
@@ -250,7 +250,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
-			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+			ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
 			var genesisInfo *astriaPb.GenesisInfo
@@ -342,8 +342,143 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlock(t *testing.T) {
 	}
 }
 
+func TestExecutionServiceServerV1Alpha2_ExecuteBlockWithOutEnoughGas(t *testing.T) {
+	ethservice, _ := setupExecutionService(t, 0, true)
+
+	tests := []struct {
+		description                          string
+		callGenesisInfoAndGetCommitmentState bool
+		numberOfTxs                          int
+		prevBlockHash                        []byte
+		timestamp                            uint64
+		depositTxAmount                      *big.Int // if this is non zero then we send a deposit tx
+		expectedReturnCode                   codes.Code
+		expectedTransactionCount             int
+	}{
+		{
+			description:                          "ExecuteBlock with 5 txs and no deposit tx",
+			callGenesisInfoAndGetCommitmentState: true,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:                      big.NewInt(0),
+			expectedReturnCode:                   0,
+			expectedTransactionCount:             0,
+		},
+		{
+			description:                          "ExecuteBlock with 5 txs and a deposit tx",
+			callGenesisInfoAndGetCommitmentState: true,
+			numberOfTxs:                          5,
+			prevBlockHash:                        ethservice.BlockChain().CurrentSafeBlock().Hash().Bytes(),
+			timestamp:                            ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:                      big.NewInt(1000000000000000000),
+			expectedReturnCode:                   0,
+			expectedTransactionCount:             1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// reset the blockchain with each test
+			ethservice, serviceV1Alpha1 := setupExecutionService(t, 0, true)
+
+			var err error // adding this to prevent shadowing of genesisInfo in the below if branch
+			var genesisInfo *astriaPb.GenesisInfo
+			var commitmentStateBeforeExecuteBlock *astriaPb.CommitmentState
+			if tt.callGenesisInfoAndGetCommitmentState {
+				// call getGenesisInfo and getCommitmentState before calling executeBlock
+				genesisInfo, err = serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
+				require.Nil(t, err, "GetGenesisInfo failed")
+				require.NotNil(t, genesisInfo, "GenesisInfo is nil")
+
+				commitmentStateBeforeExecuteBlock, err = serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				require.Nil(t, err, "GetCommitmentState failed")
+				require.NotNil(t, commitmentStateBeforeExecuteBlock, "CommitmentState is nil")
+			}
+
+			// create the txs to send
+			// create 5 txs
+			txs := []*types.Transaction{}
+			marshalledTxs := []*sequencerblockv1.RollupData{}
+			for i := 0; i < 5; i++ {
+				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+				require.Nil(t, err, "Failed to sign tx")
+				txs = append(txs, tx)
+
+				marshalledTx, err := tx.MarshalBinary()
+				require.Nil(t, err, "Failed to marshal tx")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+					Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
+				})
+			}
+
+			// create deposit tx if depositTxAmount is non zero
+			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
+				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
+				bridgeAddress := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].BridgeAddress
+				bridgeAssetDenom := ethservice.BlockChain().Config().AstriaBridgeAddressConfigs[0].AssetDenom
+
+				// create new chain destination address for better testing
+				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
+				require.Nil(t, err, "Failed to generate chain destination address")
+
+				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
+
+				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+					BridgeAddress: &primitivev1.Address{
+						Bech32M: bridgeAddress,
+					},
+					Asset:                   bridgeAssetDenom,
+					Amount:                  depositAmount,
+					RollupId:                genesisInfo.RollupId,
+					DestinationChainAddress: chainDestinationAddress.String(),
+					SourceTransactionId: &primitivev1.TransactionId{
+						Inner: "test_tx_hash",
+					},
+					SourceActionIndex: 0,
+				}}}
+
+				marshalledTxs = append(marshalledTxs, depositTx)
+			}
+
+			executeBlockReq := &astriaPb.ExecuteBlockRequest{
+				PrevBlockHash: tt.prevBlockHash,
+				Timestamp: &timestamppb.Timestamp{
+					Seconds: int64(tt.timestamp),
+				},
+				Transactions: marshalledTxs,
+			}
+
+			block := ethservice.BlockChain().CurrentSafeBlock()
+			require.NotNil(t, block, "Block is nil")
+			executeBlockRes, err := serviceV1Alpha1.ExecuteBlock(context.Background(), executeBlockReq)
+			if tt.expectedReturnCode > 0 {
+				require.NotNil(t, err, "ExecuteBlock should return an error")
+				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
+			} else {
+				require.Nil(t, err, "ExecuteBlock failed %v", err)
+				require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
+
+				astriaOrdered := ethservice.TxPool().AstriaOrdered()
+				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+				// check if commitment state is not updated
+				commitmentStateAfterExecuteBlock, err := serviceV1Alpha1.GetCommitmentState(context.Background(), &astriaPb.GetCommitmentStateRequest{})
+				require.Nil(t, err, "GetCommitmentState failed")
+
+				require.Exactly(t, commitmentStateBeforeExecuteBlock, commitmentStateAfterExecuteBlock, "Commitment state should not be updated")
+
+				blockhash := common.BytesToHash(executeBlockRes.Hash)
+				block := ethservice.BlockChain().GetBlockByHash(blockhash)
+				require.Equal(t, tt.expectedTransactionCount, len(block.Transactions()), "Transaction count is not correct")
+			}
+		})
+	}
+}
+
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	// call genesis info
 	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})
@@ -479,7 +614,7 @@ func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitment(t *testi
 
 // Check that invalid transactions are not added into a block and are removed from the mempool
 func TestExecutionServiceServerV1Alpha2_ExecuteBlockAndUpdateCommitmentWithInvalidTransactions(t *testing.T) {
-	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10)
+	ethservice, serviceV1Alpha1 := setupExecutionService(t, 10, false)
 
 	// call genesis info
 	genesisInfo, err := serviceV1Alpha1.GetGenesisInfo(context.Background(), &astriaPb.GetGenesisInfoRequest{})

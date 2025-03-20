@@ -35,7 +35,7 @@ var (
 	testBalance = big.NewInt(2e18)
 )
 
-func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
+func generateMergeChain(n int, merged bool, gasLimit uint64) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -68,7 +68,7 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 		{
 			BridgeAddress:  bech32mBridgeAddress,
 			SenderAddress:  common.Address{},
-			StartHeight:    2,
+			StartHeight:    1,
 			AssetDenom:     "nria",
 			AssetPrecision: 18,
 			Erc20Asset:     nil,
@@ -87,13 +87,14 @@ func generateMergeChain(n int, merged bool) (*core.Genesis, []*types.Block, stri
 
 	genesis := &core.Genesis{
 		Config: &config,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			testAddr: {Balance: testBalance},
 		},
 		ExtraData:  []byte("test genesis"),
 		Timestamp:  9000,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(0),
+		GasLimit:   gasLimit,
 	}
 	testNonce := uint64(0)
 	generate := func(i int, g *core.BlockGen) {
@@ -130,9 +131,15 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 	return ethservice
 }
 
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV1) {
+func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, lowGasLimt bool) (*eth.Ethereum, *ExecutionServiceServerV1) {
 	t.Helper()
-	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true)
+	var gasLimit uint64
+	if lowGasLimt {
+		gasLimit = 5000
+	} else {
+		gasLimit = 50000000
+	}
+	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true, gasLimit)
 	ethservice := startEthService(t, genesis)
 
 	serviceV1Alpha1, err := NewExecutionServiceServerV1(ethservice)
