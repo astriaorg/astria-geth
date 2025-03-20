@@ -21,7 +21,7 @@ import (
 )
 
 func TestExecutionServiceServerV2_CreateExecutionSession(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
 	require.Nil(t, err, "CreateExecutionSession failed")
@@ -63,7 +63,7 @@ func TestExecutionServiceServerV2_CreateExecutionSession(t *testing.T) {
 }
 
 func TestExecutionServiceServerV2_GetExecutedBlockMetadata(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	tests := []struct {
 		description        string
@@ -121,7 +121,7 @@ func TestExecutionServiceServerV2_GetExecutedBlockMetadata(t *testing.T) {
 }
 
 func TestExecutionServiceServerV2_ExecuteBlock(t *testing.T) {
-	ethservice, _ := setupExecutionService(t, 10)
+	ethservice, _ := setupExecutionService(t, 10, false)
 
 	tests := []struct {
 		description        string
@@ -170,17 +170,22 @@ func TestExecutionServiceServerV2_ExecuteBlock(t *testing.T) {
 		},
 	}
 
-	fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
-	var bridgeConfig params.AstriaBridgeAddressConfig
-	for _, cfg := range fork.BridgeAddresses {
-		bridgeConfig = *cfg
-		break
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			// reset the blockchain with each test
-			ethservice, serviceV2 := setupExecutionService(t, 10)
+			ethservice, serviceV2 := setupExecutionService(t, 10, false)
+
+			fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+			var bridgeConfig params.AstriaBridgeAddressConfig
+			for _, cfg := range fork.BridgeAddresses {
+				bridgeConfig = *cfg
+				break
+			}
+
+			expectedTransactionCount := tt.numberOfTxs
+			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 {
+				expectedTransactionCount = expectedTransactionCount + 1
+			}
 
 			var err error
 			var session *astriaPb.ExecutionSession
@@ -275,13 +280,166 @@ func TestExecutionServiceServerV2_ExecuteBlock(t *testing.T) {
 
 				astriaOrdered := ethservice.TxPool().AstriaOrdered()
 				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+				blockhash := common.HexToHash(executeBlockRes.ExecutedBlockMetadata.Hash)
+				block := ethservice.BlockChain().GetBlockByHash(blockhash)
+				require.Equal(t, expectedTransactionCount, len(block.Transactions()), "Transaction count is not correct")
+			}
+		})
+	}
+}
+
+func TestExecutionServiceServerV2_ExecuteBlockWithGasOverrun(t *testing.T) {
+	ethservice, _ := setupExecutionService(t, 0, true)
+
+	tests := []struct {
+		description              string
+		createSessionFirst       bool
+		numberOfTxs              int
+		prevBlockHash            string
+		timestamp                uint64
+		depositTxAmount          *big.Int // if this is non zero then we send a deposit tx
+		expectedReturnCode       codes.Code
+		expectedTransactionCount int
+	}{
+		{
+			description:              "ExecuteBlock with 5 txs and no deposit tx",
+			createSessionFirst:       true,
+			numberOfTxs:              5,
+			prevBlockHash:            ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(),
+			timestamp:                ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:          big.NewInt(0),
+			expectedReturnCode:       0,
+			expectedTransactionCount: 0,
+		},
+		{
+			description:              "ExecuteBlock with 5 txs and a deposit tx",
+			createSessionFirst:       true,
+			numberOfTxs:              5,
+			prevBlockHash:            ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(),
+			timestamp:                ethservice.BlockChain().CurrentSafeBlock().Time + 2,
+			depositTxAmount:          big.NewInt(1000000000000000000),
+			expectedReturnCode:       0,
+			expectedTransactionCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// reset the blockchain with each test
+			ethservice, serviceV2 := setupExecutionService(t, 0, true)
+
+			fork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+			var bridgeConfig params.AstriaBridgeAddressConfig
+			for _, cfg := range fork.BridgeAddresses {
+				bridgeConfig = *cfg
+				break
+			}
+
+			var err error
+			var session *astriaPb.ExecutionSession
+			if tt.createSessionFirst {
+				// Create execution session before calling executeBlock
+				session, err = serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
+				require.Nil(t, err, "CreateExecutionSession failed")
+				require.NotNil(t, session, "ExecutionSession is nil")
+
+				// Debug information for the "incorrect previous block hash" test
+				if tt.description == "ExecuteBlock with incorrect previous block hash" {
+					currentBlock := ethservice.BlockChain().CurrentBlock()
+					currentHeight := currentBlock.Number.Uint64() + 1
+					currentFork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(currentHeight)
+
+					t.Logf("Debug - Current height: %d, Fork height: %d, Fork stop height: %d",
+						currentHeight, currentFork.Height, currentFork.StopHeight)
+					t.Logf("Debug - Current safe block hash: %s, Test previous hash: %s",
+						ethservice.BlockChain().CurrentSafeBlock().Hash().Hex(), tt.prevBlockHash)
+				}
+			}
+
+			// create 5 txs
+			marshalledTxs := []*sequencerblockv1.RollupData{}
+			for i := 0; i < 5; i++ {
+				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+				require.Nil(t, err, "Failed to sign tx")
+
+				marshalledTx, err := tx.MarshalBinary()
+				require.Nil(t, err, "Failed to marshal tx")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+					Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
+				})
+			}
+
+			// create deposit tx if depositTxAmount is non zero
+			if tt.depositTxAmount.Cmp(big.NewInt(0)) != 0 && tt.createSessionFirst {
+				depositAmount := bigIntToProtoU128(tt.depositTxAmount)
+				bridgeAddress := bridgeConfig.BridgeAddress
+				bridgeAssetDenom := bridgeConfig.AssetDenom
+
+				// create new chain destination address for better testing
+				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
+				require.Nil(t, err, "Failed to generate chain destination address")
+
+				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
+
+				hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
+				rollupId := primitivev1.RollupId{
+					Inner: hashedRollupId[:],
+				}
+
+				depositTx := &sequencerblockv1.RollupData{Value: &sequencerblockv1.RollupData_Deposit{Deposit: &sequencerblockv1.Deposit{
+					BridgeAddress: &primitivev1.Address{
+						Bech32M: bridgeAddress,
+					},
+					Asset:                   bridgeAssetDenom,
+					Amount:                  depositAmount,
+					RollupId:                &rollupId,
+					DestinationChainAddress: chainDestinationAddress.String(),
+					SourceTransactionId: &primitivev1.TransactionId{
+						Inner: "test_tx_hash",
+					},
+					SourceActionIndex: 0,
+				}}}
+
+				marshalledTxs = append(marshalledTxs, depositTx)
+			}
+
+			sessionId := ""
+			if session != nil {
+				sessionId = session.SessionId
+			}
+
+			executeBlockReq := &astriaPb.ExecuteBlockRequest{
+				SessionId:  sessionId,
+				ParentHash: tt.prevBlockHash,
+				Timestamp: &timestamppb.Timestamp{
+					Seconds: int64(tt.timestamp),
+				},
+				Transactions: marshalledTxs,
+			}
+
+			executeBlockRes, err := serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+			if tt.expectedReturnCode > 0 {
+				require.NotNil(t, err, "ExecuteBlock should return an error")
+				require.Equal(t, tt.expectedReturnCode, status.Code(err), "ExecuteBlock failed")
+			}
+			if err == nil {
+				require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
+
+				astriaOrdered := ethservice.TxPool().AstriaOrdered()
+				require.Equal(t, 0, astriaOrdered.Len(), "AstriaOrdered should be empty")
+
+				blockhash := common.HexToHash(executeBlockRes.ExecutedBlockMetadata.Hash)
+				block := ethservice.BlockChain().GetBlockByHash(blockhash)
+				require.Equal(t, tt.expectedTransactionCount, len(block.Transactions()), "Transaction count is not correct")
 			}
 		})
 	}
 }
 
 func TestExecutionServiceServerV2_UpdateCommitmentState(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	// Create execution session
 	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
@@ -379,7 +537,7 @@ func TestExecutionServiceServerV2_UpdateCommitmentState(t *testing.T) {
 }
 
 func TestEthHeaderToExecutedBlockMetadata(t *testing.T) {
-	ethservice, _ := setupExecutionService(t, 10)
+	ethservice, _ := setupExecutionService(t, 10, false)
 
 	// Test with valid header
 	header := ethservice.BlockChain().CurrentBlock()
@@ -397,7 +555,7 @@ func TestEthHeaderToExecutedBlockMetadata(t *testing.T) {
 }
 
 func TestGetExecutedBlockMetadataFromIdentifier(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 	bc := ethservice.BlockChain()
 
 	// Get a block by number
@@ -467,7 +625,7 @@ func TestExecutionServiceServerV2_CreateExecutionSession_HaltedFork(t *testing.T
 }
 
 func TestExecutionServiceServerV2_ExecuteBlock_InvalidSession(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	softBlock := ethservice.BlockChain().CurrentSafeBlock()
 	executeBlockReq := &astriaPb.ExecuteBlockRequest{
@@ -515,7 +673,7 @@ func TestExecutionServiceServerV2_ExecuteBlock_HaltedFork(t *testing.T) {
 }
 
 func TestExecutionServiceServerV2_ExecuteBlock_OutOfRange(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
 	require.Nil(t, err, "CreateExecutionSession failed")
@@ -542,7 +700,7 @@ func TestExecutionServiceServerV2_ExecuteBlock_OutOfRange(t *testing.T) {
 }
 
 func TestExecutionServiceServerV2_UpdateCommitmentState_OutOfRange(t *testing.T) {
-	ethservice, serviceV2 := setupExecutionService(t, 10)
+	ethservice, serviceV2 := setupExecutionService(t, 10, false)
 
 	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
 	require.Nil(t, err, "CreateExecutionSession failed")
@@ -578,7 +736,7 @@ func TestExecutionServiceServerV2_UpdateCommitmentState_OutOfRange(t *testing.T)
 }
 
 func TestExecutionServiceServerV2_UpdateCommitmentState_NonCanonicalBlocks(t *testing.T) {
-	_, serviceV2 := setupExecutionService(t, 10)
+	_, serviceV2 := setupExecutionService(t, 10, false)
 
 	session, err := serviceV2.CreateExecutionSession(context.Background(), &astriaPb.CreateExecutionSessionRequest{})
 	require.Nil(t, err, "CreateExecutionSession failed")

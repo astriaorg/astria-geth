@@ -257,7 +257,7 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 			}
 		}
 		// If we don't have enough gas for any further transactions then we're done.
-		if env.gasPool.Gas() < params.TxGas {
+		if env.gasPool.Gas() < params.TxGas && tx.Type() != types.InjectedTxType {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
 			// remove txs from the mempool if they are too big for this block
 			for _, txToRemove := range (*txs)[i:] {

@@ -56,7 +56,7 @@ func generateBech32MAddress() string {
 }
 
 func TestSequenceTxValidation(t *testing.T) {
-	ethservice, _ := setupExecutionService(t, 10)
+	ethservice, _ := setupExecutionService(t, 10, false)
 
 	blobTx, err := testBlobTx().MarshalBinary()
 	require.Nil(t, err, "failed to marshal random blob tx: %v", err)

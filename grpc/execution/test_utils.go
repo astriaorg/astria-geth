@@ -42,7 +42,7 @@ func bigIntToProtoU128(i *big.Int) *primitivev1.Uint128 {
 	return &primitivev1.Uint128{Lo: lo, Hi: hi}
 }
 
-func generateMergeChain(n int, merged bool, halted ...bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
+func generateMergeChain(n int, merged bool, gasLimit uint64, halted ...bool) (*core.Genesis, []*types.Block, string, *ecdsa.PrivateKey) {
 	config := *params.AllEthashProtocolChanges
 	engine := consensus.Engine(beaconConsensus.New(ethash.NewFaker()))
 	if merged {
@@ -108,13 +108,14 @@ func generateMergeChain(n int, merged bool, halted ...bool) (*core.Genesis, []*t
 
 	genesis := &core.Genesis{
 		Config: &config,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			testAddr: {Balance: testBalance},
 		},
 		ExtraData:  []byte("test genesis"),
 		Timestamp:  9000,
 		BaseFee:    big.NewInt(params.InitialBaseFee),
 		Difficulty: big.NewInt(0),
+		GasLimit:   gasLimit,
 	}
 	testNonce := uint64(0)
 	generate := func(i int, g *core.BlockGen) {
@@ -152,16 +153,20 @@ func startEthService(t *testing.T, genesis *core.Genesis) *eth.Ethereum {
 }
 
 // setupExecutionService creates an execution service for testing
-func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, halted ...bool) (*eth.Ethereum, *ExecutionServiceServerV2) {
+func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, lowGasLimit bool, halted ...bool) (*eth.Ethereum, *ExecutionServiceServerV2) {
 	t.Helper()
-
+	var gasLimit uint64
+	if lowGasLimit {
+		gasLimit = 5000
+	} else {
+		gasLimit = 50000000
+	}
 	// Check if halted parameter was provided
 	isHalted := false
 	if len(halted) > 0 {
 		isHalted = halted[0]
 	}
-
-	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true, isHalted)
+	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true, gasLimit, isHalted)
 	ethservice := startEthService(t, genesis)
 
 	serviceV2, err := NewExecutionServiceServerV2(ethservice, false, 0)
@@ -192,5 +197,5 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, halted ...boo
 
 // setupExecutionServiceWithHaltedFork sets up an execution service with a halted fork
 func setupExecutionServiceWithHaltedFork(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV2) {
-	return setupExecutionService(t, noOfBlocksToGenerate, true)
+	return setupExecutionService(t, noOfBlocksToGenerate, false, true)
 }
