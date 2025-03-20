@@ -301,15 +301,18 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 		return nil, status.Error(codes.OutOfRange, "Soft commitment is out of range")
 	}
 
-	// Firm commitment is out of range
-	// If StopHeight is 0, there is no upper limit
-	if !s.softAsFirm {
+	// If softAsFirm is true, firm commitment states is ignored. If the firm commitment
+	// state is unchanged, we assume the stored firm block is correct and do not
+	// perform checks.
+	if !s.softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()){
+		// Firm commitment is out of range
+		// If StopHeight is 0, there is no upper limit
 		if s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight {
-			return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+			return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Firm number %d is greater than stop height %d", req.CommitmentState.FirmExecutedBlockMetadata.Number, s.activeFork.StopHeight))
 		}
-		// If the fork is not genesis, the firm commitment must be greater than the fork height
-		if s.activeFork.Height > 1 && req.CommitmentState.FirmExecutedBlockMetadata.Number < s.activeFork.Height {
-			return nil, status.Error(codes.OutOfRange, "Firm commitment is out of range")
+		// The firm commitment must be greater than or equal to the fork height
+		if req.CommitmentState.FirmExecutedBlockMetadata.Number < s.activeFork.Height {
+			return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Firm number %d is less than current fork height %d", req.CommitmentState.FirmExecutedBlockMetadata.Number, s.activeFork.Height))
 		}
 	}
 
