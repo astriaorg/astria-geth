@@ -301,9 +301,9 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 		return nil, status.Error(codes.OutOfRange, "Soft commitment is out of range")
 	}
 
-	// If softAsFirm is true, firm commitment states is ignored. If the firm commitment
+	// If softAsFirm is true, firm commitment state is ignored. If the firm commitment
 	// state is unchanged, we assume the stored firm block is correct and do not
-	// perform checks.
+	// perform these height checks.
 	if !s.softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()){
 		// Firm commitment is out of range
 		// If StopHeight is 0, there is no upper limit
