@@ -164,7 +164,7 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, halted ...boo
 	genesis, blocks, bridgeAddress, feeCollectorKey := generateMergeChain(noOfBlocksToGenerate, true, isHalted)
 	ethservice := startEthService(t, genesis)
 
-	serviceV2, err := NewExecutionServiceServerV2(ethservice, false)
+	serviceV2, err := NewExecutionServiceServerV2(ethservice, false, 0)
 	require.Nil(t, err, "can't create execution service")
 
 	fork := genesis.Config.AstriaForks.GetForkAtHeight(1)
