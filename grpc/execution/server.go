@@ -116,6 +116,11 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		return nil, status.Error(codes.Internal, "Could not locate firm block")
 	}
 
+	lowestCelestiaSearchHeight := s.bc.CurrentBaseCelestiaHeight()
+	if lowestCelestiaSearchHeight < fork.Celestia.StartHeight {
+		lowestCelestiaSearchHeight = s.bc.CurrentBaseCelestiaHeight()
+	}
+
 	res := &astriaPb.ExecutionSession{
 		SessionId: s.activeSessionId,
 		ExecutionSessionParameters: &astriaPb.ExecutionSessionParameters{
@@ -130,7 +135,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		CommitmentState: &astriaPb.CommitmentState{
 			SoftExecutedBlockMetadata:  softBlock,
 			FirmExecutedBlockMetadata:  firmBlock,
-			LowestCelestiaSearchHeight: s.bc.CurrentBaseCelestiaHeight(),
+			LowestCelestiaSearchHeight: lowestCelestiaSearchHeight,
 		},
 	}
 
