@@ -118,7 +118,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 
 	lowestCelestiaSearchHeight := s.bc.CurrentBaseCelestiaHeight()
 	if lowestCelestiaSearchHeight < fork.Celestia.StartHeight {
-		lowestCelestiaSearchHeight = s.bc.CurrentBaseCelestiaHeight()
+		lowestCelestiaSearchHeight = fork.Celestia.StartHeight
 	}
 
 	res := &astriaPb.ExecutionSession{
