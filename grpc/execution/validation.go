@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/contracts"
@@ -18,24 +18,15 @@ import (
 // If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
 // If the sequencer transaction is not a deposit tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
 // tx is not a blob tx or a deposit tx.
-func validateAndUnmarshalSequencerTx(
-	height uint64,
-	tx *sequencerblockv1.RollupData,
-	bridgeAddresses map[string]*params.AstriaBridgeAddressConfig,
-	bridgeAllowedAssets map[string]struct{},
-) (*types.Transaction, error) {
+func validateAndUnmarshalSequencerTx(tx *sequencerblockv1.RollupData, fork *params.AstriaForkData) (*types.Transaction, error) {
 	if deposit := tx.GetDeposit(); deposit != nil {
 		bridgeAddress := deposit.BridgeAddress.GetBech32M()
-		bac, ok := bridgeAddresses[bridgeAddress]
+		bac, ok := fork.BridgeAddresses[bridgeAddress]
 		if !ok {
 			return nil, fmt.Errorf("unknown bridge address: %s", bridgeAddress)
 		}
 
-		if height < uint64(bac.StartHeight) {
-			return nil, fmt.Errorf("bridging asset %s from bridge %s not allowed before height %d", bac.AssetDenom, bridgeAddress, bac.StartHeight)
-		}
-
-		if _, ok := bridgeAllowedAssets[deposit.Asset]; !ok {
+		if _, ok := fork.BridgeAllowedAssets[deposit.Asset]; !ok {
 			return nil, fmt.Errorf("disallowed asset %s in deposit tx", deposit.Asset)
 		}
 
@@ -111,11 +102,14 @@ func validateAndUnmarshalSequencerTx(
 // to the current state of the system. This is useful for validating the request before any
 // state changes or reads are made as a basic guard.
 func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error {
-	if req.PrevBlockHash == nil {
-		return fmt.Errorf("PrevBlockHash cannot be nil")
+	if req.SessionId == "" {
+		return fmt.Errorf("session_id cannot be empty")
+	}
+	if req.ParentHash == "" {
+		return fmt.Errorf("parent_hash cannot be empty")
 	}
 	if req.Timestamp == nil {
-		return fmt.Errorf("Timestamp cannot be nil")
+		return fmt.Errorf("timestamp cannot be nil")
 	}
 
 	return nil
@@ -126,36 +120,35 @@ func validateStaticCommitmentState(commitmentState *astriaPb.CommitmentState) er
 	if commitmentState == nil {
 		return fmt.Errorf("commitment state is nil")
 	}
-	if commitmentState.Soft == nil {
-		return fmt.Errorf("soft block is nil")
+	if commitmentState.SoftExecutedBlockMetadata == nil {
+		return fmt.Errorf("SoftExecutedBlockMetadata cannot be nil")
 	}
-	if commitmentState.Firm == nil {
-		return fmt.Errorf("firm block is nil")
+	if commitmentState.FirmExecutedBlockMetadata == nil {
+		return fmt.Errorf("FirmExecutedBlockMetadata cannot be nil")
 	}
-	if commitmentState.BaseCelestiaHeight == 0 {
-		return fmt.Errorf("base celestia height of 0 is not valid")
-	}
-
-	if err := validateStaticBlock(commitmentState.Soft); err != nil {
+	if err := validateStaticExecutedBlockMetadata(commitmentState.SoftExecutedBlockMetadata, false); err != nil {
 		return fmt.Errorf("soft block invalid: %w", err)
 	}
-	if err := validateStaticBlock(commitmentState.Firm); err != nil {
+	if err := validateStaticExecutedBlockMetadata(commitmentState.FirmExecutedBlockMetadata, true); err != nil {
 		return fmt.Errorf("firm block invalid: %w", err)
 	}
 
 	return nil
 }
 
-// `validateStaticBlock` validates the given block as a  without regard to the current state of the system.
-func validateStaticBlock(block *astriaPb.Block) error {
-	if block.ParentBlockHash == nil {
-		return fmt.Errorf("parent block hash is nil")
+// `validateStaticExecutedBlockMetadata` validates the given block metadata without regard to the current state of the system.
+func validateStaticExecutedBlockMetadata(block *astriaPb.ExecutedBlockMetadata, firm bool) error {
+	if !firm && block.Number == 0 {
+		return fmt.Errorf("block number cannot be 0")
 	}
-	if block.Hash == nil {
-		return fmt.Errorf("block hash is nil")
+	if block.ParentHash == "" {
+		return fmt.Errorf("parent hash cannot be empty")
+	}
+	if block.Hash == "" {
+		return fmt.Errorf("block hash cannot be empty")
 	}
 	if block.Timestamp == nil {
-		return fmt.Errorf("timestamp is 0")
+		return fmt.Errorf("timestamp cannot be nil")
 	}
 
 	return nil

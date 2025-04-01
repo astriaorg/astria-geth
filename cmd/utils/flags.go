@@ -35,7 +35,7 @@ import (
 	"strings"
 	"time"
 
-	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v1/executionv1grpc"
+	astriaGrpc "buf.build/gen/go/astria/execution-apis/grpc/go/astria/execution/v2/executionv2grpc"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	bparams "github.com/ethereum/go-ethereum/beacon/params"
@@ -883,6 +883,13 @@ var (
 		Usage:    "Gas price below which gpo will ignore transactions",
 		Value:    ethconfig.Defaults.GPO.IgnorePrice.Int64(),
 		Category: flags.GasPriceCategory,
+	}
+
+	// ExecutionService flags
+	ExecutionSoftAsFirmFlag = &cli.BoolFlag{
+		Name:     "execution.soft-as-firm",
+		Usage:    "Use soft commitment as firm commitment",
+		Category: flags.ExecutionCategory,
 	}
 
 	// Metrics flags
