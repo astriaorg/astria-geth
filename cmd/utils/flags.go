@@ -886,7 +886,7 @@ var (
 	}
 
 	// ExecutionService flags
-	ExecutionSoftAsFirmFlag = &cli.BoolFlag{
+	ExecutionServiceSoftAsFirmFlag = &cli.BoolFlag{
 		Name:     "execution.soft-as-firm",
 		Usage:    "Use soft commitment as firm commitment",
 		Category: flags.ExecutionCategory,
