@@ -306,7 +306,7 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 
 	valid := []*types.Transaction{}
 	for idx, tx := range txs {
-		err := pool.validateTxBasics(tx, false)
+		err := pool.validateTxBasics(tx, false, true)
 		if err != nil {
 			log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
 			continue
@@ -692,16 +692,16 @@ func (pool *LegacyPool) local() map[common.Address]types.Transactions {
 // rules, but does not check state-dependent validation such as sufficient balance.
 // This check is meant as an early check which only needs to be performed once,
 // and does not require the pool mutex to be held.
-func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) error {
+func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool, isAstriaOrdered bool) error {
 	opts := &txpool.ValidationOptions{
 		Config: pool.chainconfig,
 		Accept: 0 |
 			1<<types.LegacyTxType |
 			1<<types.AccessListTxType |
-			1<<types.DynamicFeeTxType |
-			1<<types.DepositTxType,
-		MaxSize: txMaxSize,
-		MinTip:  pool.gasTip.Load().ToBig(),
+			1<<types.DynamicFeeTxType,
+		MaxSize:        txMaxSize,
+		MinTip:         pool.gasTip.Load().ToBig(),
+		AcceptDeposits: isAstriaOrdered,
 	}
 	if local {
 		opts.MinTip = new(big.Int)
@@ -1082,7 +1082,7 @@ func (pool *LegacyPool) Add(txs []*types.Transaction, local, sync bool) []error 
 		// Exclude transactions with basic errors, e.g invalid signatures and
 		// insufficient intrinsic gas as soon as possible and cache senders
 		// in transactions before obtaining lock
-		if err := pool.validateTxBasics(tx, local); err != nil {
+		if err := pool.validateTxBasics(tx, local, false); err != nil {
 			errs[i] = err
 			log.Trace("Discarding invalid transaction", "hash", tx.Hash(), "err", err)
 			invalidTxMeter.Mark(1)
