@@ -252,6 +252,13 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func protoI128ToBigInt(i128 *primitivev1.Int128) *big.Int {
+	lo := big.NewInt(0).SetUint64(i128.Lo)
+	hi := big.NewInt(0).SetUint64(i128.Hi)
+	hi.Lsh(hi, 64)
+	return lo.Add(lo, hi)
+}
+
 type conversionConfig struct {
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
 	bridgeAllowedAssets   map[string]struct{}
@@ -289,6 +296,15 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
+	blockTimestamp := uint64(req.GetTimestamp().GetSeconds())
+	var sequencerHashRef *common.Hash
+	if s.bc.Config().IsCancun(big.NewInt(int64(height)), blockTimestamp) {
+		if req.SequencerBlockHash == nil {
+			return nil, status.Error(codes.InvalidArgument, "Sequencer block hash must be set for Cancun block")
+		}
+		sequencerHash := common.BytesToHash(req.SequencerBlockHash)
+		sequencerHashRef = &sequencerHash
+	}
 
 	txsToProcess := types.Transactions{}
 	conversionConfig := &conversionConfig{
@@ -318,6 +334,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
+		BeaconRoot:   sequencerHashRef,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -327,7 +344,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
@@ -341,14 +358,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &astriaPb.Block{
-		Number:          uint32(block.NumberU64()),
-		Hash:            block.Hash().Bytes(),
-		ParentBlockHash: block.ParentHash().Bytes(),
-		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(block.Time()),
-		},
-	}
+	res, _ := ethHeaderToExecutionBlock(block.Header())
 
 	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
 		s.nextFeeRecipient = next
@@ -502,7 +512,10 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 	if header == nil {
 		return nil, fmt.Errorf("cannot convert nil header to execution block")
 	}
-
+	var sequencerHashBytes []byte
+	if header.ParentBeaconRoot != nil {
+		sequencerHashBytes = header.ParentBeaconRoot.Bytes()
+	}
 	return &astriaPb.Block{
 		Number:          uint32(header.Number.Int64()),
 		Hash:            header.Hash().Bytes(),
@@ -510,6 +523,7 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
+		SequencerBlockHash: sequencerHashBytes,
 	}, nil
 }
 

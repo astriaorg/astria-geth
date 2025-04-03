@@ -529,6 +529,10 @@ func (s *PersonalAccountAPI) SignTransaction(ctx context.Context, args Transacti
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), s.b.RPCTxFeeCap()); err != nil {
 		return nil, err
 	}
+	// Validate the transaction's effective gas tip is higher than the baseFee
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), tx); err != nil {
+		return nil, err
+	}
 	signed, err := s.signTransaction(ctx, &args, passwd)
 	if err != nil {
 		log.Warn("Failed transaction sign attempt", "from", args.from(), "to", args.To, "value", args.Value.ToInt(), "err", err)
@@ -1770,6 +1774,10 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), b.RPCTxFeeCap()); err != nil {
 		return common.Hash{}, err
 	}
+	// Validate the transaction's effective gas tip is higher than the baseFee
+	if err := checkTxBaseFee(b.ChainConfig(), b.CurrentBlock().Number.Uint64(), tx); err != nil {
+		return common.Hash{}, err
+	}
 	if !b.UnprotectedAllowed() && !tx.Protected() {
 		// Ensure only eip155 signed transactions are submitted if EIP155Required is set.
 		return common.Hash{}, errors.New("only replay-protected (EIP-155) transactions allowed over RPC")
@@ -1915,6 +1923,9 @@ func (s *TransactionAPI) SignTransaction(ctx context.Context, args TransactionAr
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), s.b.RPCTxFeeCap()); err != nil {
 		return nil, err
 	}
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), tx); err != nil {
+		return nil, err
+	}
 	signed, err := s.sign(args.from(), tx)
 	if err != nil {
 		return nil, err
@@ -1981,6 +1992,9 @@ func (s *TransactionAPI) Resend(ctx context.Context, sendArgs TransactionArgs, g
 		gas = uint64(*gasLimit)
 	}
 	if err := checkTxFee(price, gas, s.b.RPCTxFeeCap()); err != nil {
+		return common.Hash{}, err
+	}
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), matchTx); err != nil {
 		return common.Hash{}, err
 	}
 	// Iterate the pending list for replacement
@@ -2183,4 +2197,15 @@ func checkTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
 		return fmt.Errorf("tx fee (%.2f ether) exceeds the configured cap (%.2f ether)", feeFloat, cap)
 	}
 	return nil
+}
+
+func checkTxBaseFee(chainConfig *params.ChainConfig, blockNum uint64, tx *types.Transaction) error {
+	if chainConfig.AstriaEIP1559Params == nil {
+		return nil
+	}
+
+	baseFee := chainConfig.AstriaEIP1559Params.MinBaseFeeAt(blockNum)
+	_, err := tx.EffectiveGasTip(baseFee)
+
+	return err
 }

@@ -284,6 +284,11 @@ func (b *EthAPIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscri
 }
 
 func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
+	// Astria Geth does not support BlobTxs
+	// InjectedTxType can only be generated through execution pathway
+	if signedTx.Type() == types.BlobTxType || signedTx.Type() == types.InjectedTxType {
+		return types.ErrTxTypeNotSupported
+	}
 	return b.eth.txPool.Add([]*types.Transaction{signedTx}, true, false)[0]
 }
 

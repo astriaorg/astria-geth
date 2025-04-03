@@ -30,15 +30,15 @@ func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
 	return bytes
 }
 
-func validateAndConvertOracleDataTx(
+func validateAndConvertPriceFeedDataTx(
 	ctx context.Context,
 	height uint64,
-	oracleData *sequencerblockv1.OracleData,
+	priceFeedData *sequencerblockv1.PriceFeedData,
 	cfg *conversionConfig,
 ) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, 0)
 
-	log.Debug("creating oracle data update tx", "price count", len(oracleData.Prices))
+	log.Debug("creating price feed data update tx", "price count", len(priceFeedData.Prices))
 	abi, err := contracts.AstriaOracleMetaData.GetAbi()
 	if err != nil {
 		// this should never happen, as the abi is hardcoded in the contract bindings
@@ -72,7 +72,7 @@ func validateAndConvertOracleDataTx(
 		return nil, fmt.Errorf("unexpected return type for requireCurrencyPairAuthorization: %T", res[0])
 	}
 
-	for _, price := range oracleData.Prices {
+	for _, price := range priceFeedData.Prices {
 		currencyPairHash := hashCurrencyPair(price.CurrencyPair)
 
 		// see if currency pair was already initialized; if not, initialize it
@@ -96,7 +96,7 @@ func validateAndConvertOracleDataTx(
 		}
 		if init {
 			currencyPairsToSet = append(currencyPairsToSet, currencyPairHash)
-			pricesToSet = append(pricesToSet, protoU128ToBigInt(price.Price))
+			pricesToSet = append(pricesToSet, protoI128ToBigInt(price.Price))
 			continue
 		}
 
@@ -141,7 +141,7 @@ func validateAndConvertOracleDataTx(
 		tx := types.NewTx(&txdata)
 		txs = append(txs, tx)
 		currencyPairsToSet = append(currencyPairsToSet, currencyPairHash)
-		pricesToSet = append(pricesToSet, protoU128ToBigInt(price.Price))
+		pricesToSet = append(pricesToSet, protoI128ToBigInt(price.Price))
 		log.Debug("created initializeCurrencyPair tx for currency pair", "pair", price.CurrencyPair, "hash", hex.EncodeToString(currencyPairHash[:]))
 	}
 
@@ -161,7 +161,7 @@ func validateAndConvertOracleDataTx(
 		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
 		SourceTransactionIndex: 0,                           // not relevant
 	}
-	log.Debug("created setPrices tx", "pairs", oracleData.Prices)
+	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 	return txs, nil
@@ -256,7 +256,7 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transacti
 
 // `validateAndConvertSequencerTx` validates and unmarshals the given rollup sequencer transaction and converts it into
 // an EVM transaction.
-// If the sequencer transaction is an oracle data update tx, we create a transaction to update the oracle data.
+// If the sequencer transaction is an price feed data update tx, we create a transaction to update the price feed data.
 // If the sequencer transaction is a deposit tx, we ensure that the asset ID is allowed and the bridge address is known.
 // If the sequencer transaction is a normal user tx, we unmarshal the sequenced data into an Ethereum transaction. We ensure that the
 // tx is not a blob tx or a deposit tx.
@@ -267,8 +267,8 @@ func validateAndConvertSequencerTx(
 	cfg *conversionConfig,
 ) ([]*types.Transaction, error) {
 	switch {
-	case tx.GetOracleData() != nil:
-		return validateAndConvertOracleDataTx(ctx, height, tx.GetOracleData(), cfg)
+	case tx.GetPriceFeedData() != nil:
+		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg)
 	case tx.GetDeposit() != nil:
 		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
 	case tx.GetSequencedData() != nil:
