@@ -101,7 +101,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if tx.GasFeeCapIntCmp(tx.GasTipCap()) < 0 {
 		return core.ErrTipAboveFeeCap
 	}
-	if tx.Type() != types.DepositTxType {
+	if tx.Type() != types.InjectedTxType {
 		// Make sure the transaction is signed properly
 		if _, err := types.Sender(signer, tx); err != nil {
 			return ErrInvalidSender

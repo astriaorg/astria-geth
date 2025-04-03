@@ -9,3 +9,6 @@
 [submodule "contracts/astria-bridge-contracts"]
 	path = contracts/astria-bridge-contracts
 	url = https://github.com/astriaorg/astria-bridge-contracts.git
+[submodule "contracts/astria-oracle-contracts"]
+	path = contracts/astria-oracle-contracts
+	url = https://github.com/astriaorg/astria-oracle-contracts.git
