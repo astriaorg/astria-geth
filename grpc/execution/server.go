@@ -126,7 +126,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		CommitmentState: &astriaPb.CommitmentState{
 			SoftExecutedBlockMetadata:  softBlock,
 			FirmExecutedBlockMetadata:  firmBlock,
-			LowestCelestiaSearchHeight: s.bc.CurrentBaseCelestiaHeight(),
+			LowestCelestiaSearchHeight: max(s.bc.CurrentBaseCelestiaHeight(), fork.Celestia.StartHeight),
 		},
 	}
 
@@ -304,7 +304,7 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 	// If softAsFirm is true, firm commitment state is ignored. If the firm commitment
 	// state is unchanged, we assume the stored firm block is correct and do not
 	// perform these height checks.
-	if !s.softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()){
+	if !s.softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()) {
 		// Firm commitment is out of range
 		// If StopHeight is 0, there is no upper limit
 		if s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight {
