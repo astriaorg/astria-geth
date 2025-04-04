@@ -207,7 +207,11 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 	// Configure gRPC if requested.
 	if ctx.IsSet(utils.GRPCEnabledFlag.Name) {
-		serviceV2, err := execution.NewExecutionServiceServerV2(eth, ctx.Bool(utils.ExecutionSoftAsFirmFlag.Name))
+		serviceV2, err := execution.NewExecutionServiceServerV2(
+			eth,
+			ctx.Bool(utils.ExecutionServiceSoftAsFirmFlag.Name),
+			ctx.Uint64(utils.ExecutionServiceSoftAsFirmMaxHeightFlag.Name),
+		)
 		if err != nil {
 			utils.Fatalf("failed to create execution service: %v", err)
 		}

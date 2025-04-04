@@ -44,7 +44,7 @@ type ExecutionServiceServerV2 struct {
 	commitmentUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock   sync.Mutex // Lock for the NewPayload method
 
-	softAsFirm bool
+	softAsFirm softAsFirmConfig
 
 	activeSessionId string
 	activeFork      *params.AstriaForkData
@@ -68,18 +68,22 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool) (*ExecutionServiceServerV2, error) {
+func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool, softAsFirmMaxHeight uint64) (*ExecutionServiceServerV2, error) {
 	bc := eth.BlockChain()
 
 	if bc.Config().AstriaRollupName == "" {
 		return nil, errors.New("rollup name not set")
 	}
 
+	softAsFirmConfig := softAsFirmConfig{
+		enabled:   softAsFirm,
+		maxHeight: softAsFirmMaxHeight,
+	}
 	return &ExecutionServiceServerV2{
 		eth: eth,
 		bc:  bc,
 
-		softAsFirm: softAsFirm,
+		softAsFirm: softAsFirmConfig,
 	}, nil
 }
 
@@ -304,7 +308,8 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 	// If softAsFirm is true, firm commitment state is ignored. If the firm commitment
 	// state is unchanged, we assume the stored firm block is correct and do not
 	// perform these height checks.
-	if !s.softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()) {
+	softAsFirm := s.softAsFirm.useHeightAsFirm(req.CommitmentState.SoftExecutedBlockMetadata.Number)
+	if !softAsFirm && (req.CommitmentState.FirmExecutedBlockMetadata.Number != s.bc.CurrentFinalBlock().Number.Uint64()) {
 		// Firm commitment is out of range
 		// If StopHeight is 0, there is no upper limit
 		if s.activeFork.StopHeight > 0 && req.CommitmentState.FirmExecutedBlockMetadata.Number > s.activeFork.StopHeight {
@@ -327,7 +332,7 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 	softEthHash := common.HexToHash(req.CommitmentState.SoftExecutedBlockMetadata.Hash)
 
 	var firmEthHash common.Hash
-	if s.softAsFirm {
+	if softAsFirm {
 		firmEthHash = softEthHash
 	} else {
 		firmEthHash = common.HexToHash(req.CommitmentState.FirmExecutedBlockMetadata.Hash)
@@ -433,4 +438,17 @@ func ethHeaderToExecutedBlockMetadata(header *types.Header) (*astriaPb.ExecutedB
 			Seconds: int64(header.Time),
 		},
 	}, nil
+}
+
+type softAsFirmConfig struct {
+	enabled   bool
+	maxHeight uint64
+}
+
+func (sfc *softAsFirmConfig) useHeightAsFirm(blockNum uint64) bool {
+	if !sfc.enabled {
+		return false
+	}
+
+	return sfc.maxHeight == 0 || blockNum <= sfc.maxHeight
 }

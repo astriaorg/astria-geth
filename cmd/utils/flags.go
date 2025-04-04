@@ -886,9 +886,14 @@ var (
 	}
 
 	// ExecutionService flags
-	ExecutionSoftAsFirmFlag = &cli.BoolFlag{
+	ExecutionServiceSoftAsFirmFlag = &cli.BoolFlag{
 		Name:     "execution.soft-as-firm",
 		Usage:    "Use soft commitment as firm commitment",
+		Category: flags.ExecutionCategory,
+	}
+	ExecutionServiceSoftAsFirmMaxHeightFlag = &cli.Uint64Flag{
+		Name:     "execution.soft-as-firm-max-height",
+		Usage:    "Max height for soft commitment to be used as firm commitment",
 		Category: flags.ExecutionCategory,
 	}
 
