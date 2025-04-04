@@ -130,7 +130,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		CommitmentState: &astriaPb.CommitmentState{
 			SoftExecutedBlockMetadata:  softBlock,
 			FirmExecutedBlockMetadata:  firmBlock,
-			LowestCelestiaSearchHeight: s.bc.CurrentBaseCelestiaHeight(),
+			LowestCelestiaSearchHeight: max(s.bc.CurrentBaseCelestiaHeight(), fork.Celestia.StartHeight),
 		},
 	}
 
