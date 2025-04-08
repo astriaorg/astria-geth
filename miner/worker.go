@@ -285,6 +285,8 @@ func (miner *Miner) commitAstriaTransactions(env *environment, txs *types.Transa
 		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+		case errors.Is(err, nil):
+			// Transaction successfully applied, continue
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).

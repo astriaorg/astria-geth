@@ -20,11 +20,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/google/uuid"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -116,6 +118,23 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		return nil, status.Error(codes.Internal, "Could not locate firm block")
 	}
 
+	// sanity code check for oracle contract address
+	if fork.Oracle.ContractAddress != (common.Address{}) {
+		height := s.bc.CurrentFinalBlock().Number.Uint64() // consider should this be the current final block, safe block, or the fork start height - 1?
+		state, header, err := s.eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
+		if err != nil {
+			log.Error("failed to get state and header for height", "height", height, "error", err)
+			return nil, status.Error(codes.Internal, "Failed to get state and header for height")
+		}
+
+		evm := s.eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		code := evm.StateDB.GetCode(fork.Oracle.ContractAddress)
+		if len(code) == 0 {
+			log.Error("oracle contract address has no code", "address", fork.Oracle.ContractAddress)
+			return nil, status.Error(codes.FailedPrecondition, "Oracle contract address has no code")
+		}
+	}
+
 	res := &astriaPb.ExecutionSession{
 		SessionId: s.activeSessionId,
 		ExecutionSessionParameters: &astriaPb.ExecutionSessionParameters{
@@ -165,6 +184,21 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	hi := big.NewInt(0).SetUint64(u128.Hi)
 	hi.Lsh(hi, 64)
 	return lo.Add(lo, hi)
+}
+
+func protoI128ToBigInt(i128 *primitivev1.Int128) *big.Int {
+	lo := big.NewInt(0).SetUint64(i128.Lo)
+	hi := big.NewInt(0).SetUint64(i128.Hi)
+	hi.Lsh(hi, 64)
+	return lo.Add(lo, hi)
+}
+
+type conversionConfig struct {
+	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	bridgeAllowedAssets   map[string]struct{}
+	api                   *eth.EthAPIBackend
+	oracleContractAddress common.Address
+	oracleCallerAddress   common.Address
 }
 
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
@@ -223,13 +257,21 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	}
 
 	txsToProcess := types.Transactions{}
+	conversionConfig := &conversionConfig{
+		bridgeAddresses:       s.activeFork.BridgeAddresses,
+		bridgeAllowedAssets:   s.activeFork.BridgeAllowedAssets,
+		api:                   s.eth.APIBackend,
+		oracleContractAddress: s.activeFork.Oracle.ContractAddress,
+		oracleCallerAddress:   s.activeFork.Oracle.CallerAddress,
+	}
+
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(tx, s.activeFork)
+		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
 		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+		txsToProcess = append(txsToProcess, txs...)
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by

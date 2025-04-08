@@ -29,6 +29,7 @@ type AstriaForkConfig struct {
 	Sequencer         *AstriaSequencerConfig            `json:"sequencer,omitempty"`
 	Celestia          *AstriaCelestiaConfig             `json:"celestia,omitempty"`
 	BridgeAddresses   []AstriaBridgeAddressConfig       `json:"bridgeAddresses,omitempty"`
+	Oracle            *AstriaOracleConfig               `json:"oracle,omitempty"`
 	Precompiles       map[common.Address]PrecompileType `json:"precompiles,omitempty"`
 }
 
@@ -45,6 +46,7 @@ type AstriaForkData struct {
 	Celestia            AstriaCelestiaConfig
 	BridgeAddresses     map[string]*AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
+	Oracle              AstriaOracleConfig
 	Precompiles         map[common.Address]PrecompileType
 }
 
@@ -64,6 +66,11 @@ type AstriaEIP1559Params struct {
 	MinBaseFee               uint64 `json:"minBaseFee"`
 	ElasticityMultiplier     uint64 `json:"elasticityMultiplier"`
 	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
+}
+
+type AstriaOracleConfig struct {
+	ContractAddress common.Address `json:"contractAddress"`
+	CallerAddress   common.Address `json:"callerAddress"`
 }
 
 func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
@@ -162,6 +169,10 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 
 		if currentFork.EIP1559Params != nil {
 			orderedForks[i].EIP1559Params = *currentFork.EIP1559Params
+		}
+
+		if currentFork.Oracle != nil {
+			orderedForks[i].Oracle = *currentFork.Oracle
 		}
 
 		if currentFork.Sequencer != nil {
@@ -433,6 +444,7 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 		Sequencer:         &fd.Sequencer,
 		Celestia:          &fd.Celestia,
 		BridgeAddresses:   bridgeAddrs,
+		Oracle:            &fd.Oracle,
 		Precompiles:       fd.Precompiles,
 	}
 
