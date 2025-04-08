@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"math/big"
 
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -30,7 +29,7 @@ type InjectedTx struct {
 	Data []byte
 	// the transaction ID of the source action on the sequencer, consisting
 	// of the transaction hash.
-	SourceTransactionId primitivev1.TransactionId
+	SourceTransactionId string
 	// index of the source action within its sequencer transaction
 	SourceTransactionIndex uint64
 }
