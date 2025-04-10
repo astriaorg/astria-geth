@@ -29,7 +29,7 @@ func GetPrecompiles(chainConfig *params.ChainConfig, height uint64, timestamp ui
 	// Initialize precompiles for this fork
 	precompiles := make(precompile.PrecompileMap)
 	for addr, precompileType := range fork.Precompiles {
-		switch precompileType {
+		switch *precompileType {
 		case params.PrecompileBase64:
 			precompiles[addr] = pcbase64.NewBase64()
 		default:

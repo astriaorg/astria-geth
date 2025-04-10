@@ -20,17 +20,17 @@ type AstriaForks struct {
 }
 
 type AstriaForkConfig struct {
-	Height            uint64                            `json:"height"`
-	Halt              bool                              `json:"halt,omitempty"`
-	SnapshotChecksum  string                            `json:"snapshotChecksum,omitempty"`
-	ExtraDataOverride hexutil.Bytes                     `json:"extraDataOverride,omitempty"`
-	FeeCollector      *common.Address                   `json:"feeCollector,omitempty"`
-	EIP1559Params     *AstriaEIP1559Params              `json:"eip1559Params,omitempty"`
-	Sequencer         *AstriaSequencerConfig            `json:"sequencer,omitempty"`
-	Celestia          *AstriaCelestiaConfig             `json:"celestia,omitempty"`
-	BridgeAddresses   []AstriaBridgeAddressConfig       `json:"bridgeAddresses,omitempty"`
-	Oracle            *AstriaOracleConfig               `json:"oracle,omitempty"`
-	Precompiles       map[common.Address]PrecompileType `json:"precompiles,omitempty"`
+	Height            uint64                      `json:"height"`
+	Halt              bool                        `json:"halt,omitempty"`
+	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
+	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
+	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
+	EIP1559Params     *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
+	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
+	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
+	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+	Oracle            *AstriaOracleConfig         `json:"oracle,omitempty"`
+	Precompiles       []PrecompileConfig          `json:"precompiles,omitempty"`
 }
 
 type AstriaForkData struct {
@@ -40,6 +40,7 @@ type AstriaForkData struct {
 	Halt                bool
 	SnapshotChecksum    string
 	ExtraDataOverride   hexutil.Bytes
+	ExtraData           hexutil.Bytes
 	FeeCollector        common.Address
 	EIP1559Params       AstriaEIP1559Params
 	Sequencer           AstriaSequencerConfig
@@ -47,7 +48,7 @@ type AstriaForkData struct {
 	BridgeAddresses     map[string]*AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
 	Oracle              AstriaOracleConfig
-	Precompiles         map[common.Address]PrecompileType
+	Precompiles         map[common.Address]*PrecompileType
 }
 
 type AstriaSequencerConfig struct {
@@ -75,21 +76,7 @@ type AstriaOracleConfig struct {
 
 func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
 	fork := c.GetAstriaForks().GetForkAtHeight(height)
-	return fork.ExtraData()
-}
-
-func (f *AstriaForkData) ExtraData() []byte {
-	if f.ExtraDataOverride != nil {
-		return f.ExtraDataOverride
-	}
-
-	forkJSON, err := json.Marshal(f)
-	if err != nil {
-		log.Error("failed to marshal astria forks", "error", err)
-		return nil
-	}
-
-	return crypto.Keccak256(forkJSON)
+	return fork.ExtraData
 }
 
 func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
@@ -126,7 +113,7 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 			// maps are pointers, so we need to create new maps for each fork
 			orderedForks[i].BridgeAddresses = make(map[string]*AstriaBridgeAddressConfig)
 			orderedForks[i].BridgeAllowedAssets = make(map[string]struct{})
-			orderedForks[i].Precompiles = make(map[common.Address]PrecompileType)
+			orderedForks[i].Precompiles = make(map[common.Address]*PrecompileType)
 
 			// Copy previous fork's maps if needed
 			for k, v := range orderedForks[i-1].BridgeAddresses {
@@ -159,10 +146,6 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 			orderedForks[i].SnapshotChecksum = currentFork.SnapshotChecksum
 		}
 
-		if currentFork.ExtraDataOverride != nil {
-			orderedForks[i].ExtraDataOverride = currentFork.ExtraDataOverride
-		}
-
 		if currentFork.FeeCollector != nil {
 			orderedForks[i].FeeCollector = *currentFork.FeeCollector
 		}
@@ -188,6 +171,9 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		if len(currentFork.BridgeAddresses) > 0 {
 			for _, cfg := range currentFork.BridgeAddresses {
 				err := cfg.Validate(orderedForks[i].Sequencer.AddressPrefix)
+				if orderedForks[i].BridgeAddresses[cfg.BridgeAddress] != nil {
+					return nil, fmt.Errorf("duplicate bridge address config: %s", cfg.BridgeAddress)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("invalid bridge address config: %w", err)
 				}
@@ -216,9 +202,23 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 
 		// add precompiles
 		if len(currentFork.Precompiles) > 0 {
-			for addr, pType := range currentFork.Precompiles {
-				orderedForks[i].Precompiles[addr] = pType
+			for _, precompile := range currentFork.Precompiles {
+				if orderedForks[i].Precompiles[precompile.Address] != nil {
+					return nil, fmt.Errorf("duplicate precompile address config: %s", precompile.Address)
+				}
+				orderedForks[i].Precompiles[precompile.Address] = &precompile.Type
 			}
+		}
+
+		orderedForks[i].ExtraDataOverride = currentFork.ExtraDataOverride
+		if currentFork.ExtraDataOverride == nil {
+			data, err := json.Marshal(orderedForks[i].ToConfig())
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal astria forks: %w", err)
+			}
+			orderedForks[i].ExtraData = crypto.Keccak256(data)
+		} else {
+			orderedForks[i].ExtraData = currentFork.ExtraDataOverride
 		}
 	}
 
@@ -289,7 +289,7 @@ func GetDefaultAstriaForkData() AstriaForkData {
 		},
 		BridgeAddresses:     make(map[string]*AstriaBridgeAddressConfig),
 		BridgeAllowedAssets: make(map[string]struct{}),
-		Precompiles:         make(map[common.Address]PrecompileType),
+		Precompiles:         make(map[common.Address]*PrecompileType),
 	}
 }
 
@@ -408,6 +408,11 @@ func (abc *AstriaBridgeAddressConfig) ScaledDepositAmount(deposit *big.Int) *big
 	return new(big.Int).Mul(deposit, multiplier)
 }
 
+type PrecompileConfig struct {
+	Address common.Address `json:"address"`
+	Type    PrecompileType `json:"precompileType"`
+}
+
 // PrecompileType represents the type of precompile to enable
 type PrecompileType string
 
@@ -429,9 +434,30 @@ func (p PrecompileType) Validate() error {
 // converts an AstriaForkData to AstriaForkConfig
 func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 	// Convert bridge addresses from map to slice
-	bridgeAddrs := make([]AstriaBridgeAddressConfig, 0, len(fd.BridgeAddresses))
-	for _, cfg := range fd.BridgeAddresses {
-		bridgeAddrs = append(bridgeAddrs, *cfg)
+	bridgeAddrs := make([]string, 0, len(fd.BridgeAddresses))
+	for addr, _ := range fd.BridgeAddresses {
+		bridgeAddrs = append(bridgeAddrs, addr)
+	}
+	bridgeAddressConfigs := make([]AstriaBridgeAddressConfig, len(fd.BridgeAddresses))
+	sort.Strings(bridgeAddrs)
+	for _, addr := range bridgeAddrs {
+		bridgeAddressConfigs = append(bridgeAddressConfigs, *fd.BridgeAddresses[addr])
+	}
+
+	precompileAddresses := make([]common.Address, 0, len(fd.Precompiles))
+	for addr, _ := range fd.Precompiles {
+		precompileAddresses = append(precompileAddresses, addr)
+	}
+	precompiles := make([]PrecompileConfig, len(fd.Precompiles))
+	sort.Slice(precompileAddresses, func(i, j int) bool {
+		return precompileAddresses[i].Hex() < precompileAddresses[j].Hex()
+	})
+	for _, addr := range precompileAddresses {
+		precompile := PrecompileConfig{
+			Address: addr,
+			Type:    *fd.Precompiles[addr],
+		}
+		precompiles = append(precompiles, precompile)
 	}
 
 	config := AstriaForkConfig{
@@ -443,9 +469,9 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 		EIP1559Params:     &fd.EIP1559Params,
 		Sequencer:         &fd.Sequencer,
 		Celestia:          &fd.Celestia,
-		BridgeAddresses:   bridgeAddrs,
+		BridgeAddresses:   bridgeAddressConfigs,
 		Oracle:            &fd.Oracle,
-		Precompiles:       fd.Precompiles,
+		Precompiles:       precompiles,
 	}
 
 	return config
