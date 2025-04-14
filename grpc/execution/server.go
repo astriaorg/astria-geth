@@ -20,11 +20,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -48,6 +50,9 @@ type ExecutionServiceServerV1 struct {
 
 	bridgeAddresses     map[string]*params.AstriaBridgeAddressConfig // astria bridge addess to config for that bridge account
 	bridgeAllowedAssets map[string]struct{}                          // a set of allowed asset IDs structs are left empty
+
+	oracleContractAddress common.Address
+	oracleCallerAddress   common.Address
 
 	nextFeeRecipient common.Address // Fee recipient for the next block
 }
@@ -143,12 +148,29 @@ func NewExecutionServiceServerV1(eth *eth.Ethereum) (*ExecutionServiceServerV1, 
 		}
 	}
 
+	// sanity code check for oracle contract address
+	if bc.Config().AstriaOracleContractAddress != (common.Address{}) {
+		height := bc.CurrentBlock().Number.Uint64()
+		state, header, err := eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
+		}
+
+		evm := eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		code := evm.StateDB.GetCode(bc.Config().AstriaOracleContractAddress)
+		if len(code) == 0 {
+			return nil, fmt.Errorf("oracle contract address %s has no code", bc.Config().AstriaOracleContractAddress)
+		}
+	}
+
 	return &ExecutionServiceServerV1{
-		eth:                 eth,
-		bc:                  bc,
-		bridgeAddresses:     bridgeAddresses,
-		bridgeAllowedAssets: bridgeAllowedAssets,
-		nextFeeRecipient:    nextFeeRecipient,
+		eth:                   eth,
+		bc:                    bc,
+		bridgeAddresses:       bridgeAddresses,
+		bridgeAllowedAssets:   bridgeAllowedAssets,
+		nextFeeRecipient:      nextFeeRecipient,
+		oracleContractAddress: bc.Config().AstriaOracleContractAddress,
+		oracleCallerAddress:   bc.Config().AstriaOracleCallerAddress,
 	}, nil
 }
 
@@ -230,6 +252,21 @@ func protoU128ToBigInt(u128 *primitivev1.Uint128) *big.Int {
 	return lo.Add(lo, hi)
 }
 
+func protoI128ToBigInt(i128 *primitivev1.Int128) *big.Int {
+	lo := big.NewInt(0).SetUint64(i128.Lo)
+	hi := big.NewInt(0).SetUint64(i128.Hi)
+	hi.Lsh(hi, 64)
+	return lo.Add(lo, hi)
+}
+
+type conversionConfig struct {
+	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
+	bridgeAllowedAssets   map[string]struct{}
+	api                   *eth.EthAPIBackend
+	oracleContractAddress common.Address
+	oracleCallerAddress   common.Address
+}
+
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
 // block data
 func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astriaPb.ExecuteBlockRequest) (*astriaPb.Block, error) {
@@ -259,15 +296,32 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// the height that this block will be at
 	height := s.bc.CurrentBlock().Number.Uint64() + 1
+	blockTimestamp := uint64(req.GetTimestamp().GetSeconds())
+	var sequencerHashRef *common.Hash
+	if s.bc.Config().IsCancun(big.NewInt(int64(height)), blockTimestamp) {
+		if req.SequencerBlockHash == nil {
+			return nil, status.Error(codes.InvalidArgument, "Sequencer block hash must be set for Cancun block")
+		}
+		sequencerHash := common.BytesToHash(req.SequencerBlockHash)
+		sequencerHashRef = &sequencerHash
+	}
 
 	txsToProcess := types.Transactions{}
+	conversionConfig := &conversionConfig{
+		bridgeAddresses:       s.bridgeAddresses,
+		bridgeAllowedAssets:   s.bridgeAllowedAssets,
+		api:                   s.eth.APIBackend,
+		oracleContractAddress: s.oracleContractAddress,
+		oracleCallerAddress:   s.oracleCallerAddress,
+	}
+
 	for _, tx := range req.Transactions {
-		unmarshalledTx, err := validateAndUnmarshalSequencerTx(height, tx, s.bridgeAddresses, s.bridgeAllowedAssets)
+		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
 		if err != nil {
-			log.Debug("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
+			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
-		txsToProcess = append(txsToProcess, unmarshalledTx)
+		txsToProcess = append(txsToProcess, txs...)
 	}
 
 	// This set of ordered TXs on the TxPool is has been configured to be used by
@@ -280,6 +334,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 		Timestamp:    uint64(req.GetTimestamp().GetSeconds()),
 		Random:       common.Hash{},
 		FeeRecipient: s.nextFeeRecipient,
+		BeaconRoot:   sequencerHashRef,
 	}
 	payload, err := s.eth.Miner().BuildPayload(payloadAttributes)
 	if err != nil {
@@ -289,7 +344,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 
 	// call blockchain.InsertChain to actually execute and write the blocks to
 	// state
-	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, nil)
+	block, err := engine.ExecutableDataToBlock(*payload.Resolve().ExecutionPayload, nil, sequencerHashRef)
 	if err != nil {
 		log.Error("failed to convert executable data to block", err)
 		return nil, status.Error(codes.Internal, "failed to execute block")
@@ -303,14 +358,7 @@ func (s *ExecutionServiceServerV1) ExecuteBlock(ctx context.Context, req *astria
 	// remove txs from original mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
-	res := &astriaPb.Block{
-		Number:          uint32(block.NumberU64()),
-		Hash:            block.Hash().Bytes(),
-		ParentBlockHash: block.ParentHash().Bytes(),
-		Timestamp: &timestamppb.Timestamp{
-			Seconds: int64(block.Time()),
-		},
-	}
+	res, _ := ethHeaderToExecutionBlock(block.Header())
 
 	if next, ok := s.bc.Config().AstriaFeeCollectors[res.Number+1]; ok {
 		s.nextFeeRecipient = next
@@ -464,7 +512,10 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 	if header == nil {
 		return nil, fmt.Errorf("cannot convert nil header to execution block")
 	}
-
+	var sequencerHashBytes []byte
+	if header.ParentBeaconRoot != nil {
+		sequencerHashBytes = header.ParentBeaconRoot.Bytes()
+	}
 	return &astriaPb.Block{
 		Number:          uint32(header.Number.Int64()),
 		Hash:            header.Hash().Bytes(),
@@ -472,6 +523,7 @@ func ethHeaderToExecutionBlock(header *types.Header) (*astriaPb.Block, error) {
 		Timestamp: &timestamppb.Timestamp{
 			Seconds: int64(header.Time),
 		},
+		SequencerBlockHash: sequencerHashBytes,
 	}, nil
 }
 

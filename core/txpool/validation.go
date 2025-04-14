@@ -54,6 +54,10 @@ type ValidationOptions struct {
 // This check is public to allow different transaction pools to check the basic
 // rules without duplicating code and running the risk of missed updates.
 func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error {
+	if tx.Type() == types.BlobTxType {
+		return fmt.Errorf("%w: tx type %v not supported by Astria Geth", core.ErrTxTypeNotSupported, tx.Type())
+	}
+
 	// Ensure transactions not implemented by the calling pool are rejected
 	if opts.Accept&(1<<tx.Type()) == 0 {
 		return fmt.Errorf("%w: tx type %v not supported by this pool", core.ErrTxTypeNotSupported, tx.Type())
@@ -97,7 +101,7 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	if tx.GasFeeCapIntCmp(tx.GasTipCap()) < 0 {
 		return core.ErrTipAboveFeeCap
 	}
-	if tx.Type() != types.DepositTxType {
+	if tx.Type() != types.InjectedTxType {
 		// Make sure the transaction is signed properly
 		if _, err := types.Sender(signer, tx); err != nil {
 			return ErrInvalidSender

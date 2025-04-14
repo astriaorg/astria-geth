@@ -58,7 +58,7 @@ import (
 const estimateGasErrorRatio = 0.015
 
 var errBlobTxNotSupported = errors.New("blob transactions not supported")
-var errDepositTxNotSupported = errors.New("deposit transactions not supported")
+var errInjectedTxNotSupported = errors.New("injected transactions not supported")
 
 // EthereumAPI provides an API to access Ethereum related information.
 type EthereumAPI struct {
@@ -527,6 +527,10 @@ func (s *PersonalAccountAPI) SignTransaction(ctx context.Context, args Transacti
 	// Before actually signing the transaction, ensure the transaction fee is reasonable.
 	tx := args.ToTransaction()
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), s.b.RPCTxFeeCap()); err != nil {
+		return nil, err
+	}
+	// Validate the transaction's effective gas tip is higher than the baseFee
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), tx); err != nil {
 		return nil, err
 	}
 	signed, err := s.signTransaction(ctx, &args, passwd)
@@ -1761,13 +1765,17 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	if tx.Type() == types.BlobTxType {
 		return common.Hash{}, errBlobTxNotSupported
 	}
-	if tx.Type() == types.DepositTxType {
-		return common.Hash{}, errDepositTxNotSupported
+	if tx.Type() == types.InjectedTxType {
+		return common.Hash{}, errInjectedTxNotSupported
 	}
 
 	// If the transaction fee cap is already specified, ensure the
 	// fee of the given transaction is _reasonable_.
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), b.RPCTxFeeCap()); err != nil {
+		return common.Hash{}, err
+	}
+	// Validate the transaction's effective gas tip is higher than the baseFee
+	if err := checkTxBaseFee(b.ChainConfig(), b.CurrentBlock().Number.Uint64(), tx); err != nil {
 		return common.Hash{}, err
 	}
 	if !b.UnprotectedAllowed() && !tx.Protected() {
@@ -1915,6 +1923,9 @@ func (s *TransactionAPI) SignTransaction(ctx context.Context, args TransactionAr
 	if err := checkTxFee(tx.GasPrice(), tx.Gas(), s.b.RPCTxFeeCap()); err != nil {
 		return nil, err
 	}
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), tx); err != nil {
+		return nil, err
+	}
 	signed, err := s.sign(args.from(), tx)
 	if err != nil {
 		return nil, err
@@ -1981,6 +1992,9 @@ func (s *TransactionAPI) Resend(ctx context.Context, sendArgs TransactionArgs, g
 		gas = uint64(*gasLimit)
 	}
 	if err := checkTxFee(price, gas, s.b.RPCTxFeeCap()); err != nil {
+		return common.Hash{}, err
+	}
+	if err := checkTxBaseFee(s.b.ChainConfig(), s.b.CurrentBlock().Number.Uint64(), matchTx); err != nil {
 		return common.Hash{}, err
 	}
 	// Iterate the pending list for replacement
@@ -2183,4 +2197,15 @@ func checkTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
 		return fmt.Errorf("tx fee (%.2f ether) exceeds the configured cap (%.2f ether)", feeFloat, cap)
 	}
 	return nil
+}
+
+func checkTxBaseFee(chainConfig *params.ChainConfig, blockNum uint64, tx *types.Transaction) error {
+	if chainConfig.AstriaEIP1559Params == nil {
+		return nil
+	}
+
+	baseFee := chainConfig.AstriaEIP1559Params.MinBaseFeeAt(blockNum)
+	_, err := tx.EffectiveGasTip(baseFee)
+
+	return err
 }

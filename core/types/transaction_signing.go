@@ -40,8 +40,9 @@ type sigCache struct {
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) Signer {
 	var signer Signer
 	switch {
-	case config.IsCancun(blockNumber, blockTime):
-		signer = NewCancunSigner(config.ChainID)
+	// Astria Geth does not support blobs, and thus the Cancun signer
+	// case config.IsCancun(blockNumber, blockTime):
+	//	 signer = NewCancunSigner(config.ChainID)
 	case config.IsLondon(blockNumber):
 		signer = NewLondonSigner(config.ChainID)
 	case config.IsBerlin(blockNumber):
@@ -65,9 +66,10 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint
 // have the current block number available, use MakeSigner instead.
 func LatestSigner(config *params.ChainConfig) Signer {
 	if config.ChainID != nil {
-		if config.CancunTime != nil {
-			return NewCancunSigner(config.ChainID)
-		}
+		// Astria Geth does not support blobs, and thus the Cancun signer
+		// if config.CancunTime != nil {
+		// 	 return NewCancunSigner(config.ChainID)
+		// }
 		if config.LondonBlock != nil {
 			return NewLondonSigner(config.ChainID)
 		}

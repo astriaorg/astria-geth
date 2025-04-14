@@ -69,9 +69,9 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool, isDepositTx bool) (uint64, error) {
-	if isDepositTx {
-		// deposit txs are gasless
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation bool, isHomestead, isEIP2028 bool, isEIP3860 bool, isInjectedTx bool) (uint64, error) {
+	if isInjectedTx {
+		// injected txs are gasless
 		return 0, nil
 	}
 
@@ -147,7 +147,7 @@ type Message struct {
 	AccessList    types.AccessList
 	BlobGasFeeCap *big.Int
 	BlobHashes    []common.Hash
-	IsDepositTx   bool
+	IsInjectedTx  bool
 
 	// When SkipAccountChecks is true, the message nonce is not checked against the
 	// account nonce in state. It also disables checking that the sender is an EOA.
@@ -157,7 +157,7 @@ type Message struct {
 
 // TransactionToMessage converts a transaction into a Message.
 func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.Int) (*Message, error) {
-	isDepositTx := tx.Type() == types.DepositTxType
+	isInjectedTx := tx.Type() == types.InjectedTxType
 
 	msg := &Message{
 		Nonce:             tx.Nonce(),
@@ -172,13 +172,13 @@ func TransactionToMessage(tx *types.Transaction, s types.Signer, baseFee *big.In
 		SkipAccountChecks: false,
 		BlobHashes:        tx.BlobHashes(),
 		BlobGasFeeCap:     tx.BlobGasFeeCap(),
-		IsDepositTx:       isDepositTx,
+		IsInjectedTx:      isInjectedTx,
 	}
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
 		msg.GasPrice = cmath.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
 	}
-	if isDepositTx {
+	if isInjectedTx {
 		msg.From = tx.From()
 		return msg, nil
 	}
@@ -292,8 +292,8 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	if st.msg.IsDepositTx {
-		// deposit txs do not require checks as they are part of rollup consensus,
+	if st.msg.IsInjectedTx {
+		// injected txs do not require checks as they are part of rollup consensus,
 		// not txs that originate externally.
 		return nil
 	}
@@ -391,10 +391,10 @@ func (st *StateTransition) preCheck() error {
 // However if any consensus issue encountered, return the error directly with
 // nil evm execution result.
 func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
-	// if this is a deposit tx, we only need to mint funds and no gas is used.
-	if st.msg.IsDepositTx && len(st.msg.Data) == 0 {
+	// if this is a injected tx with no data, it's a native token mint.
+	if st.msg.IsInjectedTx && len(st.msg.Data) == 0 {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
-		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaDepositTx)
+		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaInjectedTx)
 		return &ExecutionResult{
 			UsedGas:    0,
 			Err:        nil,
@@ -402,10 +402,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		}, nil
 	}
 
-	if st.msg.IsDepositTx {
+	if st.msg.IsInjectedTx {
 		st.initialGas = st.msg.GasLimit
 		st.gasRemaining = st.msg.GasLimit
-		log.Debug("deposit tx minting erc20", "to", *st.msg.To, "value", st.msg.Value)
 	}
 
 	// First check this message satisfies all consensus rules before
@@ -431,7 +430,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai, msg.IsDepositTx)
+	gas, err := IntrinsicGas(msg.Data, msg.AccessList, contractCreation, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai, msg.IsInjectedTx)
 	if err != nil {
 		return nil, err
 	}
@@ -474,10 +473,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, value)
 	}
 
-	// if this is a deposit tx, don't refund gas and also don't pay to the coinbase,
+	// if this is a injected tx, don't refund gas and also don't pay to the coinbase,
 	// as no gas was used.
-	if st.msg.IsDepositTx {
-		log.Debug("deposit tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
+	if st.msg.IsInjectedTx {
+		log.Debug("injected tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
 		return &ExecutionResult{
 			UsedGas:    st.gasUsed(),
 			Err:        vmerr,
