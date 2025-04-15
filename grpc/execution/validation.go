@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v1"
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	connecttypesv2 "buf.build/gen/go/astria/vendored/protocolbuffers/go/connect/types/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -135,7 +134,7 @@ func validateAndConvertPriceFeedDataTx(
 			Gas:                    100000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    primitivev1.TransactionId{},
+			SourceTransactionId:    "",
 			SourceTransactionIndex: 0,
 		}
 		tx := types.NewTx(&txdata)
@@ -158,8 +157,8 @@ func validateAndConvertPriceFeedDataTx(
 		Gas:                    900000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
-		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
-		SourceTransactionIndex: 0,                           // not relevant
+		SourceTransactionId:    "", // not relevant
+		SourceTransactionIndex: 0,  // not relevant
 	}
 	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
 	tx := types.NewTx(&txdata)
@@ -218,7 +217,7 @@ func validateAndConvertDepositTx(
 			Gas:                    64000,
 			To:                     &bac.Erc20Asset.ContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    *deposit.SourceTransactionId,
+			SourceTransactionId:    deposit.SourceTransactionId.Inner,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 
@@ -230,7 +229,7 @@ func validateAndConvertDepositTx(
 		To:                     &recipient,
 		Value:                  amount,
 		Gas:                    0,
-		SourceTransactionId:    *deposit.SourceTransactionId,
+		SourceTransactionId:    deposit.SourceTransactionId.Inner,
 		SourceTransactionIndex: deposit.SourceActionIndex,
 	}
 	return []*types.Transaction{types.NewTx(&txdata)}, nil
@@ -286,7 +285,7 @@ func validateStaticExecuteBlockRequest(req *astriaPb.ExecuteBlockRequest) error 
 		return fmt.Errorf("PrevBlockHash cannot be nil")
 	}
 	if req.Timestamp == nil {
-		return fmt.Errorf("Timestamp cannot be nil")
+		return fmt.Errorf("timestamp cannot be nil")
 	}
 
 	return nil

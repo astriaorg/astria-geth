@@ -216,7 +216,7 @@ func (s *ExecutionServiceServerV1) GetBlock(ctx context.Context, req *astriaPb.G
 // BatchGetBlocks will return an array of Blocks given an array of block
 // identifiers.
 func (s *ExecutionServiceServerV1) BatchGetBlocks(ctx context.Context, req *astriaPb.BatchGetBlocksRequest) (*astriaPb.BatchGetBlocksResponse, error) {
-	if req.Identifiers == nil || len(req.Identifiers) == 0 {
+	if len(req.Identifiers) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "identifiers cannot be empty")
 	}
 
