@@ -20,12 +20,13 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"os"
 	"reflect"
 	"runtime"
 	"strings"
 	"unicode"
+
+	"github.com/ethereum/go-ethereum/eth/catalyst"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/external"
@@ -206,11 +207,15 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 	// Configure gRPC if requested.
 	if ctx.IsSet(utils.GRPCEnabledFlag.Name) {
-		serviceV1, err := execution.NewExecutionServiceServerV1(eth)
+		serviceV2, err := execution.NewExecutionServiceServerV2(
+			eth,
+			ctx.Bool(utils.ExecutionServiceSoftAsFirmFlag.Name),
+			ctx.Uint64(utils.ExecutionServiceSoftAsFirmMaxHeightFlag.Name),
+		)
 		if err != nil {
 			utils.Fatalf("failed to create execution service: %v", err)
 		}
-		utils.RegisterGRPCExecutionService(stack, serviceV1, &cfg.Node)
+		utils.RegisterGRPCExecutionService(stack, serviceV2, &cfg.Node)
 	}
 
 	// Add the Ethereum Stats daemon if requested.

@@ -17,18 +17,11 @@
 package params
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params/forks"
-	"github.com/ethereum/go-ethereum/rlp"
-
-	"github.com/btcsuite/btcd/btcutil/bech32"
 )
 
 // Genesis hashes to enforce below configs on.
@@ -378,101 +371,9 @@ type ChainConfig struct {
 	IsDevMode bool          `json:"isDev,omitempty"`
 
 	// Astria Specific Configuration
-	AstriaOverrideGenesisExtraData bool                        `json:"astriaOverrideGenesisExtraData,omitempty"`
-	AstriaExtraDataOverride        hexutil.Bytes               `json:"astriaExtraDataOverride,omitempty"`
-	AstriaRollupName               string                      `json:"astriaRollupName"`
-	AstriaSequencerInitialHeight   uint32                      `json:"astriaSequencerInitialHeight"`
-	AstriaSequencerAddressPrefix   string                      `json:"astriaSequencerAddressPrefix,omitempty"`
-	AstriaCelestiaInitialHeight    uint64                      `json:"astriaCelestiaInitialHeight"`
-	AstriaCelestiaHeightVariance   uint64                      `json:"astriaCelestiaHeightVariance,omitempty"`
-	AstriaBridgeAddressConfigs     []AstriaBridgeAddressConfig `json:"astriaBridgeAddresses,omitempty"`
-	AstriaFeeCollectors            map[uint32]common.Address   `json:"astriaFeeCollectors"`
-	AstriaEIP1559Params            *AstriaEIP1559Params        `json:"astriaEIP1559Params,omitempty"`
-	AstriaOracleContractAddress    common.Address              `json:"astriaOracleContractAddress,omitempty"`
-	AstriaOracleCallerAddress      common.Address              `json:"astriaOracleCallerAddress,omitempty"`
-}
-
-func (c *ChainConfig) AstriaExtraData() []byte {
-	if c.AstriaExtraDataOverride != nil {
-		return c.AstriaExtraDataOverride
-	}
-
-	// create default extradata
-	extra, _ := rlp.EncodeToBytes([]interface{}{
-		c.AstriaRollupName,
-		c.AstriaSequencerInitialHeight,
-		c.AstriaCelestiaInitialHeight,
-		c.AstriaCelestiaHeightVariance,
-	})
-	if uint64(len(extra)) > MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", MaximumExtraDataSize)
-		extra = nil
-	}
-	return extra
-}
-
-type AstriaEIP1559Param struct {
-	MinBaseFee               uint64 `json:"minBaseFee"`
-	ElasticityMultiplier     uint64 `json:"elasticityMultiplier"`
-	BaseFeeChangeDenominator uint64 `json:"baseFeeChangeDenominator"`
-}
-
-type AstriaEIP1559Params struct {
-	heights        map[uint64]AstriaEIP1559Param
-	orderedHeights []uint64
-}
-
-func NewAstriaEIP1559Params(heights map[uint64]AstriaEIP1559Param) *AstriaEIP1559Params {
-	orderedHeights := []uint64{}
-	for k := range heights {
-		orderedHeights = append(orderedHeights, k)
-	}
-	sort.Slice(orderedHeights, func(i, j int) bool { return orderedHeights[i] > orderedHeights[j] })
-
-	return &AstriaEIP1559Params{
-		heights:        heights,
-		orderedHeights: orderedHeights,
-	}
-}
-
-func (c *AstriaEIP1559Params) MinBaseFeeAt(height uint64) *big.Int {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return big.NewInt(0).SetUint64(c.heights[h].MinBaseFee)
-		}
-	}
-	return common.Big0
-}
-
-func (c *AstriaEIP1559Params) ElasticityMultiplierAt(height uint64) uint64 {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return c.heights[h].ElasticityMultiplier
-		}
-	}
-	return DefaultElasticityMultiplier
-}
-
-func (c *AstriaEIP1559Params) BaseFeeChangeDenominatorAt(height uint64) uint64 {
-	for _, h := range c.orderedHeights {
-		if height >= h {
-			return c.heights[h].BaseFeeChangeDenominator
-		}
-	}
-	return DefaultBaseFeeChangeDenominator
-}
-
-func (c AstriaEIP1559Params) MarshalJSON() ([]byte, error) {
-	return json.Marshal(c.heights)
-}
-
-func (c *AstriaEIP1559Params) UnmarshalJSON(data []byte) error {
-	var heights map[uint64]AstriaEIP1559Param
-	if err := json.Unmarshal(data, &heights); err != nil {
-		return err
-	}
-	*c = *NewAstriaEIP1559Params(heights)
-	return nil
+	AstriaOverrideGenesisExtraData bool         `json:"astriaOverrideGenesisExtraData,omitempty"`
+	AstriaRollupName               string       `json:"astriaRollupName"`
+	AstriaForks                    *AstriaForks `json:"astriaForks,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -583,6 +484,19 @@ func (c *ChainConfig) Description() string {
 	if c.VerkleTime != nil {
 		banner += fmt.Sprintf(" - Verkle:                      @%-10v\n", *c.VerkleTime)
 	}
+	banner += "\n"
+
+	// Add Astria forks
+	banner += "Astria forks (block based):\n"
+	forks := c.GetAstriaForks().forkMap
+	for forkName, fork := range forks {
+		banner += fmt.Sprintf(" - %-30s #%-8v", forkName+":", fork.Height)
+		if fork.Halt {
+			banner += " (!chain halts at this height)"
+		}
+		banner += "\n"
+	}
+
 	return banner
 }
 
@@ -850,22 +764,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	return nil
 }
 
-// BaseFeeChangeDenominator bounds the amount the base fee can change between blocks.
-func (c *ChainConfig) BaseFeeChangeDenominator(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.BaseFeeChangeDenominatorAt(height)
-	}
-	return DefaultBaseFeeChangeDenominator
-}
-
-// ElasticityMultiplier bounds the maximum gas limit an EIP-1559 block may have.
-func (c *ChainConfig) ElasticityMultiplier(height uint64) uint64 {
-	if c.AstriaEIP1559Params != nil {
-		return c.AstriaEIP1559Params.ElasticityMultiplierAt(height)
-	}
-	return DefaultElasticityMultiplier
-}
-
 // LatestFork returns the latest time-based fork that would be active for the given time.
 func (c *ChainConfig) LatestFork(time uint64) forks.Fork {
 	// Assume last non-time-based fork has passed.
@@ -1052,61 +950,4 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsPrague:         isMerge && c.IsPrague(num, timestamp),
 		IsVerkle:         isMerge && c.IsVerkle(num, timestamp),
 	}
-}
-
-type AstriaBridgeAddressConfig struct {
-	BridgeAddress  string                  `json:"bridgeAddress"`
-	SenderAddress  common.Address          `json:"senderAddress,omitempty"`
-	StartHeight    uint32                  `json:"startHeight"`
-	AssetDenom     string                  `json:"assetDenom"`
-	AssetPrecision uint16                  `json:"assetPrecision"`
-	Erc20Asset     *AstriaErc20AssetConfig `json:"erc20Asset,omitempty"`
-}
-
-type AstriaErc20AssetConfig struct {
-	ContractAddress   common.Address `json:"contractAddress"`
-	ContractPrecision uint16         `json:"contractPrecision"`
-}
-
-func (abc *AstriaBridgeAddressConfig) Validate(genesisPrefix string) error {
-	prefix, byteAddress, err := bech32.Decode(abc.BridgeAddress)
-	if err != nil {
-		return fmt.Errorf("bridge address must be a bech32 encoded string")
-	}
-	byteAddress, err = bech32.ConvertBits(byteAddress, 5, 8, false)
-	if err != nil {
-		return fmt.Errorf("failed to convert address to 8 bit")
-	}
-	if prefix != genesisPrefix {
-		return fmt.Errorf("bridge address must have prefix %s", genesisPrefix)
-	}
-	if len(byteAddress) != 20 {
-		return fmt.Errorf("bridge address must have resolve to 20 byte address, got %d", len(byteAddress))
-	}
-	if abc.StartHeight == 0 {
-		return fmt.Errorf("start height must be greater than 0")
-	}
-	if abc.AssetDenom == "" {
-		return fmt.Errorf("asset denom must be set")
-	}
-	if abc.Erc20Asset == nil && abc.AssetPrecision > 18 {
-		return fmt.Errorf("asset precision of native asset must be less than or equal to 18")
-	}
-	if abc.Erc20Asset != nil && abc.AssetPrecision > abc.Erc20Asset.ContractPrecision {
-		return fmt.Errorf("asset precision must be less than or equal to contract precision")
-	}
-
-	return nil
-}
-
-func (abc *AstriaBridgeAddressConfig) ScaledDepositAmount(deposit *big.Int) *big.Int {
-	var exponent uint16
-	if abc.Erc20Asset != nil {
-		exponent = abc.Erc20Asset.ContractPrecision - abc.AssetPrecision
-	} else {
-		exponent = 18 - abc.AssetPrecision
-	}
-	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
-
-	return new(big.Int).Mul(deposit, multiplier)
 }
