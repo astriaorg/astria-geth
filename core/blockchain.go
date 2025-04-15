@@ -503,6 +503,11 @@ func (bc *BlockChain) loadLastState() error {
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(headBlock.Header())
 	headBlockGauge.Update(int64(headBlock.NumberU64()))
+	// Note: the safe block is not stored on disk, in traditional Geth, on startup
+	// the safe block falls back to the last known finalized block.
+	// Astria Geth has single slot finality. The latest and safe are always equal.
+	bc.currentSafeBlock.Store(headBlock.Header())
+	headSafeBlockGauge.Update(int64(headBlock.NumberU64()))
 
 	// Restore the last known head header
 	headHeader := headBlock.Header()
@@ -524,15 +529,11 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 
-	// Restore the last known finalized block and safe block
-	// Note: the safe block is not stored on disk and it is set to the last
-	// known finalized block on startup
+	// Restore the last known finalized block
 	if head := rawdb.ReadFinalizedBlockHash(bc.db); head != (common.Hash{}) {
 		if block := bc.GetBlockByHash(head); block != nil {
 			bc.currentFinalBlock.Store(block.Header())
 			headFinalizedBlockGauge.Update(int64(block.NumberU64()))
-			bc.currentSafeBlock.Store(block.Header())
-			headSafeBlockGauge.Update(int64(block.NumberU64()))
 		}
 	}
 
