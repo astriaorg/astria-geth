@@ -28,8 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/google/uuid"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -92,6 +92,12 @@ func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool, softAsFirmM
 func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, req *astriaPb.CreateExecutionSessionRequest) (*astriaPb.ExecutionSession, error) {
 	log.Debug("CreateExecutionSession called")
 	createExecutionSessionRequestCount.Inc(1)
+
+	// We shouldn't create a new session if we are actively executing within one.
+	s.blockExecutionLock.Lock()
+	defer s.blockExecutionLock.Unlock()
+	s.commitmentUpdateLock.Lock()
+	defer s.commitmentUpdateLock.Unlock()
 
 	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
 	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
@@ -274,12 +280,15 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		txsToProcess = append(txsToProcess, txs...)
 	}
 
-	// This set of ordered TXs on the TxPool is has been configured to be used by
-	// the Miner when building a payload.
+	// This set of ordered TXs on the TxPool is used when building a payload.
 	s.eth.TxPool().SetAstriaOrdered(txsToProcess)
 
-	// set extra data
-	s.eth.Miner().SetExtra(s.activeFork.ExtraData())
+	// Set extra data deterministically based on the current block and genesis.
+	err := s.eth.Miner().SetExtra(s.activeFork.ExtraData)
+	if err != nil {
+		log.Error("failed to set extra data", "err", err)
+		return nil, status.Error(codes.Internal, "could not set extra data")
+	}
 
 	// Build a payload to add to the chain
 	payloadAttributes := &miner.BuildPayloadArgs{
@@ -309,7 +318,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 		return nil, status.Error(codes.Internal, "failed to insert block to chain")
 	}
 
-	// remove txs from original mempool
+	// Reset the building pool, this also clears out any excluded from txs from the main mempool
 	s.eth.TxPool().ClearAstriaOrdered()
 
 	resBlockMetadata, _ := ethHeaderToExecutedBlockMetadata(block.Header())
@@ -385,10 +394,25 @@ func (s *ExecutionServiceServerV2) UpdateCommitmentState(ctx context.Context, re
 	if softBlock == nil {
 		return nil, status.Error(codes.InvalidArgument, "Soft block specified does not exist")
 	}
+	if softBlock.NumberU64() != req.CommitmentState.SoftExecutedBlockMetadata.Number {
+		return nil, status.Error(codes.InvalidArgument, "Soft block number specified does not match the block number identified by hash")
+	}
+	if softBlock.ParentHash() != common.HexToHash(req.CommitmentState.SoftExecutedBlockMetadata.ParentHash) {
+		return nil, status.Error(codes.InvalidArgument, "Soft block parent hash specified does not match the block parent hash identified by hash")
+	}
 
 	firmBlock := s.bc.GetBlockByHash(firmEthHash)
 	if firmBlock == nil {
 		return nil, status.Error(codes.InvalidArgument, "Firm block specified does not exist")
+	}
+	// Only validate matches if softAsFirm is false, otherwise we would expect will match the soft block and already verified.
+	if !softAsFirm {
+		if firmBlock.NumberU64() != req.CommitmentState.FirmExecutedBlockMetadata.Number {
+			return nil, status.Error(codes.InvalidArgument, "Firm block number specified does not match the block number identified by hash")
+		}
+		if firmBlock.ParentHash() != common.HexToHash(req.CommitmentState.FirmExecutedBlockMetadata.ParentHash) {
+			return nil, status.Error(codes.InvalidArgument, "Firm block parent hash specified does not match the block parent hash identified by hash")
+		}
 	}
 
 	currentHead := s.bc.CurrentBlock().Hash()
@@ -441,7 +465,7 @@ func (s *ExecutionServiceServerV2) getExecutedBlockMetadataFromIdentifier(identi
 	// Grab the header based on the identifier provided
 	switch idType := identifier.Identifier.(type) {
 	case *astriaPb.ExecutedBlockIdentifier_Number:
-		header = s.bc.GetHeaderByNumber(uint64(identifier.GetNumber()))
+		header = s.bc.GetHeaderByNumber(identifier.GetNumber())
 	case *astriaPb.ExecutedBlockIdentifier_Hash:
 		header = s.bc.GetHeaderByHash(common.HexToHash(identifier.GetHash()))
 	default:
