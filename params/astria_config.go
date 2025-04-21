@@ -266,7 +266,7 @@ func validateAstriaForks(forks []AstriaForkData) error {
 
 			for _, pType := range fork.Precompiles {
 				if err := pType.Validate(); err != nil {
-					return fmt.Errorf("fork %s: invalid precompile %s", fork.Name, pType)
+					return fmt.Errorf("fork %s: invalid precompile %s", fork.Name, *pType)
 				}
 			}
 		} else {

@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+var precompileBase64Val = PrecompileBase64
+
 func TestAstriaEIP1559Params(t *testing.T) {
 	astriaForks, _ := NewAstriaForks(map[string]AstriaForkConfig{
 		"genesis": {
@@ -447,8 +449,11 @@ func TestAstriaForksInheritance(t *testing.T) {
 				ElasticityMultiplier:     4,
 				BaseFeeChangeDenominator: 16,
 			},
-			Precompiles: map[common.Address]PrecompileType{
-				common.HexToAddress("0x01"): PrecompileBase64,
+			Precompiles: []PrecompileConfig{
+				{
+					Address: common.HexToAddress("0x01"),
+					Type:    PrecompileBase64,
+				},
 			},
 		},
 		"fork3": {
@@ -467,8 +472,11 @@ func TestAstriaForksInheritance(t *testing.T) {
 				ChainID:     "chain3",
 				StartHeight: 325,
 			},
-			Precompiles: map[common.Address]PrecompileType{
-				common.HexToAddress("0x02"): PrecompileBase64,
+			Precompiles: []PrecompileConfig{
+				{
+					Address: common.HexToAddress("0x02"),
+					Type:    PrecompileBase64,
+				},
 			},
 		},
 	}
@@ -500,7 +508,7 @@ func TestAstriaForksInheritance(t *testing.T) {
 		celestiaChainID                  string
 		celestiaStartHeight              uint64
 		celestiaSearchHeightMaxLookAhead uint64
-		precompiles                      map[common.Address]PrecompileType
+		precompiles                      map[common.Address]*PrecompileType
 	}
 
 	tests := []struct {
@@ -521,7 +529,7 @@ func TestAstriaForksInheritance(t *testing.T) {
 				celestiaChainID:                  "celestia1",
 				celestiaStartHeight:              1,
 				celestiaSearchHeightMaxLookAhead: 100,
-				precompiles:                      map[common.Address]PrecompileType{},
+				precompiles:                      map[common.Address]*PrecompileType{},
 			},
 		},
 		{
@@ -537,8 +545,8 @@ func TestAstriaForksInheritance(t *testing.T) {
 				celestiaChainID:                  "celestia1",
 				celestiaStartHeight:              1,
 				celestiaSearchHeightMaxLookAhead: 100,
-				precompiles: map[common.Address]PrecompileType{
-					common.HexToAddress("0x01"): PrecompileBase64,
+				precompiles: map[common.Address]*PrecompileType{
+					common.HexToAddress("0x01"): &precompileBase64Val,
 				},
 			},
 		},
@@ -555,8 +563,8 @@ func TestAstriaForksInheritance(t *testing.T) {
 				celestiaChainID:                  "celestia1",
 				celestiaStartHeight:              1,
 				celestiaSearchHeightMaxLookAhead: 100,
-				precompiles: map[common.Address]PrecompileType{
-					common.HexToAddress("0x01"): PrecompileBase64,
+				precompiles: map[common.Address]*PrecompileType{
+					common.HexToAddress("0x01"): &precompileBase64Val,
 				},
 			},
 		},
@@ -573,9 +581,9 @@ func TestAstriaForksInheritance(t *testing.T) {
 				celestiaChainID:                  "celestia1",
 				celestiaStartHeight:              1,
 				celestiaSearchHeightMaxLookAhead: 100,
-				precompiles: map[common.Address]PrecompileType{
-					common.HexToAddress("0x01"): PrecompileBase64,
-					common.HexToAddress("0x02"): PrecompileBase64,
+				precompiles: map[common.Address]*PrecompileType{
+					common.HexToAddress("0x01"): &precompileBase64Val,
+					common.HexToAddress("0x02"): &precompileBase64Val,
 				},
 			},
 		},
