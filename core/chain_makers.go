@@ -233,7 +233,7 @@ func (b *BlockGen) AddUncle(h *types.Header) {
 	if b.cm.config.IsLondon(h.Number) {
 		h.BaseFee = eip1559.CalcBaseFee(b.cm.config, parent)
 		if !b.cm.config.IsLondon(parent.Number) {
-			parentGasLimit := parent.GasLimit * b.cm.config.ElasticityMultiplier(parent.Number.Uint64())
+			parentGasLimit := parent.GasLimit * b.cm.config.GetAstriaForks().ElasticityMultiplierAt(parent.Number.Uint64())
 			h.GasLimit = CalcGasLimit(parentGasLimit, parentGasLimit)
 		}
 	}
@@ -540,7 +540,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, state *state.StateDB, engi
 	if cm.config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(cm.config, parent.Header())
 		if !cm.config.IsLondon(parent.Number()) {
-			parentGasLimit := parent.GasLimit() * cm.config.ElasticityMultiplier(parent.Number().Uint64())
+			parentGasLimit := parent.GasLimit() * cm.config.GetAstriaForks().ElasticityMultiplierAt(parent.Number().Uint64())
 			header.GasLimit = CalcGasLimit(parentGasLimit, parentGasLimit)
 		}
 	}

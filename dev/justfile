@@ -15,7 +15,7 @@ init:
     init geth-genesis-local.json
 
 # start a local geth node
-run:
+run softAsFirm="true":
     ../build/bin/geth \
     --http \
     --http.addr=0.0.0.0 \
@@ -31,7 +31,8 @@ run:
     --grpc.addr=0.0.0.0 \
     --grpc.port=50051 \
     --db.engine=pebble \
-    --state.scheme=path
+    --state.scheme=path \
+    --execution.soft-as-firm={{softAsFirm}}
 
 # this is specifically for mac os
 clean:

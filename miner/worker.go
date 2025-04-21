@@ -129,7 +129,7 @@ func (miner *Miner) prepareWork(genParams *generateParams) (*environment, error)
 	if miner.chainConfig.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(miner.chainConfig, parent)
 		if !miner.chainConfig.IsLondon(parent.Number) {
-			parentGasLimit := parent.GasLimit * miner.chainConfig.ElasticityMultiplier(parent.Number.Uint64())
+			parentGasLimit := parent.GasLimit * miner.chainConfig.GetAstriaForks().ElasticityMultiplierAt(parent.Number.Uint64())
 			header.GasLimit = core.CalcGasLimit(parentGasLimit, miner.config.GasCeil)
 		}
 	}
