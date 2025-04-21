@@ -14,23 +14,45 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+type AstriaTransactionType int
+
+const (
+	SequencedData = iota
+	Deposit
+	PriceFeedData
+)
+
+var (
+	AstriaTransactionTypeMap = map[string]AstriaTransactionType{
+		"sequencedData": SequencedData,
+		"deposit":       Deposit,
+		"priceFeedData": PriceFeedData,
+	}
+	AstriaTransactionTypeReverseMap = map[AstriaTransactionType]string{
+		SequencedData: "sequencedData",
+		Deposit:       "deposit",
+		PriceFeedData: "priceFeedData",
+	}
+)
+
 type AstriaForks struct {
 	orderedForks []AstriaForkData // sorted in descending order by Height
 	forkMap      map[string]AstriaForkConfig
 }
 
 type AstriaForkConfig struct {
-	Height            uint64                      `json:"height"`
-	Halt              bool                        `json:"halt,omitempty"`
-	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
-	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
-	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
-	EIP1559Params     *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
-	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
-	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
-	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
-	Oracle            *AstriaOracleConfig         `json:"oracle,omitempty"`
-	Precompiles       []PrecompileConfig          `json:"precompiles,omitempty"`
+	Height              uint64                      `json:"height"`
+	Halt                bool                        `json:"halt,omitempty"`
+	SnapshotChecksum    string                      `json:"snapshotChecksum,omitempty"`
+	ExtraDataOverride   hexutil.Bytes               `json:"extraDataOverride,omitempty"`
+	FeeCollector        *common.Address             `json:"feeCollector,omitempty"`
+	EIP1559Params       *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
+	Sequencer           *AstriaSequencerConfig      `json:"sequencer,omitempty"`
+	Celestia            *AstriaCelestiaConfig       `json:"celestia,omitempty"`
+	BridgeAddresses     []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+	Oracle              *AstriaOracleConfig         `json:"oracle,omitempty"`
+	Precompiles         []PrecompileConfig          `json:"precompiles,omitempty"`
+	AppSpecificOrdering []string                    `json:"appSpecificOrdering,omitempty"`
 }
 
 type AstriaForkData struct {
@@ -49,6 +71,7 @@ type AstriaForkData struct {
 	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
 	Oracle              AstriaOracleConfig
 	Precompiles         map[common.Address]*PrecompileType
+	AppSpecificOrdering []AstriaTransactionType
 }
 
 type AstriaSequencerConfig struct {
@@ -144,6 +167,15 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		// Override with any new values from current fork
 		if currentFork.SnapshotChecksum != "" {
 			orderedForks[i].SnapshotChecksum = currentFork.SnapshotChecksum
+		}
+
+		if currentFork.AppSpecificOrdering != nil {
+			for _, transactionType := range currentFork.AppSpecificOrdering {
+				if _, ok := AstriaTransactionTypeMap[transactionType]; !ok {
+					return nil, fmt.Errorf("invalid transaction type: %s", transactionType)
+				}
+				orderedForks[i].AppSpecificOrdering = append(orderedForks[i].AppSpecificOrdering, AstriaTransactionTypeMap[transactionType])
+			}
 		}
 
 		if currentFork.FeeCollector != nil {
@@ -460,18 +492,24 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 		precompiles = append(precompiles, precompile)
 	}
 
+	appSpecificOrdering := make([]string, len(fd.AppSpecificOrdering))
+	for _, transactionType := range fd.AppSpecificOrdering {
+		appSpecificOrdering = append(appSpecificOrdering, AstriaTransactionTypeReverseMap[transactionType])
+	}
+
 	config := AstriaForkConfig{
-		Height:            fd.Height,
-		Halt:              fd.Halt,
-		SnapshotChecksum:  fd.SnapshotChecksum,
-		ExtraDataOverride: fd.ExtraDataOverride,
-		FeeCollector:      &fd.FeeCollector,
-		EIP1559Params:     &fd.EIP1559Params,
-		Sequencer:         &fd.Sequencer,
-		Celestia:          &fd.Celestia,
-		BridgeAddresses:   bridgeAddressConfigs,
-		Oracle:            &fd.Oracle,
-		Precompiles:       precompiles,
+		Height:              fd.Height,
+		Halt:                fd.Halt,
+		SnapshotChecksum:    fd.SnapshotChecksum,
+		ExtraDataOverride:   fd.ExtraDataOverride,
+		FeeCollector:        &fd.FeeCollector,
+		EIP1559Params:       &fd.EIP1559Params,
+		Sequencer:           &fd.Sequencer,
+		Celestia:            &fd.Celestia,
+		BridgeAddresses:     bridgeAddressConfigs,
+		Oracle:              &fd.Oracle,
+		Precompiles:         precompiles,
+		AppSpecificOrdering: appSpecificOrdering,
 	}
 
 	return config
