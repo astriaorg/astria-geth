@@ -306,10 +306,12 @@ func (pool *LegacyPool) SetAstriaOrdered(txs types.Transactions) {
 
 	valid := []*types.Transaction{}
 	for idx, tx := range txs {
-		err := pool.validateTxBasics(tx, false)
-		if err != nil {
-			log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
-			continue
+		if tx.Type() != types.InjectedTxType {
+			err := pool.validateTxBasics(tx, false)
+			if err != nil {
+				log.Warn("astria tx failed validation", "index", idx, "hash", tx.Hash(), "error", err)
+				continue
+			}
 		}
 
 		valid = append(valid, tx)
@@ -698,8 +700,7 @@ func (pool *LegacyPool) validateTxBasics(tx *types.Transaction, local bool) erro
 		Accept: 0 |
 			1<<types.LegacyTxType |
 			1<<types.AccessListTxType |
-			1<<types.DynamicFeeTxType |
-			1<<types.InjectedTxType,
+			1<<types.DynamicFeeTxType,
 		MaxSize: txMaxSize,
 		MinTip:  pool.gasTip.Load().ToBig(),
 	}
