@@ -5,11 +5,11 @@ go 1.22
 toolchain go1.22.4
 
 require (
-	buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-00000000000000-f35ed7b0b1db.2
-	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.6-00000000000000-f35ed7b0b1db.1
-	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.36.6-00000000000000-41dabb51ab4b.1
-	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.36.6-00000000000000-245b5b7234fb.1
-	buf.build/gen/go/astria/vendored/protocolbuffers/go v1.36.6-00000000000000-aea44791c4bf.1
+	buf.build/gen/go/astria/execution-apis/grpc/go v1.5.1-20250421182031-00e5d6f5587d.2
+	buf.build/gen/go/astria/execution-apis/protocolbuffers/go v1.36.6-20250421182031-00e5d6f5587d.1
+	buf.build/gen/go/astria/primitives/protocolbuffers/go v1.36.6-20250410153152-4e41f6ebb18a.1
+	buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go v1.36.6-20250418224031-3bbc472dfc9b.1
+	buf.build/gen/go/astria/vendored/protocolbuffers/go v1.36.6-20250418162348-cb98d7f0591d.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/VictoriaMetrics/fastcache v1.12.1
