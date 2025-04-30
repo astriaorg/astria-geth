@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
-	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	sequencerblockv1 "buf.build/gen/go/astria/sequencerblock-apis/protocolbuffers/go/astria/sequencerblock/v1"
 	connecttypesv2 "buf.build/gen/go/astria/vendored/protocolbuffers/go/connect/types/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -141,7 +140,7 @@ func validateAndConvertPriceFeedDataTx(
 			Gas:                    100000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    primitivev1.TransactionId{},
+			SourceTransactionId:    "",
 			SourceTransactionIndex: 0,
 		}
 		tx := types.NewTx(&txdata)
@@ -164,8 +163,8 @@ func validateAndConvertPriceFeedDataTx(
 		Gas:                    900000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
-		SourceTransactionId:    primitivev1.TransactionId{}, // not relevant
-		SourceTransactionIndex: 0,                           // not relevant
+		SourceTransactionId:    "", // not relevant
+		SourceTransactionIndex: 0,  // not relevant
 	}
 	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
 	tx := types.NewTx(&txdata)
