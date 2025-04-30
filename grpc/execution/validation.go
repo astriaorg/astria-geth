@@ -224,7 +224,7 @@ func validateAndConvertDepositTx(
 			Gas:                    64000,
 			To:                     &bac.Erc20Asset.ContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    primitivev1.TransactionId{Inner: deposit.SourceTransactionId.Inner},
+			SourceTransactionId:    deposit.SourceTransactionId.Inner,
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 
@@ -240,7 +240,7 @@ func validateAndConvertDepositTx(
 		To:                     &recipient,
 		Value:                  amount,
 		Gas:                    0,
-		SourceTransactionId:    primitivev1.TransactionId{Inner: deposit.SourceTransactionId.Inner},
+		SourceTransactionId:    deposit.SourceTransactionId.Inner,
 		SourceTransactionIndex: deposit.SourceActionIndex,
 	}
 	astriaTx := &AstriaTransaction{
