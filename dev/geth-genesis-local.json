@@ -31,7 +31,12 @@
                     "chainId": "mocha-4",
                     "startHeight": 2,
                     "searchHeightMaxLookAhead": 10
-                }
+                },
+                "appSpecificOrdering": [
+                    "sequencedData",
+                    "deposit",
+                    "priceFeedData"
+                ]
             }
         }
     },

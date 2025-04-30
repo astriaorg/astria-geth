@@ -490,7 +490,7 @@ func (c *ChainConfig) Description() string {
 	banner += "Astria forks (block based):\n"
 	forks := c.GetAstriaForks().forkMap
 	for forkName, fork := range forks {
-		banner += fmt.Sprintf(" - %-30s #%-8v", forkName+":", fork.Height)
+		banner += fmt.Sprintf(" - %-30s #%-8v Tx Ordering: %v", forkName+":", fork.Height, fork.AppSpecificOrdering)
 		if fork.Halt {
 			banner += " (!chain halts at this height)"
 		}

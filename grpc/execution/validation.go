@@ -173,7 +173,7 @@ func validateAndConvertPriceFeedDataTx(
 
 	astriaTx := &AstriaTransaction{
 		TransactionType: params.PriceFeedData,
-		Tx:              txs,
+		Transactions:    txs,
 	}
 	return astriaTx, nil
 }
@@ -225,13 +225,13 @@ func validateAndConvertDepositTx(
 			Gas:                    64000,
 			To:                     &bac.Erc20Asset.ContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    *deposit.SourceTransactionId,
+			SourceTransactionId:    primitivev1.TransactionId{Inner: deposit.SourceTransactionId.Inner},
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 
 		astriaTx := &AstriaTransaction{
 			TransactionType: params.Deposit,
-			Tx:              []*types.Transaction{types.NewTx(&txdata)},
+			Transactions:    []*types.Transaction{types.NewTx(&txdata)},
 		}
 		return astriaTx, nil
 	}
@@ -241,12 +241,12 @@ func validateAndConvertDepositTx(
 		To:                     &recipient,
 		Value:                  amount,
 		Gas:                    0,
-		SourceTransactionId:    *deposit.SourceTransactionId,
+		SourceTransactionId:    primitivev1.TransactionId{Inner: deposit.SourceTransactionId.Inner},
 		SourceTransactionIndex: deposit.SourceActionIndex,
 	}
 	astriaTx := &AstriaTransaction{
 		TransactionType: params.Deposit,
-		Tx:              []*types.Transaction{types.NewTx(&txdata)},
+		Transactions:    []*types.Transaction{types.NewTx(&txdata)},
 	}
 	return astriaTx, nil
 }
@@ -268,7 +268,7 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) (*AstriaTransaction
 
 	astriaTx := &AstriaTransaction{
 		TransactionType: params.SequencedData,
-		Tx:              []*types.Transaction{ethTx},
+		Transactions:    []*types.Transaction{ethTx},
 	}
 	return astriaTx, nil
 }

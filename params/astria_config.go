@@ -322,6 +322,11 @@ func GetDefaultAstriaForkData() AstriaForkData {
 		BridgeAddresses:     make(map[string]*AstriaBridgeAddressConfig),
 		BridgeAllowedAssets: make(map[string]struct{}),
 		Precompiles:         make(map[common.Address]*PrecompileType),
+		AppSpecificOrdering: []AstriaTransactionType{
+			Deposit,
+			SequencedData,
+			PriceFeedData,
+		},
 	}
 }
 
@@ -467,7 +472,7 @@ func (p PrecompileType) Validate() error {
 func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 	// Convert bridge addresses from map to slice
 	bridgeAddrs := make([]string, 0, len(fd.BridgeAddresses))
-	for addr, _ := range fd.BridgeAddresses {
+	for addr := range fd.BridgeAddresses {
 		bridgeAddrs = append(bridgeAddrs, addr)
 	}
 	bridgeAddressConfigs := make([]AstriaBridgeAddressConfig, len(fd.BridgeAddresses))
@@ -477,7 +482,7 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 	}
 
 	precompileAddresses := make([]common.Address, 0, len(fd.Precompiles))
-	for addr, _ := range fd.Precompiles {
+	for addr := range fd.Precompiles {
 		precompileAddresses = append(precompileAddresses, addr)
 	}
 	precompiles := make([]PrecompileConfig, len(fd.Precompiles))
