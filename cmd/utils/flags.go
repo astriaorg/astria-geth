@@ -896,6 +896,11 @@ var (
 		Usage:    "Max height for soft commitment to be used as firm commitment",
 		Category: flags.ExecutionCategory,
 	}
+	ExecutionServiceTrustedCelestiaHeightFlag = &cli.Uint64Flag{
+		Name:     "execution.trusted-celestia-height",
+		Usage:    "Height of the minimum Celestia block that is trusted (use to bump celestia search height after running in soft-as-firm mode)",
+		Category: flags.ExecutionCategory,
+	}
 
 	// Metrics flags
 	MetricsEnabledFlag = &cli.BoolFlag{
