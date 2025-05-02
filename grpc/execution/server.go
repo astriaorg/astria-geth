@@ -46,7 +46,8 @@ type ExecutionServiceServerV2 struct {
 	commitmentUpdateLock sync.Mutex // Lock for the forkChoiceUpdated method
 	blockExecutionLock   sync.Mutex // Lock for the NewPayload method
 
-	softAsFirm softAsFirmConfig
+	softAsFirm            softAsFirmConfig
+	trustedCelestiaHeight uint64
 
 	activeSessionId string
 	activeFork      *params.AstriaForkData
@@ -70,7 +71,7 @@ var (
 	commitmentStateUpdateTimer = metrics.GetOrRegisterTimer("astria/execution/commitment", nil)
 )
 
-func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool, softAsFirmMaxHeight uint64) (*ExecutionServiceServerV2, error) {
+func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool, softAsFirmMaxHeight uint64, trustedCelestiaHeight uint64) (*ExecutionServiceServerV2, error) {
 	bc := eth.BlockChain()
 
 	if bc.Config().AstriaRollupName == "" {
@@ -85,7 +86,8 @@ func NewExecutionServiceServerV2(eth *eth.Ethereum, softAsFirm bool, softAsFirmM
 		eth: eth,
 		bc:  bc,
 
-		softAsFirm: softAsFirmConfig,
+		softAsFirm:            softAsFirmConfig,
+		trustedCelestiaHeight: trustedCelestiaHeight,
 	}, nil
 }
 
@@ -155,7 +157,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		CommitmentState: &astriaPb.CommitmentState{
 			SoftExecutedBlockMetadata:  softBlock,
 			FirmExecutedBlockMetadata:  firmBlock,
-			LowestCelestiaSearchHeight: max(s.bc.CurrentBaseCelestiaHeight(), fork.Celestia.StartHeight),
+			LowestCelestiaSearchHeight: max(s.trustedCelestiaHeight, s.bc.CurrentBaseCelestiaHeight(), fork.Celestia.StartHeight),
 		},
 	}
 
