@@ -1,10 +1,8 @@
 package execution
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -31,31 +29,12 @@ func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
 	return bytes
 }
 
-// Create a unique source transaction ID for price feed data transactions
-func createPriceFeedSourceTxId(height uint64, header *types.Header, priceFeedData *sequencerblockv1.PriceFeedData) string {
-	var buffer bytes.Buffer
-
-	binary.Write(&buffer, binary.BigEndian, height)
-
-	binary.Write(&buffer, binary.BigEndian, header.Time)
-
-	for _, price := range priceFeedData.Prices {
-		buffer.WriteString(price.CurrencyPair.Base)
-		buffer.WriteString(price.CurrencyPair.Quote)
-		binary.Write(&buffer, binary.BigEndian, price.Price.Hi)
-		binary.Write(&buffer, binary.BigEndian, price.Price.Lo)
-	}
-
-	hash := crypto.Keccak256(buffer.Bytes())
-
-	return hex.EncodeToString(hash)
-}
-
 func validateAndConvertPriceFeedDataTx(
 	ctx context.Context,
 	height uint64,
 	priceFeedData *sequencerblockv1.PriceFeedData,
 	cfg *conversionConfig,
+	sequencerBlockHash string,
 ) ([]*types.Transaction, error) {
 	txs := make([]*types.Transaction, 0)
 
@@ -71,9 +50,6 @@ func validateAndConvertPriceFeedDataTx(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state and header for height %d: %w", height-1, err)
 	}
-
-	// create a unique source transaction ID for the price feed data update
-	sourceTxId := createPriceFeedSourceTxId(height, header, priceFeedData)
 
 	// arguments for calling the `setPrices()` function on the oracle contract
 	currencyPairsToSet := make([][32]byte, 0)
@@ -159,7 +135,7 @@ func validateAndConvertPriceFeedDataTx(
 			Gas:                    100000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    sourceTxId,
+			SourceTransactionId:    sequencerBlockHash,
 			SourceTransactionIndex: 0,
 		}
 		tx := types.NewTx(&txdata)
@@ -182,7 +158,7 @@ func validateAndConvertPriceFeedDataTx(
 		Gas:                    900000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
-		SourceTransactionId:    sourceTxId,
+		SourceTransactionId:    sequencerBlockHash,
 		SourceTransactionIndex: 0,
 	}
 	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
@@ -285,10 +261,11 @@ func validateAndConvertSequencerTx(
 	height uint64,
 	tx *sequencerblockv1.RollupData,
 	cfg *conversionConfig,
+	sequencerBlockHash string,
 ) ([]*types.Transaction, error) {
 	switch {
 	case tx.GetPriceFeedData() != nil:
-		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg)
+		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg, sequencerBlockHash)
 	case tx.GetDeposit() != nil:
 		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
 	case tx.GetSequencedData() != nil:

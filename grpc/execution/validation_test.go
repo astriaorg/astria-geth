@@ -187,7 +187,7 @@ func TestSequenceTxValidation(t *testing.T) {
 				bridgeAddresses:     fork.BridgeAddresses,
 				bridgeAllowedAssets: fork.BridgeAllowedAssets,
 			}
-			_, err := validateAndConvertSequencerTx(context.Background(), 2, test.sequencerTx, cfg)
+			_, err := validateAndConvertSequencerTx(context.Background(), 2, test.sequencerTx, cfg, "")
 			if test.wantErr == "" && err == nil {
 				return
 			}
