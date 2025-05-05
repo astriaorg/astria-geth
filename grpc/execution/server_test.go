@@ -780,24 +780,24 @@ func TestExecutionServiceServerV2_ExecuteBlockTransactionOrdering(t *testing.T) 
 		expectedOrder      []params.AstriaTransactionType
 	}{
 		{
-			description: "Set order (deposit before sequenced)",
+			description: "Set order (sequenced before deposit)",
 			forkConfig: params.AstriaForkConfig{
 				Height:              2,
-				AppSpecificOrdering: []string{"deposit", "sequencedData", "priceFeedData"},
-			},
-			numberOfRegularTxs: 3,
-			numberOfDepositTxs: 2,
-			expectedOrder:      []params.AstriaTransactionType{params.Deposit, params.Deposit, params.SequencedData, params.SequencedData, params.SequencedData},
-		},
-		{
-			description: "Reversed order (sequenced before deposit)",
-			forkConfig: params.AstriaForkConfig{
-				Height:              3,
 				AppSpecificOrdering: []string{"sequencedData", "deposit", "priceFeedData"},
 			},
 			numberOfRegularTxs: 3,
 			numberOfDepositTxs: 2,
 			expectedOrder:      []params.AstriaTransactionType{params.SequencedData, params.SequencedData, params.SequencedData, params.Deposit, params.Deposit},
+		},
+		{
+			description: "Update order (deposit before sequenced)",
+			forkConfig: params.AstriaForkConfig{
+				Height:              3,
+				AppSpecificOrdering: []string{"deposit", "sequencedData", "priceFeedData"},
+			},
+			numberOfRegularTxs: 3,
+			numberOfDepositTxs: 2,
+			expectedOrder:      []params.AstriaTransactionType{params.Deposit, params.Deposit, params.SequencedData, params.SequencedData, params.SequencedData},
 		},
 		{
 			description: "No ordering",
