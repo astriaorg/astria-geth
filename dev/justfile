@@ -39,3 +39,6 @@ clean:
     rm -rf ~/Library/Ethereum/
 
 clean-restart: clean init run
+
+test:
+    cd .. && go test -v ./...

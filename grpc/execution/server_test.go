@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -768,4 +769,165 @@ func TestExecutionServiceServerV2_UpdateCommitmentState_NonCanonicalBlocks(t *te
 	_, err = serviceV2.UpdateCommitmentState(context.Background(), updateReq)
 	require.NotNil(t, err, "UpdateCommitmentState should fail with non-existent blocks")
 	require.Equal(t, codes.InvalidArgument, status.Code(err), "Should get InvalidArgument error")
+}
+
+func TestExecutionServiceServerV2_ExecuteBlockTransactionOrdering(t *testing.T) {
+	tests := []struct {
+		description        string
+		forkConfig         params.AstriaForkConfig
+		numberOfRegularTxs int
+		numberOfDepositTxs int
+		expectedOrder      []params.AstriaTransactionType
+	}{
+		{
+			description: "Set order (deposit before sequenced)",
+			forkConfig: params.AstriaForkConfig{
+				Height:              2,
+				AppSpecificOrdering: []string{"deposit", "sequencedData", "priceFeedData"},
+			},
+			numberOfRegularTxs: 3,
+			numberOfDepositTxs: 2,
+			expectedOrder:      []params.AstriaTransactionType{params.Deposit, params.Deposit, params.SequencedData, params.SequencedData, params.SequencedData},
+		},
+		{
+			description: "Reversed order (sequenced before deposit)",
+			forkConfig: params.AstriaForkConfig{
+				Height:              3,
+				AppSpecificOrdering: []string{"sequencedData", "deposit", "priceFeedData"},
+			},
+			numberOfRegularTxs: 3,
+			numberOfDepositTxs: 2,
+			expectedOrder:      []params.AstriaTransactionType{params.SequencedData, params.SequencedData, params.SequencedData, params.Deposit, params.Deposit},
+		},
+		{
+			description: "No ordering",
+			forkConfig: params.AstriaForkConfig{
+				Height:              4,
+				AppSpecificOrdering: nil,
+			},
+			numberOfRegularTxs: 3,
+			numberOfDepositTxs: 2,
+			// This order is the order that the test txs are created in
+			expectedOrder: []params.AstriaTransactionType{params.SequencedData, params.SequencedData, params.SequencedData, params.Deposit, params.Deposit},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			// Setup execution service with custom fork configuration
+			ethservice, serviceV2 := setupExecutionService(t, 10, false)
+
+			// Create a fork with the app specific ordering
+			var aso []params.AstriaTransactionType
+			if tt.forkConfig.AppSpecificOrdering != nil {
+				for _, txType := range tt.forkConfig.AppSpecificOrdering {
+					aso = append(aso, params.AstriaTransactionTypeMap[txType])
+				}
+			} else {
+				aso = nil
+			}
+			// Get the default fork at height 1 to copy bridge addresses and other required fields
+			defaultFork := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+			fork := params.AstriaForkData{
+				Height:              tt.forkConfig.Height,
+				AppSpecificOrdering: aso,
+				BridgeAddresses:     defaultFork.BridgeAddresses,
+				BridgeAllowedAssets: defaultFork.BridgeAllowedAssets,
+				Sequencer:           defaultFork.Sequencer,
+				Celestia:            defaultFork.Celestia,
+				EIP1559Params:       defaultFork.EIP1559Params,
+				FeeCollector:        defaultFork.FeeCollector,
+				Oracle:              defaultFork.Oracle,
+				Precompiles:         defaultFork.Precompiles,
+			}
+
+			// Create execution session
+			session, err := serviceV2.createExecutionSessionWithForkOverride(context.Background(), &astriaPb.CreateExecutionSessionRequest{}, fork)
+			require.Nil(t, err, "CreateExecutionSession failed")
+			require.NotNil(t, session, "ExecutionSession is nil")
+
+			// Create regular transactions
+			marshalledTxs := []*sequencerblockv1.RollupData{}
+			for i := 0; i < tt.numberOfRegularTxs; i++ {
+				unsignedTx := types.NewTransaction(uint64(i), testToAddress, big.NewInt(1), params.TxGas, big.NewInt(params.InitialBaseFee*2), nil)
+				tx, err := types.SignTx(unsignedTx, types.LatestSigner(ethservice.BlockChain().Config()), testKey)
+				require.Nil(t, err, "Failed to sign tx")
+
+				marshalledTx, err := tx.MarshalBinary()
+				require.Nil(t, err, "Failed to marshal tx")
+				marshalledTxs = append(marshalledTxs, &sequencerblockv1.RollupData{
+					Value: &sequencerblockv1.RollupData_SequencedData{SequencedData: marshalledTx},
+				})
+			}
+
+			// Create deposit transactions
+			bf := ethservice.BlockChain().Config().AstriaForks.GetForkAtHeight(1)
+			var bridgeConfig params.AstriaBridgeAddressConfig
+			for _, cfg := range bf.BridgeAddresses {
+				bridgeConfig = *cfg
+				break
+			}
+
+			for i := 0; i < tt.numberOfDepositTxs; i++ {
+				chainDestinationAddressPrivKey, err := crypto.GenerateKey()
+				require.Nil(t, err, "Failed to generate chain destination address")
+				chainDestinationAddress := crypto.PubkeyToAddress(chainDestinationAddressPrivKey.PublicKey)
+
+				hashedRollupId := sha256.Sum256([]byte(ethservice.BlockChain().Config().AstriaRollupName))
+				rollupId := primitivev1.RollupId{
+					Inner: hashedRollupId[:],
+				}
+
+				depositTx := &sequencerblockv1.RollupData{
+					Value: &sequencerblockv1.RollupData_Deposit{
+						Deposit: &sequencerblockv1.Deposit{
+							BridgeAddress: &primitivev1.Address{
+								Bech32M: bridgeConfig.BridgeAddress,
+							},
+							Asset:                   bridgeConfig.AssetDenom,
+							Amount:                  bigIntToProtoU128(big.NewInt(1000000000000000000)),
+							RollupId:                &rollupId,
+							DestinationChainAddress: chainDestinationAddress.String(),
+							SourceTransactionId: &primitivev1.TransactionId{
+								Inner: fmt.Sprintf("test_tx_hash_%d", i),
+							},
+							SourceActionIndex: 0,
+						},
+					},
+				}
+				marshalledTxs = append(marshalledTxs, depositTx)
+			}
+
+			// Execute block
+			softBlock := ethservice.BlockChain().CurrentSafeBlock()
+			executeBlockReq := &astriaPb.ExecuteBlockRequest{
+				SessionId:  session.SessionId,
+				ParentHash: softBlock.Hash().Hex(),
+				Timestamp: &timestamppb.Timestamp{
+					Seconds: int64(softBlock.Time + 2),
+				},
+				Transactions: marshalledTxs,
+			}
+
+			executeBlockRes, err := serviceV2.ExecuteBlock(context.Background(), executeBlockReq)
+			require.Nil(t, err, "ExecuteBlock failed")
+			require.NotNil(t, executeBlockRes, "ExecuteBlock response is nil")
+
+			// Verify transaction ordering in the block
+			block := ethservice.BlockChain().GetBlockByHash(common.HexToHash(executeBlockRes.ExecutedBlockMetadata.Hash))
+			require.NotNil(t, block, "Block not found")
+			require.Equal(t, tt.numberOfRegularTxs+tt.numberOfDepositTxs, len(block.Transactions()), "Transaction count mismatch")
+
+			// Verify the transaction type ordering
+			for i, tx := range block.Transactions() {
+				var txType params.AstriaTransactionType
+				if tx.Type() == types.InjectedTxType {
+					txType = params.Deposit
+				} else {
+					txType = params.SequencedData
+				}
+				require.Equal(t, tt.expectedOrder[i], txType, "Transaction at index %d has incorrect type", i)
+			}
+		})
+	}
 }

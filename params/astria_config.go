@@ -52,7 +52,7 @@ type AstriaForkConfig struct {
 	BridgeAddresses     []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
 	Oracle              *AstriaOracleConfig         `json:"oracle,omitempty"`
 	Precompiles         []PrecompileConfig          `json:"precompiles,omitempty"`
-	AppSpecificOrdering []string                    `json:"appSpecificOrdering,omitempty"`
+	AppSpecificOrdering []string                    `json:"appSpecificOrdering"`
 }
 
 type AstriaForkData struct {
@@ -170,12 +170,39 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		}
 
 		if currentFork.AppSpecificOrdering != nil {
+			if len(currentFork.AppSpecificOrdering) == 0 {
+				log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
+			} else {
+				log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
+			}
+		} else {
+			log.Debug("currentFork.AppSpecificOrdering before", "ordering", "nil")
+		}
+		// Apply ordering rules to the current fork
+		if currentFork.AppSpecificOrdering == nil && i > 0 {
+			// Carry over ordering from previous fork
+			orderedForks[i].AppSpecificOrdering = orderedForks[i-1].AppSpecificOrdering
+		} else if currentFork.AppSpecificOrdering != nil && len(currentFork.AppSpecificOrdering) == 0 {
+			// Explicitly reset ordering to empty (not nil)
+			orderedForks[i].AppSpecificOrdering = []AstriaTransactionType{}
+		} else if currentFork.AppSpecificOrdering != nil {
+			// Apply set ordering rules to the current fork
+			orderedForks[i].AppSpecificOrdering = nil
 			for _, transactionType := range currentFork.AppSpecificOrdering {
 				if _, ok := AstriaTransactionTypeMap[transactionType]; !ok {
 					return nil, fmt.Errorf("invalid transaction type: %s", transactionType)
 				}
 				orderedForks[i].AppSpecificOrdering = append(orderedForks[i].AppSpecificOrdering, AstriaTransactionTypeMap[transactionType])
 			}
+		}
+		if orderedForks[i].AppSpecificOrdering != nil {
+			if len(orderedForks[i].AppSpecificOrdering) == 0 {
+				log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", "[]")
+			} else {
+				log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", fmt.Sprintf("%v", orderedForks[i].AppSpecificOrdering))
+			}
+		} else {
+			log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", "nil")
 		}
 
 		if currentFork.FeeCollector != nil {
@@ -301,11 +328,37 @@ func validateAstriaForks(forks []AstriaForkData) error {
 					return fmt.Errorf("fork %s: invalid precompile %s", fork.Name, *pType)
 				}
 			}
+
+			if err := validateAppSpecificOrdering(fork.AppSpecificOrdering); err != nil {
+				return fmt.Errorf("fork %s: %w", fork.Name, err)
+			}
 		} else {
 			log.Warn("fork will halt", "fork", fork.Name, "height", fork.Height)
 		}
 	}
 
+	return nil
+}
+
+func validateAppSpecificOrdering(appSpecificOrdering []AstriaTransactionType) error {
+	// ordering not set
+	if appSpecificOrdering == nil {
+		return nil
+	}
+	// ordering explicitly set to [] (reset ordering)
+	if appSpecificOrdering != nil && len(appSpecificOrdering) == 0 {
+		return nil
+	}
+	transactionTypeSet := make(map[AstriaTransactionType]struct{})
+	for _, transactionType := range appSpecificOrdering {
+		if _, ok := transactionTypeSet[transactionType]; ok {
+			return fmt.Errorf("app specific ordering contains duplicate transaction types")
+		}
+		transactionTypeSet[transactionType] = struct{}{}
+	}
+	if len(appSpecificOrdering) != len(AstriaTransactionTypeMap) {
+		return fmt.Errorf("app specific ordering must contain all transaction types")
+	}
 	return nil
 }
 
@@ -322,11 +375,6 @@ func GetDefaultAstriaForkData() AstriaForkData {
 		BridgeAddresses:     make(map[string]*AstriaBridgeAddressConfig),
 		BridgeAllowedAssets: make(map[string]struct{}),
 		Precompiles:         make(map[common.Address]*PrecompileType),
-		AppSpecificOrdering: []AstriaTransactionType{
-			Deposit,
-			SequencedData,
-			PriceFeedData,
-		},
 	}
 }
 
@@ -497,9 +545,15 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 		precompiles = append(precompiles, precompile)
 	}
 
-	appSpecificOrdering := make([]string, len(fd.AppSpecificOrdering))
-	for _, transactionType := range fd.AppSpecificOrdering {
-		appSpecificOrdering = append(appSpecificOrdering, AstriaTransactionTypeReverseMap[transactionType])
+	var appSpecificOrdering []string
+	if fd.AppSpecificOrdering != nil {
+		for _, transactionType := range fd.AppSpecificOrdering {
+			appSpecificOrdering = append(appSpecificOrdering, AstriaTransactionTypeReverseMap[transactionType])
+		}
+		if len(appSpecificOrdering) == len(AstriaTransactionTypeMap) {
+			// TODO: should setting the ordering rules wrong halt the chain?
+			appSpecificOrdering = nil
+		}
 	}
 
 	config := AstriaForkConfig{

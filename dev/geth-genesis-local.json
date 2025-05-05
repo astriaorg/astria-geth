@@ -37,6 +37,24 @@
                     "deposit",
                     "priceFeedData"
                 ]
+            },
+            "testSequencingRulesUpdate": {
+                "height": 2
+            },
+            "testSequencingRulesUpdate2": {
+                "height": 3,
+                "appSpecificOrdering": [
+                    "deposit",
+                    "sequencedData",
+                    "priceFeedData"
+                ]
+            },
+            "removeRules": {
+                "height": 4,
+                "appSpecificOrdering": []
+            },
+            "testSequencingRulesUpdate3": {
+                "height": 5
             }
         }
     },
