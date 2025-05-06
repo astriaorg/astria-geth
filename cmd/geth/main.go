@@ -156,9 +156,7 @@ var (
 		utils.BeaconGenesisRootFlag,
 		utils.BeaconGenesisTimeFlag,
 		utils.BeaconCheckpointFlag,
-		utils.ExecutionServiceSoftAsFirmFlag,
-		utils.ExecutionServiceSoftAsFirmMaxHeightFlag,
-		utils.ExecutionServiceTrustedCelestiaHeightFlag,
+		utils.CollectWitnessFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
