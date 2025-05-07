@@ -244,6 +244,10 @@ func (t *callTracer) OnLog(log *types.Log) {
 	if t.interrupt.Load() {
 		return
 	}
+	// No calls were traced
+	if len(t.callstack) == 0 {
+		return
+	}
 	l := callLog{
 		Address:  log.Address,
 		Topics:   log.Topics,
