@@ -265,8 +265,9 @@ func (t *callTracer) OnLog(log *types.Log) {
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *callTracer) GetResult() (json.RawMessage, error) {
+	// If no calls were traced, return an empty array
 	if len(t.callstack) == 0 {
-		return nil, errors.New("no calls were traced")
+		return json.RawMessage("[]"), nil
 	}
 	if len(t.callstack) > 1 {
 		return nil, errors.New("unexpected number of top-level calls")
