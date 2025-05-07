@@ -248,11 +248,16 @@ func (t *callTracer) OnLog(log *types.Log) {
 	if len(t.callstack) == 0 {
 		return
 	}
+	var position hexutil.Uint = 0
+	if len(t.callstack) > 0 && t.callstack[len(t.callstack)-1].Calls != nil {
+		position = hexutil.Uint(len(t.callstack[len(t.callstack)-1].Calls))
+	}
+
 	l := callLog{
 		Address:  log.Address,
 		Topics:   log.Topics,
 		Data:     log.Data,
-		Position: hexutil.Uint(len(t.callstack[len(t.callstack)-1].Calls)),
+		Position: position,
 	}
 	t.callstack[len(t.callstack)-1].Logs = append(t.callstack[len(t.callstack)-1].Logs, l)
 }
@@ -260,8 +265,11 @@ func (t *callTracer) OnLog(log *types.Log) {
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *callTracer) GetResult() (json.RawMessage, error) {
-	if len(t.callstack) != 1 {
-		return nil, errors.New("incorrect number of top-level calls")
+	if len(t.callstack) == 0 {
+		return nil, errors.New("no calls were traced")
+	}
+	if len(t.callstack) > 1 {
+		return nil, errors.New("unexpected number of top-level calls")
 	}
 
 	res, err := json.Marshal(t.callstack[0])
@@ -285,7 +293,9 @@ func clearFailedLogs(cf *callFrame, parentFailed bool) {
 	if failed {
 		cf.Logs = nil
 	}
-	for i := range cf.Calls {
-		clearFailedLogs(&cf.Calls[i], failed)
+	if cf.Calls != nil {
+		for i := range cf.Calls {
+			clearFailedLogs(&cf.Calls[i], failed)
+		}
 	}
 }
