@@ -274,7 +274,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	}
 
 	for _, tx := range req.Transactions {
-		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
+		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig, req.SequencerBlockHash)
 		if err != nil {
 			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
