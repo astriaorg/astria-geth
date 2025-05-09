@@ -394,7 +394,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// if this is a injected tx with no data, it's a native token mint.
 	if st.msg.IsInjectedTx && len(st.msg.Data) == 0 {
 		log.Debug("deposit tx minting funds", "to", *st.msg.To, "value", st.msg.Value)
+
+		if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnEnter != nil {
+			st.evm.Config.Tracer.OnEnter(0, byte(vm.CALL), st.msg.From, *st.msg.To, st.msg.Data, st.msg.GasLimit, st.msg.Value)
+		}
+
 		st.state.AddBalance(*st.msg.To, uint256.MustFromBig(st.msg.Value), tracing.BalanceIncreaseAstriaInjectedTx)
+
+		if st.evm.Config.Tracer != nil && st.evm.Config.Tracer.OnExit != nil {
+			st.evm.Config.Tracer.OnExit(0, nil, 0, nil, false)
+		}
+
 		return &ExecutionResult{
 			UsedGas:    0,
 			Err:        nil,

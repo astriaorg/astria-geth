@@ -40,6 +40,7 @@ func validateAndConvertPriceFeedDataTx(
 	height uint64,
 	priceFeedData *sequencerblockv1.PriceFeedData,
 	cfg *conversionConfig,
+	sequencerBlockHash string,
 ) (*AstriaTransactionsWithType, error) {
 	txs := make([]*types.Transaction, 0)
 
@@ -140,7 +141,7 @@ func validateAndConvertPriceFeedDataTx(
 			Gas:                    100000,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
-			SourceTransactionId:    "",
+			SourceTransactionId:    sequencerBlockHash,
 			SourceTransactionIndex: 0,
 		}
 		tx := types.NewTx(&txdata)
@@ -163,8 +164,8 @@ func validateAndConvertPriceFeedDataTx(
 		Gas:                    900000,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
-		SourceTransactionId:    "", // not relevant
-		SourceTransactionIndex: 0,  // not relevant
+		SourceTransactionId:    sequencerBlockHash,
+		SourceTransactionIndex: 0,
 	}
 	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
 	tx := types.NewTx(&txdata)
@@ -283,10 +284,11 @@ func validateAndConvertSequencerTx(
 	height uint64,
 	tx *sequencerblockv1.RollupData,
 	cfg *conversionConfig,
+	sequencerBlockHash string,
 ) (*AstriaTransactionsWithType, error) {
 	switch {
 	case tx.GetPriceFeedData() != nil:
-		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg)
+		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg, sequencerBlockHash)
 	case tx.GetDeposit() != nil:
 		return validateAndConvertDepositTx(height, tx.GetDeposit(), cfg)
 	case tx.GetSequencedData() != nil:

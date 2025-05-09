@@ -211,6 +211,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 			eth,
 			ctx.Bool(utils.ExecutionServiceSoftAsFirmFlag.Name),
 			ctx.Uint64(utils.ExecutionServiceSoftAsFirmMaxHeightFlag.Name),
+			ctx.Uint64(utils.ExecutionServiceTrustedCelestiaHeightFlag.Name),
 		)
 		if err != nil {
 			utils.Fatalf("failed to create execution service: %v", err)

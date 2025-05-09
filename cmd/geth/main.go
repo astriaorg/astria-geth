@@ -158,6 +158,7 @@ var (
 		utils.BeaconCheckpointFlag,
 		utils.ExecutionServiceSoftAsFirmFlag,
 		utils.ExecutionServiceSoftAsFirmMaxHeightFlag,
+		utils.ExecutionServiceTrustedCelestiaHeightFlag,
 	}, utils.NetworkFlags, utils.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
