@@ -17,7 +17,7 @@ import (
 type AstriaTransactionType int
 
 const (
-	SequencedData = iota
+	SequencedData AstriaTransactionType = iota
 	Deposit
 	PriceFeedData
 )
