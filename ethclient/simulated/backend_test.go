@@ -188,6 +188,12 @@ func TestFork(t *testing.T) {
 	}
 }
 
+// XXX: Commented out because while Astria-Geth accepts
+// transactions received via SendTransaction, it does
+// not use the same fork mechanism as vanilla eth but
+// relies on its chain being driven externally via
+// the Astria ExecutionApi.
+//
 // TestForkResendTx checks that re-sending a TX after a fork
 // is possible and does not cause a "nonce mismatch" panic.
 // Steps:
@@ -197,48 +203,50 @@ func TestFork(t *testing.T) {
 //  4. Fork by using the parent block as ancestor.
 //  5. Mine a block, Re-send the transaction and mine another one.
 //  6. Check that the TX is now included in block 2.
-//func TestForkResendTx(t *testing.T) {
-//	t.Parallel()
-//	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-//	sim := simTestBackend(testAddr)
-//	defer sim.Close()
-//
-//	client := sim.Client()
-//	ctx := context.Background()
-//
-//	// 1.
-//	parent, _ := client.HeaderByNumber(ctx, nil)
-//
-//	// 2.
-//	tx, err := newTx(sim, testKey)
-//	if err != nil {
-//		t.Fatalf("could not create transaction: %v", err)
-//	}
-//	client.SendTransaction(ctx, tx)
-//	sim.Commit()
-//
-//	// 3.
-//	receipt, _ := client.TransactionReceipt(ctx, tx.Hash())
-//	if h := receipt.BlockNumber.Uint64(); h != 1 {
-//		t.Errorf("TX included in wrong block: %d", h)
-//	}
-//
-//	// 4.
-//	if err := sim.Fork(parent.Hash()); err != nil {
-//		t.Errorf("forking: %v", err)
-//	}
-//
-//	// 5.
-//	sim.Commit()
-//	if err := client.SendTransaction(ctx, tx); err != nil {
-//		t.Fatalf("sending transaction: %v", err)
-//	}
-//	sim.Commit()
-//	receipt, _ = client.TransactionReceipt(ctx, tx.Hash())
-//	if h := receipt.BlockNumber.Uint64(); h != 2 {
-//		t.Errorf("TX included in wrong block: %d", h)
-//	}
-//}
+// func TestForkResendTx(t *testing.T) {
+// 	t.Parallel()
+// 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+// 	sim := simTestBackend(testAddr)
+// 	defer sim.Close()
+
+// 	client := sim.Client()
+// 	ctx := context.Background()
+
+// 	// 1.
+// 	parent, _ := client.HeaderByNumber(ctx, nil)
+
+// 	// 2.
+// 	tx, err := newTx(sim, testKey)
+// 	if err != nil {
+// 		t.Fatalf("could not create transaction: %v", err)
+// 	}
+// 	if err := client.SendTransaction(ctx, tx); err != nil {
+// 		t.Fatalf("sending transaction: %v", err)
+// 	}
+// 	sim.Commit()
+
+// 	// 3.
+// 	receipt, _ := client.TransactionReceipt(ctx, tx.Hash())
+// 	if h := receipt.BlockNumber.Uint64(); h != 1 {
+// 		t.Errorf("TX included in wrong block: %d", h)
+// 	}
+
+// 	// 4.
+// 	if err := sim.Fork(parent.Hash()); err != nil {
+// 		t.Errorf("forking: %v", err)
+// 	}
+
+// 	// 5.
+// 	sim.Commit()
+// 	if err := client.SendTransaction(ctx, tx); err != nil {
+// 		t.Fatalf("sending transaction: %v", err)
+// 	}
+// 	sim.Commit()
+// 	receipt, _ = client.TransactionReceipt(ctx, tx.Hash())
+// 	if h := receipt.BlockNumber.Uint64(); h != 2 {
+// 		t.Errorf("TX included in wrong block: %d", h)
+// 	}
+// }
 
 func TestCommitReturnValue(t *testing.T) {
 	t.Parallel()
@@ -257,11 +265,10 @@ func TestCommitReturnValue(t *testing.T) {
 	}
 
 	// Create a block in the original chain (containing a transaction to force different block hashes)
-	head, _ := client.HeaderByNumber(ctx, nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
-	tx, _ := types.SignTx(_tx, types.HomesteadSigner{}, testKey)
-	client.SendTransaction(ctx, tx)
+	tx, _ := newTx(sim, testKey)
+	if err := client.SendTransaction(ctx, tx); err != nil {
+		t.Errorf("sending transaction: %v", err)
+	}
 
 	h2 := sim.Commit()
 
