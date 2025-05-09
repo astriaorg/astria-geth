@@ -12,11 +12,13 @@ build:
 init:
     ../build/bin/geth --db.engine pebble \
     --state.scheme=path \
+    --verbosity=4 \
     init geth-genesis-local.json
 
 # start a local geth node
 run softAsFirm="true":
     ../build/bin/geth \
+    --verbosity=4 \
     --http \
     --http.addr=0.0.0.0 \
     --http.port=8545 \

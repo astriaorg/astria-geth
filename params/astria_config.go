@@ -170,11 +170,7 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		}
 
 		if currentFork.AppSpecificOrdering != nil {
-			if len(currentFork.AppSpecificOrdering) == 0 {
-				log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
-			} else {
-				log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
-			}
+			log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
 		} else {
 			log.Debug("currentFork.AppSpecificOrdering before", "ordering", "nil")
 		}
@@ -187,20 +183,16 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 			orderedForks[i].AppSpecificOrdering = []AstriaTransactionType{}
 		} else if currentFork.AppSpecificOrdering != nil {
 			// Apply set ordering rules to the current fork
-			orderedForks[i].AppSpecificOrdering = nil
-			for _, transactionType := range currentFork.AppSpecificOrdering {
+			orderedForks[i].AppSpecificOrdering = make([]AstriaTransactionType, len(currentFork.AppSpecificOrdering))
+			for j, transactionType := range currentFork.AppSpecificOrdering {
 				if _, ok := AstriaTransactionTypeMap[transactionType]; !ok {
 					return nil, fmt.Errorf("invalid transaction type: %s", transactionType)
 				}
-				orderedForks[i].AppSpecificOrdering = append(orderedForks[i].AppSpecificOrdering, AstriaTransactionTypeMap[transactionType])
+				orderedForks[i].AppSpecificOrdering[j] = AstriaTransactionTypeMap[transactionType]
 			}
 		}
 		if orderedForks[i].AppSpecificOrdering != nil {
-			if len(orderedForks[i].AppSpecificOrdering) == 0 {
-				log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", "[]")
-			} else {
-				log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", fmt.Sprintf("%v", orderedForks[i].AppSpecificOrdering))
-			}
+			log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", fmt.Sprintf("%v", orderedForks[i].AppSpecificOrdering))
 		} else {
 			log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", "nil")
 		}

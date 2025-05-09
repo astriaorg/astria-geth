@@ -23,7 +23,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-type AstriaTransaction struct {
+type AstriaTransactionsWithType struct {
 	TransactionType params.AstriaTransactionType
 	Transactions    []*types.Transaction
 }
@@ -40,7 +40,7 @@ func validateAndConvertPriceFeedDataTx(
 	height uint64,
 	priceFeedData *sequencerblockv1.PriceFeedData,
 	cfg *conversionConfig,
-) (*AstriaTransaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	txs := make([]*types.Transaction, 0)
 
 	log.Debug("creating price feed data update tx", "price count", len(priceFeedData.Prices))
@@ -170,7 +170,7 @@ func validateAndConvertPriceFeedDataTx(
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
 
-	astriaTx := &AstriaTransaction{
+	astriaTx := &AstriaTransactionsWithType{
 		TransactionType: params.PriceFeedData,
 		Transactions:    txs,
 	}
@@ -181,7 +181,7 @@ func validateAndConvertDepositTx(
 	height uint64,
 	deposit *sequencerblockv1.Deposit,
 	cfg *conversionConfig,
-) (*AstriaTransaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	bridgeAddress := deposit.BridgeAddress.GetBech32M()
 	bac, ok := cfg.bridgeAddresses[bridgeAddress]
 	if !ok {
@@ -228,7 +228,7 @@ func validateAndConvertDepositTx(
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 
-		astriaTx := &AstriaTransaction{
+		astriaTx := &AstriaTransactionsWithType{
 			TransactionType: params.Deposit,
 			Transactions:    []*types.Transaction{types.NewTx(&txdata)},
 		}
@@ -243,14 +243,14 @@ func validateAndConvertDepositTx(
 		SourceTransactionId:    deposit.SourceTransactionId.Inner,
 		SourceTransactionIndex: deposit.SourceActionIndex,
 	}
-	astriaTx := &AstriaTransaction{
+	astriaTx := &AstriaTransactionsWithType{
 		TransactionType: params.Deposit,
 		Transactions:    []*types.Transaction{types.NewTx(&txdata)},
 	}
 	return astriaTx, nil
 }
 
-func validateAndConvertSequencedDataTx(sequencedData []byte) (*AstriaTransaction, error) {
+func validateAndConvertSequencedDataTx(sequencedData []byte) (*AstriaTransactionsWithType, error) {
 	ethTx := new(types.Transaction)
 	err := ethTx.UnmarshalBinary(sequencedData)
 	if err != nil {
@@ -265,7 +265,7 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) (*AstriaTransaction
 		return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
 	}
 
-	astriaTx := &AstriaTransaction{
+	astriaTx := &AstriaTransactionsWithType{
 		TransactionType: params.SequencedData,
 		Transactions:    []*types.Transaction{ethTx},
 	}
@@ -283,7 +283,7 @@ func validateAndConvertSequencerTx(
 	height uint64,
 	tx *sequencerblockv1.RollupData,
 	cfg *conversionConfig,
-) (*AstriaTransaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	switch {
 	case tx.GetPriceFeedData() != nil:
 		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg)

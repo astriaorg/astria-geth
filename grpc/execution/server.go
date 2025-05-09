@@ -273,15 +273,15 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	}
 
 	for _, tx := range req.Transactions {
-		astriaTx, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
+		astriaTxs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig)
 		if err != nil {
 			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
 		if s.activeFork.AppSpecificOrdering == nil {
-			txsToProcess = append(txsToProcess, astriaTx.Transactions...)
+			txsToProcess = append(txsToProcess, astriaTxs.Transactions...)
 		} else {
-			txsByType[astriaTx.TransactionType] = append(txsByType[astriaTx.TransactionType], astriaTx.Transactions...)
+			txsByType[astriaTxs.TransactionType] = append(txsByType[astriaTxs.TransactionType], astriaTxs.Transactions...)
 		}
 	}
 	if s.activeFork.AppSpecificOrdering != nil {
