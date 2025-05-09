@@ -18,9 +18,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/holiman/uint256"
 )
+
+type AstriaTransactionsWithType struct {
+	TransactionType params.AstriaTransactionType
+	Transactions    []*types.Transaction
+}
 
 func hashCurrencyPair(currencyPair *connecttypesv2.CurrencyPair) [32]byte {
 	cpStr := fmt.Sprintf("%s/%s", currencyPair.Base, currencyPair.Quote)
@@ -35,7 +41,7 @@ func validateAndConvertPriceFeedDataTx(
 	priceFeedData *sequencerblockv1.PriceFeedData,
 	cfg *conversionConfig,
 	sequencerBlockHash string,
-) ([]*types.Transaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	txs := make([]*types.Transaction, 0)
 
 	log.Debug("creating price feed data update tx", "price count", len(priceFeedData.Prices))
@@ -164,14 +170,19 @@ func validateAndConvertPriceFeedDataTx(
 	log.Debug("created setPrices tx", "pairs", priceFeedData.Prices)
 	tx := types.NewTx(&txdata)
 	txs = append(txs, tx)
-	return txs, nil
+
+	astriaTx := &AstriaTransactionsWithType{
+		TransactionType: params.PriceFeedData,
+		Transactions:    txs,
+	}
+	return astriaTx, nil
 }
 
 func validateAndConvertDepositTx(
 	height uint64,
 	deposit *sequencerblockv1.Deposit,
 	cfg *conversionConfig,
-) ([]*types.Transaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	bridgeAddress := deposit.BridgeAddress.GetBech32M()
 	bac, ok := cfg.bridgeAddresses[bridgeAddress]
 	if !ok {
@@ -218,7 +229,11 @@ func validateAndConvertDepositTx(
 			SourceTransactionIndex: deposit.SourceActionIndex,
 		}
 
-		return []*types.Transaction{types.NewTx(&txdata)}, nil
+		astriaTx := &AstriaTransactionsWithType{
+			TransactionType: params.Deposit,
+			Transactions:    []*types.Transaction{types.NewTx(&txdata)},
+		}
+		return astriaTx, nil
 	}
 
 	txdata := types.InjectedTx{
@@ -229,10 +244,14 @@ func validateAndConvertDepositTx(
 		SourceTransactionId:    deposit.SourceTransactionId.Inner,
 		SourceTransactionIndex: deposit.SourceActionIndex,
 	}
-	return []*types.Transaction{types.NewTx(&txdata)}, nil
+	astriaTx := &AstriaTransactionsWithType{
+		TransactionType: params.Deposit,
+		Transactions:    []*types.Transaction{types.NewTx(&txdata)},
+	}
+	return astriaTx, nil
 }
 
-func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transaction, error) {
+func validateAndConvertSequencedDataTx(sequencedData []byte) (*AstriaTransactionsWithType, error) {
 	ethTx := new(types.Transaction)
 	err := ethTx.UnmarshalBinary(sequencedData)
 	if err != nil {
@@ -247,7 +266,11 @@ func validateAndConvertSequencedDataTx(sequencedData []byte) ([]*types.Transacti
 		return nil, fmt.Errorf("blob tx not allowed in sequenced data. tx hash: %s", sha256.Sum256(sequencedData))
 	}
 
-	return []*types.Transaction{ethTx}, nil
+	astriaTx := &AstriaTransactionsWithType{
+		TransactionType: params.SequencedData,
+		Transactions:    []*types.Transaction{ethTx},
+	}
+	return astriaTx, nil
 }
 
 // `validateAndConvertSequencerTx` validates and unmarshals the given rollup sequencer transaction and converts it into
@@ -262,7 +285,7 @@ func validateAndConvertSequencerTx(
 	tx *sequencerblockv1.RollupData,
 	cfg *conversionConfig,
 	sequencerBlockHash string,
-) ([]*types.Transaction, error) {
+) (*AstriaTransactionsWithType, error) {
 	switch {
 	case tx.GetPriceFeedData() != nil:
 		return validateAndConvertPriceFeedDataTx(ctx, height, tx.GetPriceFeedData(), cfg, sequencerBlockHash)

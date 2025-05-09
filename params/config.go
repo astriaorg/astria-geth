@@ -19,6 +19,7 @@ package params
 import (
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params/forks"
@@ -488,9 +489,18 @@ func (c *ChainConfig) Description() string {
 
 	// Add Astria forks
 	banner += "Astria forks (block based):\n"
-	forks := c.GetAstriaForks().forkMap
-	for forkName, fork := range forks {
-		banner += fmt.Sprintf(" - %-30s #%-8v", forkName+":", fork.Height)
+	orderedForks := c.GetAstriaForks().orderedForks
+	// Sort by height ascending
+	sort.Slice(orderedForks, func(i, j int) bool {
+		return orderedForks[i].Height < orderedForks[j].Height
+	})
+	for _, fork := range orderedForks {
+		// Convert AppSpecificOrdering to txType names
+		var orderingNames []string
+		for _, txType := range fork.AppSpecificOrdering {
+			orderingNames = append(orderingNames, AstriaTransactionTypeReverseMap[txType])
+		}
+		banner += fmt.Sprintf(" - %-30s #%-8v Tx Ordering: %v", fork.Name+":", fork.Height, orderingNames)
 		if fork.Halt {
 			banner += " (!chain halts at this height)"
 		}

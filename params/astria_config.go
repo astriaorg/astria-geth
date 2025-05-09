@@ -14,23 +14,45 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+type AstriaTransactionType int
+
+const (
+	SequencedData AstriaTransactionType = iota
+	Deposit
+	PriceFeedData
+)
+
+var (
+	AstriaTransactionTypeMap = map[string]AstriaTransactionType{
+		"sequencedData": SequencedData,
+		"deposit":       Deposit,
+		"priceFeedData": PriceFeedData,
+	}
+	AstriaTransactionTypeReverseMap = map[AstriaTransactionType]string{
+		SequencedData: "sequencedData",
+		Deposit:       "deposit",
+		PriceFeedData: "priceFeedData",
+	}
+)
+
 type AstriaForks struct {
 	orderedForks []AstriaForkData // sorted in descending order by Height
 	forkMap      map[string]AstriaForkConfig
 }
 
 type AstriaForkConfig struct {
-	Height            uint64                      `json:"height"`
-	Halt              bool                        `json:"halt,omitempty"`
-	SnapshotChecksum  string                      `json:"snapshotChecksum,omitempty"`
-	ExtraDataOverride hexutil.Bytes               `json:"extraDataOverride,omitempty"`
-	FeeCollector      *common.Address             `json:"feeCollector,omitempty"`
-	EIP1559Params     *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
-	Sequencer         *AstriaSequencerConfig      `json:"sequencer,omitempty"`
-	Celestia          *AstriaCelestiaConfig       `json:"celestia,omitempty"`
-	BridgeAddresses   []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
-	Oracle            *AstriaOracleConfig         `json:"oracle,omitempty"`
-	Precompiles       []PrecompileConfig          `json:"precompiles,omitempty"`
+	Height              uint64                      `json:"height"`
+	Halt                bool                        `json:"halt,omitempty"`
+	SnapshotChecksum    string                      `json:"snapshotChecksum,omitempty"`
+	ExtraDataOverride   hexutil.Bytes               `json:"extraDataOverride,omitempty"`
+	FeeCollector        *common.Address             `json:"feeCollector,omitempty"`
+	EIP1559Params       *AstriaEIP1559Params        `json:"eip1559Params,omitempty"`
+	Sequencer           *AstriaSequencerConfig      `json:"sequencer,omitempty"`
+	Celestia            *AstriaCelestiaConfig       `json:"celestia,omitempty"`
+	BridgeAddresses     []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
+	Oracle              *AstriaOracleConfig         `json:"oracle,omitempty"`
+	Precompiles         []PrecompileConfig          `json:"precompiles,omitempty"`
+	AppSpecificOrdering []string                    `json:"appSpecificOrdering"`
 }
 
 type AstriaForkData struct {
@@ -49,6 +71,7 @@ type AstriaForkData struct {
 	BridgeAllowedAssets map[string]struct{}                   // a set of allowed asset IDs structs are left empty
 	Oracle              AstriaOracleConfig
 	Precompiles         map[common.Address]*PrecompileType
+	AppSpecificOrdering []AstriaTransactionType
 }
 
 type AstriaSequencerConfig struct {
@@ -144,6 +167,34 @@ func NewAstriaForks(forks map[string]AstriaForkConfig) (*AstriaForks, error) {
 		// Override with any new values from current fork
 		if currentFork.SnapshotChecksum != "" {
 			orderedForks[i].SnapshotChecksum = currentFork.SnapshotChecksum
+		}
+
+		if currentFork.AppSpecificOrdering != nil {
+			log.Debug("currentFork.AppSpecificOrdering before", "ordering", fmt.Sprintf("%v", currentFork.AppSpecificOrdering))
+		} else {
+			log.Debug("currentFork.AppSpecificOrdering before", "ordering", "nil")
+		}
+		// Apply ordering rules to the current fork
+		if currentFork.AppSpecificOrdering == nil && i > 0 {
+			// Carry over ordering from previous fork
+			orderedForks[i].AppSpecificOrdering = orderedForks[i-1].AppSpecificOrdering
+		} else if currentFork.AppSpecificOrdering != nil && len(currentFork.AppSpecificOrdering) == 0 {
+			// Explicitly reset ordering to empty (not nil)
+			orderedForks[i].AppSpecificOrdering = []AstriaTransactionType{}
+		} else if currentFork.AppSpecificOrdering != nil {
+			// Apply set ordering rules to the current fork
+			orderedForks[i].AppSpecificOrdering = make([]AstriaTransactionType, len(currentFork.AppSpecificOrdering))
+			for j, transactionType := range currentFork.AppSpecificOrdering {
+				if _, ok := AstriaTransactionTypeMap[transactionType]; !ok {
+					return nil, fmt.Errorf("invalid transaction type: %s", transactionType)
+				}
+				orderedForks[i].AppSpecificOrdering[j] = AstriaTransactionTypeMap[transactionType]
+			}
+		}
+		if orderedForks[i].AppSpecificOrdering != nil {
+			log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", fmt.Sprintf("%v", orderedForks[i].AppSpecificOrdering))
+		} else {
+			log.Debug("orderedForks.AppSpecificOrdering after", "index", i, "ordering", "nil")
 		}
 
 		if currentFork.FeeCollector != nil {
@@ -269,11 +320,37 @@ func validateAstriaForks(forks []AstriaForkData) error {
 					return fmt.Errorf("fork %s: invalid precompile %s", fork.Name, *pType)
 				}
 			}
+
+			if err := validateAppSpecificOrdering(fork.AppSpecificOrdering); err != nil {
+				return fmt.Errorf("fork %s: %w", fork.Name, err)
+			}
 		} else {
 			log.Warn("fork will halt", "fork", fork.Name, "height", fork.Height)
 		}
 	}
 
+	return nil
+}
+
+func validateAppSpecificOrdering(appSpecificOrdering []AstriaTransactionType) error {
+	// ordering not set
+	if appSpecificOrdering == nil {
+		return nil
+	}
+	// ordering explicitly set to [] (reset ordering)
+	if appSpecificOrdering != nil && len(appSpecificOrdering) == 0 {
+		return nil
+	}
+	transactionTypeSet := make(map[AstriaTransactionType]struct{})
+	for _, transactionType := range appSpecificOrdering {
+		if _, ok := transactionTypeSet[transactionType]; ok {
+			return fmt.Errorf("app specific ordering contains duplicate transaction types")
+		}
+		transactionTypeSet[transactionType] = struct{}{}
+	}
+	if len(appSpecificOrdering) != len(AstriaTransactionTypeMap) {
+		return fmt.Errorf("app specific ordering must contain all transaction types")
+	}
 	return nil
 }
 
@@ -435,7 +512,7 @@ func (p PrecompileType) Validate() error {
 func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 	// Convert bridge addresses from map to slice
 	bridgeAddrs := make([]string, 0, len(fd.BridgeAddresses))
-	for addr, _ := range fd.BridgeAddresses {
+	for addr := range fd.BridgeAddresses {
 		bridgeAddrs = append(bridgeAddrs, addr)
 	}
 	bridgeAddressConfigs := make([]AstriaBridgeAddressConfig, len(fd.BridgeAddresses))
@@ -445,7 +522,7 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 	}
 
 	precompileAddresses := make([]common.Address, 0, len(fd.Precompiles))
-	for addr, _ := range fd.Precompiles {
+	for addr := range fd.Precompiles {
 		precompileAddresses = append(precompileAddresses, addr)
 	}
 	precompiles := make([]PrecompileConfig, len(fd.Precompiles))
@@ -460,18 +537,30 @@ func (fd AstriaForkData) ToConfig() AstriaForkConfig {
 		precompiles = append(precompiles, precompile)
 	}
 
+	var appSpecificOrdering []string
+	if fd.AppSpecificOrdering != nil {
+		for _, transactionType := range fd.AppSpecificOrdering {
+			appSpecificOrdering = append(appSpecificOrdering, AstriaTransactionTypeReverseMap[transactionType])
+		}
+		if len(appSpecificOrdering) == len(AstriaTransactionTypeMap) {
+			// TODO: should setting the ordering rules wrong halt the chain?
+			appSpecificOrdering = nil
+		}
+	}
+
 	config := AstriaForkConfig{
-		Height:            fd.Height,
-		Halt:              fd.Halt,
-		SnapshotChecksum:  fd.SnapshotChecksum,
-		ExtraDataOverride: fd.ExtraDataOverride,
-		FeeCollector:      &fd.FeeCollector,
-		EIP1559Params:     &fd.EIP1559Params,
-		Sequencer:         &fd.Sequencer,
-		Celestia:          &fd.Celestia,
-		BridgeAddresses:   bridgeAddressConfigs,
-		Oracle:            &fd.Oracle,
-		Precompiles:       precompiles,
+		Height:              fd.Height,
+		Halt:                fd.Halt,
+		SnapshotChecksum:    fd.SnapshotChecksum,
+		ExtraDataOverride:   fd.ExtraDataOverride,
+		FeeCollector:        &fd.FeeCollector,
+		EIP1559Params:       &fd.EIP1559Params,
+		Sequencer:           &fd.Sequencer,
+		Celestia:            &fd.Celestia,
+		BridgeAddresses:     bridgeAddressConfigs,
+		Oracle:              &fd.Oracle,
+		Precompiles:         precompiles,
+		AppSpecificOrdering: appSpecificOrdering,
 	}
 
 	return config

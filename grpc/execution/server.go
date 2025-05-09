@@ -265,6 +265,7 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	}
 
 	txsToProcess := types.Transactions{}
+	txsByType := map[params.AstriaTransactionType][]*types.Transaction{}
 	conversionConfig := &conversionConfig{
 		bridgeAddresses:       s.activeFork.BridgeAddresses,
 		bridgeAllowedAssets:   s.activeFork.BridgeAllowedAssets,
@@ -274,12 +275,21 @@ func (s *ExecutionServiceServerV2) ExecuteBlock(ctx context.Context, req *astria
 	}
 
 	for _, tx := range req.Transactions {
-		txs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig, req.SequencerBlockHash)
+		astriaTxs, err := validateAndConvertSequencerTx(ctx, height, tx, conversionConfig, req.SequencerBlockHash)
 		if err != nil {
 			log.Info("failed to validate sequencer tx, ignoring", "tx", tx, "err", err)
 			continue
 		}
-		txsToProcess = append(txsToProcess, txs...)
+		if s.activeFork.AppSpecificOrdering == nil {
+			txsToProcess = append(txsToProcess, astriaTxs.Transactions...)
+		} else {
+			txsByType[astriaTxs.TransactionType] = append(txsByType[astriaTxs.TransactionType], astriaTxs.Transactions...)
+		}
+	}
+	if s.activeFork.AppSpecificOrdering != nil {
+		for _, txType := range s.activeFork.AppSpecificOrdering {
+			txsToProcess = append(txsToProcess, txsByType[txType]...)
+		}
 	}
 
 	// This set of ordered TXs on the TxPool is used when building a payload.

@@ -1,11 +1,14 @@
 package execution
 
 import (
+	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"math/big"
 	"testing"
 	"time"
 
+	astriaPb "buf.build/gen/go/astria/execution-apis/protocolbuffers/go/astria/execution/v2"
 	primitivev1 "buf.build/gen/go/astria/primitives/protocolbuffers/go/astria/primitive/v1"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/common"
@@ -14,14 +17,20 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -198,4 +207,78 @@ func setupExecutionService(t *testing.T, noOfBlocksToGenerate int, lowGasLimit b
 // setupExecutionServiceWithHaltedFork sets up an execution service with a halted fork
 func setupExecutionServiceWithHaltedFork(t *testing.T, noOfBlocksToGenerate int) (*eth.Ethereum, *ExecutionServiceServerV2) {
 	return setupExecutionService(t, noOfBlocksToGenerate, false, true)
+}
+
+func (s *ExecutionServiceServerV2) createExecutionSessionWithForkOverride(ctx context.Context, req *astriaPb.CreateExecutionSessionRequest, fork params.AstriaForkData) (*astriaPb.ExecutionSession, error) {
+	log.Debug("CreateExecutionSession called")
+	createExecutionSessionRequestCount.Inc(1)
+
+	// We shouldn't create a new session if we are actively executing within one.
+	s.blockExecutionLock.Lock()
+	defer s.blockExecutionLock.Unlock()
+	s.commitmentUpdateLock.Lock()
+	defer s.commitmentUpdateLock.Unlock()
+
+	rollupHash := sha256.Sum256([]byte(s.bc.Config().AstriaRollupName))
+	rollupId := primitivev1.RollupId{Inner: rollupHash[:]}
+
+	if fork.Halt {
+		log.Error("CreateExecutionSession called at halted fork", "fork", fork.Name)
+		return nil, status.Error(codes.FailedPrecondition, "Execution session cannot be created at halted fork")
+	}
+
+	s.activeSessionId = uuid.NewString()
+	s.activeFork = &fork
+
+	softBlock, err := ethHeaderToExecutedBlockMetadata(s.bc.CurrentSafeBlock())
+	if err != nil {
+		log.Error("error finding safe block", err)
+		return nil, status.Error(codes.Internal, "Could not locate soft block")
+	}
+
+	firmBlock, err := ethHeaderToExecutedBlockMetadata(s.bc.CurrentFinalBlock())
+	if err != nil {
+		log.Error("error finding final block", err)
+		return nil, status.Error(codes.Internal, "Could not locate firm block")
+	}
+
+	// sanity code check for oracle contract address
+	if fork.Oracle.ContractAddress != (common.Address{}) {
+		height := s.bc.CurrentFinalBlock().Number.Uint64() // consider should this be the current final block, safe block, or the fork start height - 1?
+		state, header, err := s.eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
+		if err != nil {
+			log.Error("failed to get state and header for height", "height", height, "error", err)
+			return nil, status.Error(codes.Internal, "Failed to get state and header for height")
+		}
+
+		evm := s.eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
+		code := evm.StateDB.GetCode(fork.Oracle.ContractAddress)
+		if len(code) == 0 {
+			log.Error("oracle contract address has no code", "address", fork.Oracle.ContractAddress)
+			return nil, status.Error(codes.FailedPrecondition, "Oracle contract address has no code")
+		}
+	}
+
+	res := &astriaPb.ExecutionSession{
+		SessionId: s.activeSessionId,
+		ExecutionSessionParameters: &astriaPb.ExecutionSessionParameters{
+			RollupId:                         &rollupId,
+			RollupStartBlockNumber:           fork.Height,
+			RollupEndBlockNumber:             fork.StopHeight,
+			SequencerChainId:                 fork.Sequencer.ChainID,
+			SequencerStartBlockHeight:        fork.Sequencer.StartHeight,
+			CelestiaChainId:                  fork.Celestia.ChainID,
+			CelestiaSearchHeightMaxLookAhead: fork.Celestia.SearchHeightMaxLookAhead,
+		},
+		CommitmentState: &astriaPb.CommitmentState{
+			SoftExecutedBlockMetadata:  softBlock,
+			FirmExecutedBlockMetadata:  firmBlock,
+			LowestCelestiaSearchHeight: max(s.bc.CurrentBaseCelestiaHeight(), fork.Celestia.StartHeight),
+		},
+	}
+
+	log.Info("CreateExecutionSession completed", "response", res)
+	createExecutionSessionSuccessCount.Inc(1)
+
+	return res, nil
 }
