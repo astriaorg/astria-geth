@@ -489,7 +489,8 @@ func (c *ChainConfig) Description() string {
 
 	// Add Astria forks
 	banner += "Astria forks (block based):\n"
-	orderedForks := c.GetAstriaForks().orderedForks
+	var orderedForks []AstriaForkData
+	copy(orderedForks, c.GetAstriaForks().orderedForks)
 	// Sort by height ascending
 	sort.Slice(orderedForks, func(i, j int) bool {
 		return orderedForks[i].Height < orderedForks[j].Height
