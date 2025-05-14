@@ -78,12 +78,12 @@ func validateAndConvertPriceFeedDataTx(
 		return nil, fmt.Errorf("unexpected return type for requireCurrencyPairAuthorization: %T", res[0])
 	}
 
+	// Building a list of price pairs which will be set in a single contract call.
+	// Configure any currency pairs which are not initialized with current decimal value in the parent state,
+	// and skip any pairs which are not authorized.
 	for _, price := range priceFeedData.Prices {
 		currencyPairHash := hashCurrencyPair(price.CurrencyPair)
-
-		// see if currency pair was already initialized; if not, initialize it
-		//
-		// to check if it was initialized, we call `currencyPairInfo()` on the parent state; since oracle data is always top of block,
+		// to check if it was initialized, we call `currencyPairInfo()` on the parent state;
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
 		res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "currencyPairInfo", currencyPairHash)
@@ -95,20 +95,26 @@ func validateAndConvertPriceFeedDataTx(
 		if len(res) != 2 {
 			return nil, fmt.Errorf("unexpected result length from currencyPairInfo: %d", len(res))
 		}
-
 		init, ok := res[0].(bool)
 		if !ok {
 			return nil, fmt.Errorf("unexpected return type for initialized: %T", res[0])
 		}
-		if init {
+		decimals, ok := res[1].(uint8)
+		if !ok {
+			return nil, fmt.Errorf("unexpected return type for decimals: %T", res[1])
+		}
+
+		// We can skip any further action on the pair and add to prices which need to be set if already initialized
+		// with decimals matching the latest price feed data.
+		if init && uint64(decimals) == price.Decimals {
 			currencyPairsToSet = append(currencyPairsToSet, currencyPairHash)
 			pricesToSet = append(pricesToSet, protoI128ToBigInt(price.Price))
 			continue
 		}
 
-		// if contract requires currency pair authorization to initialize,
-		// check if pair is authorized and skip it if not
-		if requireCurrencyPairAuthorization {
+		// When `requireCurrencyPairAuthorization` is true, we want to skip unauthorized currency pairs
+		// any currency pair which is already initialized is implicitly authorized.
+		if requireCurrencyPairAuthorization && !init {
 			res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "authorizedCurrencyPairs", currencyPairHash)
 			if err != nil {
 				return nil, fmt.Errorf("failed to call authorizedCurrencyPairs: %w", err)
@@ -128,17 +134,18 @@ func validateAndConvertPriceFeedDataTx(
 			}
 		}
 
+		// Create transactions to initialize the currency pair, and add it to the list of pairs to set
+
 		// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
 		args := []interface{}{currencyPairHash, uint8(price.Decimals)}
 		calldata, err := abi.Pack("initializeCurrencyPair", args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
 		}
-
 		txdata := types.InjectedTx{
 			From:                   cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
-			Gas:                    100000,
+			Gas:                    0,
 			To:                     &cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    sequencerBlockHash,
@@ -161,7 +168,7 @@ func validateAndConvertPriceFeedDataTx(
 		From:  cfg.oracleCallerAddress,
 		Value: new(big.Int),
 		// TODO: max gas costs; proportional to the amount of pairs being updated
-		Gas:                    900000,
+		Gas:                    0,
 		To:                     &cfg.oracleContractAddress,
 		Data:                   calldata,
 		SourceTransactionId:    sequencerBlockHash,
@@ -222,7 +229,7 @@ func validateAndConvertDepositTx(
 			//
 			// the fees are spent from the "bridge account" which is not actually a real account, but is instead some
 			// address defined by consensus, so the gas cost is not actually deducted from any account.
-			Gas:                    64000,
+			Gas:                    0,
 			To:                     &bac.Erc20Asset.ContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    deposit.SourceTransactionId.Inner,
