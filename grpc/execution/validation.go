@@ -42,10 +42,13 @@ func validateAndConvertPriceFeedDataTx(
 	cfg *conversionConfig,
 	sequencerBlockHash string,
 ) (*AstriaTransactionsWithType, error) {
+	if cfg.oracleContractAddress == nil || cfg.oracleCallerAddress == nil {
+		return nil, fmt.Errorf("price feed data invalid when oracle contract address or caller address is not set")
+	}
 	txs := make([]*types.Transaction, 0)
 
 	log.Debug("creating price feed data update tx", "price count", len(priceFeedData.Prices))
-	abi, err := contracts.AstriaOracleMetaData.GetAbi()
+	oracleAbi, err := contracts.AstriaOracleMetaData.GetAbi()
 	if err != nil {
 		// this should never happen, as the abi is hardcoded in the contract bindings
 		return nil, fmt.Errorf("failed to get abi for AstriaOracle: %w", err)
@@ -63,7 +66,7 @@ func validateAndConvertPriceFeedDataTx(
 
 	// see if contract requires currency pair authorization
 	evm := cfg.api.GetEVM(ctx, &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
-	res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "requireCurrencyPairAuthorization")
+	res, err := callContract(oracleAbi, evm, *cfg.oracleCallerAddress, *cfg.oracleContractAddress, "requireCurrencyPairAuthorization")
 	if err != nil {
 		return nil, fmt.Errorf("failed to call requireCurrencyPairAuthorization: %w", err)
 	}
@@ -86,7 +89,7 @@ func validateAndConvertPriceFeedDataTx(
 		// to check if it was initialized, we call `currencyPairInfo()` on the parent state;
 		// if the currency pair is not initialized in the parent state, then we need to initialize it here
 		// as it has never been initialized before.
-		res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "currencyPairInfo", currencyPairHash)
+		res, err := callContract(oracleAbi, evm, *cfg.oracleCallerAddress, *cfg.oracleContractAddress, "currencyPairInfo", currencyPairHash)
 		if err != nil {
 			return nil, fmt.Errorf("failed to call currencyPairInfo: %w", err)
 		}
@@ -115,7 +118,7 @@ func validateAndConvertPriceFeedDataTx(
 		// When `requireCurrencyPairAuthorization` is true, we want to skip unauthorized currency pairs
 		// any currency pair which is already initialized is implicitly authorized.
 		if requireCurrencyPairAuthorization && !init {
-			res, err := callContract(abi, evm, cfg.oracleCallerAddress, cfg.oracleContractAddress, "authorizedCurrencyPairs", currencyPairHash)
+			res, err := callContract(oracleAbi, evm, *cfg.oracleCallerAddress, *cfg.oracleContractAddress, "authorizedCurrencyPairs", currencyPairHash)
 			if err != nil {
 				return nil, fmt.Errorf("failed to call authorizedCurrencyPairs: %w", err)
 			}
@@ -138,15 +141,15 @@ func validateAndConvertPriceFeedDataTx(
 
 		// pack arguments for calling the `initializeCurrencyPair` function on the oracle contract
 		args := []interface{}{currencyPairHash, uint8(price.Decimals)}
-		calldata, err := abi.Pack("initializeCurrencyPair", args...)
+		calldata, err := oracleAbi.Pack("initializeCurrencyPair", args...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to pack args for initializeCurrencyPair: %w", err)
 		}
 		txdata := types.InjectedTx{
-			From:                   cfg.oracleCallerAddress,
+			From:                   *cfg.oracleCallerAddress,
 			Value:                  new(big.Int),
 			Gas:                    0,
-			To:                     &cfg.oracleContractAddress,
+			To:                     cfg.oracleContractAddress,
 			Data:                   calldata,
 			SourceTransactionId:    sequencerBlockHash,
 			SourceTransactionIndex: 0,
@@ -159,17 +162,17 @@ func validateAndConvertPriceFeedDataTx(
 	}
 
 	args := []interface{}{currencyPairsToSet, pricesToSet}
-	calldata, err := abi.Pack("setPrices", args...)
+	calldata, err := oracleAbi.Pack("setPrices", args...)
 	if err != nil {
 		return nil, err
 	}
 
 	txdata := types.InjectedTx{
-		From:  cfg.oracleCallerAddress,
+		From:  *cfg.oracleCallerAddress,
 		Value: new(big.Int),
 		// TODO: max gas costs; proportional to the amount of pairs being updated
 		Gas:                    0,
-		To:                     &cfg.oracleContractAddress,
+		To:                     cfg.oracleContractAddress,
 		Data:                   calldata,
 		SourceTransactionId:    sequencerBlockHash,
 		SourceTransactionIndex: 0,
@@ -362,7 +365,7 @@ func validateStaticExecutedBlockMetadata(block *astriaPb.ExecutedBlockMetadata, 
 }
 
 func callContract(abi *abi.ABI, evm *vm.EVM, from common.Address, to common.Address, methodName string, args ...interface{}) ([]interface{}, error) {
-	const CONTRACT_CALL_GAS = 100000 // gas is arbitrary
+	const CONTRACT_CALL_GAS = ^uint64(0) // gas is arbitrary
 
 	calldata, err := abi.Pack(methodName, args...)
 	if err != nil {
