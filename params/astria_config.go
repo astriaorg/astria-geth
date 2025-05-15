@@ -93,8 +93,8 @@ type AstriaEIP1559Params struct {
 }
 
 type AstriaOracleConfig struct {
-	ContractAddress common.Address `json:"contractAddress"`
-	CallerAddress   common.Address `json:"callerAddress"`
+	ContractAddress *common.Address `json:"contractAddress"`
+	CallerAddress   *common.Address `json:"callerAddress"`
 }
 
 func (c *ChainConfig) AstriaExtraData(height uint64) []byte {
