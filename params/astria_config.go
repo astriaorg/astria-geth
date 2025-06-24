@@ -52,7 +52,7 @@ type AstriaForkConfig struct {
 	BridgeAddresses     []AstriaBridgeAddressConfig `json:"bridgeAddresses,omitempty"`
 	Oracle              *AstriaOracleConfig         `json:"oracle,omitempty"`
 	Precompiles         []PrecompileConfig          `json:"precompiles,omitempty"`
-	AppSpecificOrdering []string                    `json:"appSpecificOrdering"`
+	AppSpecificOrdering []string                    `json:"appSpecificOrdering,omitempty"`
 }
 
 type AstriaForkData struct {
