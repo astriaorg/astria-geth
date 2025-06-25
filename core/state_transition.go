@@ -477,21 +477,18 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 	if contractCreation {
 		ret, _, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, value)
+	} else if msg.IsInjectedTx {
+		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, ^uint64(0), value)
+		log.Debug("injected tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
+		return &ExecutionResult{
+			UsedGas:    0,
+			Err:        vmerr,
+			ReturnData: ret,
+		}, nil
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)
 		ret, st.gasRemaining, vmerr = st.evm.Call(sender, st.to(), msg.Data, st.gasRemaining, value)
-	}
-
-	// if this is a injected tx, don't refund gas and also don't pay to the coinbase,
-	// as no gas was used.
-	if st.msg.IsInjectedTx {
-		log.Debug("injected tx executed", "to", *st.msg.To, "value", st.msg.Value, "from", st.msg.From, "gasUsed", st.gasUsed(), "err", vmerr)
-		return &ExecutionResult{
-			UsedGas:    st.gasUsed(),
-			Err:        vmerr,
-			ReturnData: ret,
-		}, nil
 	}
 
 	var gasRefund uint64

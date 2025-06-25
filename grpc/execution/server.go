@@ -127,7 +127,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 	}
 
 	// sanity code check for oracle contract address
-	if fork.Oracle.ContractAddress != (common.Address{}) {
+	if fork.Oracle.ContractAddress != nil {
 		height := s.bc.CurrentFinalBlock().Number.Uint64() // consider should this be the current final block, safe block, or the fork start height - 1?
 		state, header, err := s.eth.APIBackend.StateAndHeaderByNumber(context.Background(), rpc.BlockNumber(height))
 		if err != nil {
@@ -136,7 +136,7 @@ func (s *ExecutionServiceServerV2) CreateExecutionSession(ctx context.Context, r
 		}
 
 		evm := s.eth.APIBackend.GetEVM(context.Background(), &core.Message{GasPrice: big.NewInt(0)}, state, header, &vm.Config{NoBaseFee: true}, nil)
-		code := evm.StateDB.GetCode(fork.Oracle.ContractAddress)
+		code := evm.StateDB.GetCode(*fork.Oracle.ContractAddress)
 		if len(code) == 0 {
 			log.Error("oracle contract address has no code", "address", fork.Oracle.ContractAddress)
 			return nil, status.Error(codes.FailedPrecondition, "Oracle contract address has no code")
@@ -205,8 +205,8 @@ type conversionConfig struct {
 	bridgeAddresses       map[string]*params.AstriaBridgeAddressConfig
 	bridgeAllowedAssets   map[string]struct{}
 	api                   *eth.EthAPIBackend
-	oracleContractAddress common.Address
-	oracleCallerAddress   common.Address
+	oracleContractAddress *common.Address
+	oracleCallerAddress   *common.Address
 }
 
 // ExecuteBlock drives deterministic derivation of a rollup block from sequencer
